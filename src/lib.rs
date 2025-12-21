@@ -4,6 +4,20 @@ pub mod sangh;
 pub mod projection;
 pub mod math;
 pub mod renderer;
+pub mod camera;
+pub mod app;
+pub mod draw;
+pub mod config;
+pub mod scene;
+pub mod label;
+pub mod animation;
+pub mod latex;
+pub mod typst;
+pub mod tattva;
+pub mod transform;
+pub mod timeline;
+pub mod layout;
+
 
 // pub mod prelude {
 //     pub use crate::core::scene::Scene;
@@ -14,7 +28,7 @@ pub mod renderer;
 // }
 
 pub mod prelude {
-    pub use crate::core::scene::Scene;
+    pub use crate::scene::Scene;
     pub use crate::core::timeline::{Timeline, Easing, ScheduledAnimation};
     pub use crate::sangh::{Sangh, DrawableProps};
     pub use crate::projection::Project; // Re-export directly from projection

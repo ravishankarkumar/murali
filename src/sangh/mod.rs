@@ -1,5 +1,6 @@
 pub mod props;
 pub mod shapes;
+pub mod axes;
 
 use crate::projection::Project;
 pub use props::{DrawableProps, SharedProps};
