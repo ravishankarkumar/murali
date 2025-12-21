@@ -1,46 +1,35 @@
-use murali::app::App;
-use murali::prelude::*;
-use murali::sangh::axes::Axes;
-use murali::sangh::shapes::Circle; // Fix the Circle import
-use std::sync::Arc;
-use winit::window::Window;
-use murali::tattva::props::TattvaProps;
+use glam::{Vec3, Vec4};
+use murali::App;
+use murali::engine::scene::Scene;
+use murali::frontend::Tattva;
+use murali::frontend::collection::primitives::square::Square;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    // let mut app = App::new()?;
+fn main() -> anyhow::Result<()> {
+    let scene = {
+        let mut scene = Scene::new();
 
-    // // Create your math scene
-    // let mut scene = Scene::new();
-    // let circle = Sangh::new(1, Circle::new(0.5));
-    // scene.add(circle);
-    // //
-    // let mut scene = Scene::new();
-    // let mut axes = Axes::new((-10.0, 10.0), (-5.0, 5.0));
-    // axes.x_step = 2.0;
+        // 1. Pure semantic object
+        let square = Square::new(2.0, Vec4::new(1.0, 0.0, 0.0, 1.0));
 
-    // scene.add_sangh(axes);
-    // //
+        // 2. Wrap it into a Tattva
+        let square_tattva = Tattva::new(0, square); // id will be overwritten by Scene
 
-    // let mut scene = Scene::new();
+        // 3. Add to scene
+        let id = scene.add(square_tattva);
 
-    // app.with_scene(scene).run_app()
+        // 4. Mutate shared props
+        if let Some(t) = scene.get_tattva_any_mut(id) {
+            let mut props = t.props().write();
+            props.position = Vec3::new(0.0, 0.0, -5.0);
+        }
 
-    let mut app = App::new()?;
-    let mut scene = Scene::new();
+        // 5. Camera
+        scene.camera_mut().position = Vec3::new(0.0, 0.0, 10.0);
 
-    // 1. Create a Square Tattva (or Circle)
-    // We use DrawableProps to move it into view
-    let square = murali::tattva::square::Square::new(TattvaProps::default()); // Assuming this exists
+        scene
+    };
 
-    // 2. Spawn it so it's added to scene.drawables
-    scene.spawn(
-        square,
-        DrawableProps::default().at(glam::Vec3::new(0.0, 0.0, -5.0)),
-    );
-
-    // 3. Move the camera back slightly just in case
-    scene.camera.position = glam::Vec3::new(0.0, 0.0, 10.0);
-
-    app.with_scene(scene).run_app()
+    App::new()?
+        .with_scene(scene)
+        .run_app()
 }

@@ -1,19 +1,39 @@
-use glam::{Vec2, Vec3, Vec4};
+use glam::{Vec3, Vec4};
+use std::sync::Arc;
+use crate::backend::renderer::mesh::Mesh;
 
-/// The "Dumb" data that the Renderer actually understands.
-/// These are backend-agnostic.
-#[derive(Debug, Clone)]
+/// CPU-side render primitives produced by the Projection layer.
+/// These are later materialized into GPU resources by the Backend.
 pub enum RenderPrimitive {
+    /// CPU-side triangle mesh (to be uploaded to GPU later)
+    Mesh(Arc<Mesh>),
+
+    /// Line primitive (may be rendered as instanced quad or mesh)
     Line {
         start: Vec3,
         end: Vec3,
         thickness: f32,
         color: Vec4,
     },
-    Quad {
-        size: Vec2,
-        texture_id: Option<u64>, // For LaTeX/Typst textures
+
+    /// Text primitive (resolved by text system)
+    Text {
+        content: String,
+        height: f32,
         color: Vec4,
     },
-    // We can add ParticleBatch, Mesh, etc. later
+
+    /// LaTeX primitive (resolved by LaTeX system)
+    Latex {
+        source: String,
+        height: f32,
+        color: Vec4,
+    },
+
+    /// Typst primitive (resolved by Typst system)
+    Typst {
+        source: String,
+        height: f32,
+        color: Vec4,
+    },
 }

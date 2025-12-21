@@ -1,0 +1,173 @@
+// src/engine/app.rs
+
+use anyhow::Result;
+use std::sync::Arc;
+
+use winit::{
+    application::ApplicationHandler,
+    dpi::PhysicalSize,
+    event::{ElementState, MouseButton, WindowEvent},
+    event_loop::{ActiveEventLoop, EventLoop},
+    keyboard::{KeyCode, PhysicalKey},
+    window::Window,
+};
+
+use crate::engine::Engine;
+use crate::engine::camera::controller::{
+    ActiveCameraController, orbit::OrbitCameraController, pan_zoom::PanZoomCameraController,
+};
+use crate::engine::scene::Scene;
+
+pub struct App {
+    window: Option<Arc<Window>>,
+    engine: Option<Engine>,
+    pending_scene: Option<Scene>,
+    camera_controller: ActiveCameraController,
+    is_left_mouse_down: bool,
+    last_cursor_position: Option<(f64, f64)>,
+}
+
+impl App {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            window: None,
+            engine: None,
+            pending_scene: None,
+            camera_controller: ActiveCameraController::Orbit(OrbitCameraController::new(10.0)),
+            is_left_mouse_down: false,
+            last_cursor_position: None,
+        })
+    }
+
+    pub fn run_app(mut self) -> Result<()> {
+        print_camera_help();
+        let event_loop = EventLoop::new()?;
+        event_loop
+            .run_app(&mut self)
+            .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    pub fn with_scene(mut self, scene: Scene) -> Self {
+        self.pending_scene = Some(scene);
+        self
+    }
+}
+
+impl<'a> ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.window.is_some() {
+            return;
+        }
+
+        let window = event_loop
+            .create_window(
+                Window::default_attributes()
+                    .with_title("Murali")
+                    .with_inner_size(PhysicalSize::new(1280, 720)),
+            )
+            .expect("Failed to create window");
+
+        let arc_window = Arc::new(window);
+        
+        let scene = self.pending_scene.take().unwrap_or_else(Scene::new);
+
+        let engine = pollster::block_on(async { 
+            Engine::new_with_scene(arc_window, scene).await
+        });
+
+        self.engine = Some(engine);
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        let window = self.window.as_ref().unwrap();
+        let engine = self.engine.as_mut().unwrap();
+
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+
+            WindowEvent::RedrawRequested => {
+                // Drive the engine
+                engine.update(0.016);
+
+                if let Err(e) = engine.render() {
+                    eprintln!("Render error: {:?}", e);
+                    event_loop.exit();
+                }
+
+                window.request_redraw();
+            }
+
+            WindowEvent::Resized(size) => {
+                let corrected = enforce_16_9(size);
+                if corrected != size {
+                    let _ = window.request_inner_size(corrected);
+                }
+                // engine.backend.renderer.device_mgr.resize(corrected);
+                engine.backend.renderer.resize(corrected);
+            }
+
+            WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
+                match event.physical_key {
+                    PhysicalKey::Code(KeyCode::KeyO) => {
+                        self.camera_controller =
+                            ActiveCameraController::Orbit(OrbitCameraController::new(10.0))
+                    }
+                    PhysicalKey::Code(KeyCode::KeyP) => {
+                        self.camera_controller =
+                            ActiveCameraController::PanZoom(PanZoomCameraController::new())
+                    }
+                    PhysicalKey::Code(KeyCode::Escape) => event_loop.exit(),
+                    _ => {}
+                }
+            }
+
+            WindowEvent::CursorMoved { position, .. } => {
+                if let Some((lx, ly)) = self.last_cursor_position {
+                    if self.is_left_mouse_down {
+                        let delta = glam::vec2((position.x - lx) as f32, (position.y - ly) as f32);
+                        self.camera_controller
+                            .handle_mouse_drag(delta, engine.scene.camera_mut());
+                    }
+                }
+                self.last_cursor_position = Some((position.x, position.y));
+            }
+
+            WindowEvent::MouseInput { state, button, .. } => {
+                if button == MouseButton::Left {
+                    self.is_left_mouse_down = state == ElementState::Pressed;
+                }
+            }
+
+            WindowEvent::MouseWheel { delta, .. } => {
+                let scroll = match delta {
+                    winit::event::MouseScrollDelta::LineDelta(_, y) => y,
+                    winit::event::MouseScrollDelta::PixelDelta(p) => p.y as f32 * 0.01,
+                };
+                self.camera_controller
+                    .handle_scroll(scroll, engine.scene.camera_mut());
+            }
+
+            _ => {}
+        }
+    }
+}
+
+fn enforce_16_9(size: PhysicalSize<u32>) -> PhysicalSize<u32> {
+    let ratio = 16.0 / 9.0;
+    let w = size.width as f32;
+    let h = size.height as f32;
+    if (w / h) > ratio {
+        PhysicalSize::new((h * ratio) as u32, size.height)
+    } else {
+        PhysicalSize::new(size.width, (w / ratio) as u32)
+    }
+}
+
+fn print_camera_help() {
+    println!("\n🎥 Controls: [O] Orbit | [P] PanZoom | [Drag] Move | [Wheel] Zoom\n");
+}
