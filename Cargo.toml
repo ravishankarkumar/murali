@@ -1,0 +1,36 @@
+[package]
+name = "murali"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+winit = "0.30"
+wgpu = "0.20" 
+env_logger = "0.10"
+glam = "0.27"
+tracing = "0.1"
+anyhow = "1"
+bytemuck = "1.14"
+pollster = "0.3"
+tokio = { version = "1", features = ["rt", "macros", "full"] }  # you already use tokio in examples
+typst = { version = "0.13.1", optional = true }            # version may vary; required for embedded Typst
+typst-as-lib = { version = "0.13", optional = true}      # optional helper; pick actual maintained wrapper
+typst-svg = { version = "0.13.1", optional = true }        # if available; otherwise use typst APIs
+typst-kit = "0.13.0"
+lru = "0.8"
+sha2 = "0.10"
+parking_lot = "0.12"
+serde = { version = "1.0" }
+toml = "0.9.10"
+twox-hash = "2.1.2"
+image = "0.24"
+
+usvg = "0.45"
+resvg = "0.45"
+tiny-skia = "0.11"
+thiserror = "1.0"
+
+# font rendering
+fontdue = "0.8"
+hecs = "0.9"
+
