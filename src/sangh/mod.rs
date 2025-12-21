@@ -1,9 +1,8 @@
-pub mod props;
 pub mod shapes;
 pub mod axes;
 
 use crate::projection::Project;
-pub use props::{DrawableProps, SharedProps};
+use crate::scene::{DrawableProps, SharedProps};
 
 pub struct Sangh<T: Project> {
     pub id: u64,

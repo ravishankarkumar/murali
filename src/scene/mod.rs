@@ -2,7 +2,7 @@
 
 pub mod drawable_props;
 use crate::renderer::mesh::MeshInstance;
-pub use drawable_props::DrawableProps;
+pub use drawable_props::{DrawableProps, SharedProps};
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -91,6 +91,10 @@ impl Scene {
     /// Adds a mathematical Sangh (like Circle, Line) that gets projected into the ECS.
     pub fn add_sangh<T: Syncable + 'static>(&mut self, sangh: T) {
         self.sanghs.push(Box::new(sangh));
+    }
+
+    pub fn spawn_sangh<T: Tattva + 'static>(&mut self, tattva: T) -> TattvaId {
+        self.spawn(tattva, DrawableProps::default())
     }
 
     /// Syncs high-level Sanghs to the low-level ECS World.

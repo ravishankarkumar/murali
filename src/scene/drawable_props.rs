@@ -2,6 +2,10 @@
 
 use glam::{Quat, Vec3};
 use glam::Mat4;
+use std::sync::Arc;
+use parking_lot::RwLock;
+
+pub type SharedProps = Arc<RwLock<DrawableProps>>;
 
 /// Runtime visual state of a drawable.
 /// This is authoritative for rendering and animation.
