@@ -1,5 +1,8 @@
 pub mod circle;
+pub mod square;
+pub mod rectangle;
+pub mod polygon;
+pub mod ellipse;
 pub mod line;
 pub mod cube;
-pub mod square;
 pub mod path;

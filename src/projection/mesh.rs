@@ -146,6 +146,66 @@ impl Mesh {
         })
     }
 
+    /// Triangle fan ellipse in XY plane.
+    pub fn ellipse(radius_x: f32, radius_y: f32, segments: u32, color: Vec4) -> Arc<Self> {
+        let seg = segments.max(3);
+        let mut vertices = Vec::with_capacity((seg + 1) as usize);
+
+        vertices.push(MeshVertex {
+            position: [0.0, 0.0, 0.0],
+            color: [color[0], color[1], color[2]],
+        });
+
+        for i in 0..seg {
+            let t = (i as f32 / seg as f32) * std::f32::consts::TAU;
+            vertices.push(MeshVertex {
+                position: [radius_x * t.cos(), radius_y * t.sin(), 0.0],
+                color: [color[0], color[1], color[2]],
+            });
+        }
+
+        let mut indices = Vec::with_capacity((seg * 3) as usize);
+        for i in 0..seg {
+            indices.push(0);
+            indices.push((i + 1) as u16);
+            indices.push(if i + 2 <= seg { (i + 2) as u16 } else { 1 });
+        }
+
+        Arc::new(Self {
+            data: MeshData::Mesh(vertices),
+            indices,
+        })
+    }
+
+    /// Triangle fan polygon in XY plane.
+    /// Assumes vertices are convex and provided in order.
+    pub fn polygon(vertices_2d: Vec<glam::Vec2>, color: Vec4) -> Arc<Self> {
+        let n = vertices_2d.len();
+        if n < 3 {
+            return Arc::new(Self::empty());
+        }
+
+        let mut vertices = Vec::with_capacity(n);
+        for p in &vertices_2d {
+            vertices.push(MeshVertex {
+                position: [p.x, p.y, 0.0],
+                color: [color[0], color[1], color[2]],
+            });
+        }
+
+        let mut indices = Vec::with_capacity((n - 2) * 3);
+        for i in 1..(n - 1) {
+            indices.push(0);
+            indices.push(i as u16);
+            indices.push((i + 1) as u16);
+        }
+
+        Arc::new(Self {
+            data: MeshData::Mesh(vertices),
+            indices,
+        })
+    }
+
     /// Line rendered as a thin rectangle using triangles.
     pub fn line(start: [f32; 3], end: [f32; 3], thickness: f32, color: Vec4) -> Arc<Self> {
         let sx = start[0];
