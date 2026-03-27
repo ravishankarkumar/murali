@@ -12,6 +12,7 @@ pub struct TypstRaster {
     pub rgba: Vec<u8>,
     pub width: u32,
     pub height: u32,
+    pub normalized_height_px: f32,
     pub svg: Option<String>,
 }
 

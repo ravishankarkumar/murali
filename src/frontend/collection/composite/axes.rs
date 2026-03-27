@@ -1,4 +1,5 @@
 use glam::{Vec3, Vec4};
+use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 
 /// Frontend Axes.
@@ -11,6 +12,7 @@ pub struct Axes {
     pub thickness: f32,
     pub color: Vec4,
     pub tick_size: f32,
+    pub show_ticks: bool,
 }
 
 impl Axes {
@@ -23,10 +25,35 @@ impl Axes {
             thickness: 0.02,
             color: Vec4::new(1.0, 1.0, 1.0, 1.0),
             tick_size: 0.1,
+            show_ticks: true,
         }
     }
 
-    // Setters would be here, marking the parent Tattva container dirty
+    pub fn with_step(mut self, step: f32) -> Self {
+        self.x_step = step;
+        self.y_step = step;
+        self
+    }
+
+    pub fn with_color(mut self, color: Vec4) -> Self {
+        self.color = color;
+        self
+    }
+
+    pub fn with_thickness(mut self, thickness: f32) -> Self {
+        self.thickness = thickness;
+        self
+    }
+
+    pub fn with_tick_size(mut self, tick_size: f32) -> Self {
+        self.tick_size = tick_size;
+        self
+    }
+
+    pub fn without_ticks(mut self) -> Self {
+        self.show_ticks = false;
+        self
+    }
 }
 
 impl Project for Axes {
@@ -50,7 +77,7 @@ impl Project for Axes {
         });
 
         // 3. Project X Ticks
-        if self.x_step > 0.0 {
+        if self.show_ticks && self.x_step > 0.0 {
             let mut x = self.x_range.0;
             while x <= self.x_range.1 {
                 if x.abs() > 0.001 {
@@ -66,7 +93,7 @@ impl Project for Axes {
         }
 
         // 4. Project Y Ticks
-        if self.y_step > 0.0 {
+        if self.show_ticks && self.y_step > 0.0 {
             let mut y = self.y_range.0;
             while y <= self.y_range.1 {
                 if y.abs() > 0.001 {
@@ -80,5 +107,14 @@ impl Project for Axes {
                 y += self.y_step;
             }
         }
+    }
+}
+
+impl Bounded for Axes {
+    fn local_bounds(&self) -> Bounds {
+        Bounds::new(
+            glam::vec2(self.x_range.0, self.y_range.0),
+            glam::vec2(self.x_range.1, self.y_range.1),
+        )
     }
 }

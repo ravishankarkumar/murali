@@ -1,8 +1,8 @@
 use glam::Vec4;
 
+use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
-use crate::backend::renderer::mesh::Mesh;
-use std::sync::Arc;
+use crate::projection::Mesh;
 
 #[derive(Debug, Clone)]
 pub struct Cube {
@@ -36,5 +36,12 @@ impl Project for Cube {
 
         // Emit the mesh primitive to the Projection Context
         ctx.emit(RenderPrimitive::Mesh(mesh));
+    }
+}
+
+impl Bounded for Cube {
+    fn local_bounds(&self) -> Bounds {
+        let half = self.size * 0.5;
+        Bounds::new(glam::vec2(-half, -half), glam::vec2(half, half))
     }
 }

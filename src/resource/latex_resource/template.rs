@@ -7,7 +7,7 @@ pub fn latex_document(expr: &str) -> String {
 \usepackage{{amssymb}}
 \usepackage{{bm}}
 \begin{{document}}
-${}$
+$\displaystyle {}$
 \end{{document}}
 "#,
         expr

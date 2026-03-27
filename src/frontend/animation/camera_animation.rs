@@ -1,11 +1,12 @@
 use glam::Vec3;
 use crate::frontend::animation::{Animation, Ease};
-use crate::engine::camera::Projection; // Updated path
-use crate::engine::scene::Scene;              // Updated path
+use crate::engine::camera::Projection;
+use crate::engine::scene::Scene;
 
 /// Camera animation kinds targeting the semantic state of the viewpoint.
 #[derive(Debug, Clone)]
 pub enum CameraAnimKind {
+    FrameTo { position: Vec3, target: Vec3 },
     MoveTo { to: Vec3 },
     LookAt { target: Vec3 },
     /// Orthographic zoom factor
@@ -17,7 +18,6 @@ pub enum CameraAnimKind {
 /// A concrete Animation implementation that mutates the Scene's camera.
 pub struct CameraAnimate {
     pub kind: CameraAnimKind,
-    pub duration: f32,
     pub ease: Ease,
 
     // Captured start states for interpolation
@@ -29,10 +29,21 @@ pub struct CameraAnimate {
 }
 
 impl CameraAnimate {
-    pub fn new_move(to: Vec3, duration: f32, ease: Ease) -> Self {
+    pub fn new_frame(position: Vec3, target: Vec3, ease: Ease) -> Self {
+        Self {
+            kind: CameraAnimKind::FrameTo { position, target },
+            ease,
+            from_pos: None,
+            from_target: None,
+            from_width: None,
+            from_height: None,
+            from_fov: None,
+        }
+    }
+
+    pub fn new_move(to: Vec3, ease: Ease) -> Self {
         Self {
             kind: CameraAnimKind::MoveTo { to },
-            duration,
             ease,
             from_pos: None,
             from_target: None,
@@ -42,10 +53,9 @@ impl CameraAnimate {
         }
     }
 
-    pub fn new_lookat(target: Vec3, duration: f32, ease: Ease) -> Self {
+    pub fn new_lookat(target: Vec3, ease: Ease) -> Self {
         Self {
             kind: CameraAnimKind::LookAt { target },
-            duration,
             ease,
             from_pos: None,
             from_target: None,
@@ -55,10 +65,9 @@ impl CameraAnimate {
         }
     }
 
-    pub fn new_zoom(zoom: f32, duration: f32, ease: Ease) -> Self {
+    pub fn new_zoom(zoom: f32, ease: Ease) -> Self {
         Self {
             kind: CameraAnimKind::ZoomTo { zoom },
-            duration,
             ease,
             from_pos: None,
             from_target: None,
@@ -68,10 +77,9 @@ impl CameraAnimate {
         }
     }
 
-    pub fn new_fov(fov_y_rad: f32, duration: f32, ease: Ease) -> Self {
+    pub fn new_fov(fov_y_rad: f32, ease: Ease) -> Self {
         Self {
             kind: CameraAnimKind::FovTo { fov_y_rad },
-            duration,
             ease,
             from_pos: None,
             from_target: None,
@@ -102,9 +110,15 @@ impl Animation for CameraAnimate {
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
         // t is normalized (0.0 to 1.0) provided by the Timeline
         let k = self.ease.eval(t);
-        let cam = &mut scene.camera;
+        let cam = scene.camera_mut();
 
         match self.kind {
+            CameraAnimKind::FrameTo { position, target } => {
+                let from_pos = self.from_pos.unwrap_or(cam.position);
+                let from_target = self.from_target.unwrap_or(cam.target);
+                cam.position = from_pos.lerp(position, k);
+                cam.target = from_target.lerp(target, k);
+            }
             CameraAnimKind::MoveTo { to } => {
                 let from = self.from_pos.unwrap_or(cam.position);
                 cam.position = from.lerp(to, k);
@@ -117,9 +131,10 @@ impl Animation for CameraAnimate {
                 if let Projection::Orthographic { width, height, near, far } = cam.projection {
                     let fw = self.from_width.unwrap_or(width);
                     let fh = self.from_height.unwrap_or(height);
+                    let zoom = zoom.max(0.001);
                     cam.projection = Projection::Orthographic {
-                        width: fw + (zoom * fw - fw) * k,
-                        height: fh + (zoom * fh - fh) * k,
+                        width: fw + (fw / zoom - fw) * k,
+                        height: fh + (fh / zoom - fh) * k,
                         near,
                         far,
                     };

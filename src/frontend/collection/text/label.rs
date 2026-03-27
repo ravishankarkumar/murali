@@ -1,5 +1,7 @@
 
 use glam::Vec4;
+use crate::frontend::layout::{Bounded, Bounds};
+use crate::resource::text::layout::measure_label;
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 
 /// Frontend Label. 
@@ -40,6 +42,17 @@ impl Project for Label {
             content: self.text.clone(),
             height: self.world_height,
             color: self.color,
+            offset: glam::Vec3::ZERO,
         });
+    }
+}
+
+impl Bounded for Label {
+    fn local_bounds(&self) -> Bounds {
+        let layout = measure_label(&self.text, self.world_height);
+        Bounds::from_center_size(
+            glam::Vec2::ZERO,
+            glam::vec2(layout.width.max(self.world_height * 0.4), layout.height),
+        )
     }
 }

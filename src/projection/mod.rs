@@ -1,7 +1,9 @@
 pub mod context;
+pub mod mesh;
 pub mod primitives;
 
 pub use context::ProjectionCtx;
+pub use mesh::{Mesh, MeshData};
 pub use primitives::RenderPrimitive;
 
 pub trait Project: Send + Sync {

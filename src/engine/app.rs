@@ -71,11 +71,13 @@ impl<'a> ApplicationHandler for App {
         
         let scene = self.pending_scene.take().unwrap_or_else(Scene::new);
 
-        let engine = pollster::block_on(async { 
-            Engine::new_with_scene(arc_window, scene).await
+        let engine = pollster::block_on(async {
+            Engine::new_with_scene(arc_window.clone(), scene).await
         });
 
+        self.window = Some(arc_window.clone());
         self.engine = Some(engine);
+        arc_window.request_redraw();
     }
 
     fn window_event(
@@ -84,8 +86,12 @@ impl<'a> ApplicationHandler for App {
         _id: winit::window::WindowId,
         event: WindowEvent,
     ) {
-        let window = self.window.as_ref().unwrap();
-        let engine = self.engine.as_mut().unwrap();
+        let Some(window) = self.window.as_ref() else {
+            return;
+        };
+        let Some(engine) = self.engine.as_mut() else {
+            return;
+        };
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),

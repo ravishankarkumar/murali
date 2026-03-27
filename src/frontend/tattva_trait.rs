@@ -1,20 +1,26 @@
-use std::sync::Arc;
-use crate::frontend::props::DrawableProps;
+use std::any::Any;
+
+use crate::frontend::layout::Bounds;
 use crate::projection::ProjectionCtx;
-use crate::frontend::{Tattva, TattvaId};
+use crate::frontend::{DirtyFlags, Tattva, TattvaId};
 use crate::frontend::props::SharedProps;
 
 /// Object-safe interface for all Tattvas.
 /// Scene, Animation, and SyncBoundary talk ONLY through this.
 pub trait TattvaTrait: Send + Sync {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+
     /// Borrow shared transform / drawable properties
     fn props(&self) -> &SharedProps;
+    fn local_bounds(&self) -> Bounds;
 
-    /// Structural dirtiness (geometry-level)
-    fn is_dirty(&self) -> bool;
+    /// Dirty domains tracked for this object.
+    fn dirty_flags(&self) -> DirtyFlags;
 
-    /// Reset dirty flag after sync
-    fn clear_dirty(&mut self);
+    fn mark_dirty(&mut self, flags: DirtyFlags);
+    fn clear_dirty(&mut self, flags: DirtyFlags);
+    fn clear_all_dirty(&mut self);
 
     /// Identity
     fn set_id(&mut self, id: TattvaId);
@@ -28,18 +34,38 @@ pub trait TattvaTrait: Send + Sync {
 /// This bridges concrete math types → dyn TattvaTrait.
 impl<T> TattvaTrait for Tattva<T>
 where
-    T: crate::projection::Project + Send + Sync + 'static,
+    T: crate::projection::Project + crate::frontend::layout::Bounded + Send + Sync + 'static,
 {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
     fn props(&self) -> &SharedProps {
         &self.props
     }
 
-    fn is_dirty(&self) -> bool {
+    fn local_bounds(&self) -> Bounds {
+        self.state.local_bounds()
+    }
+
+    fn dirty_flags(&self) -> DirtyFlags {
         self.dirty
     }
 
-    fn clear_dirty(&mut self) {
-        self.dirty = false;
+    fn mark_dirty(&mut self, flags: DirtyFlags) {
+        self.dirty |= flags;
+    }
+
+    fn clear_dirty(&mut self, flags: DirtyFlags) {
+        self.dirty = self.dirty.without(flags);
+    }
+
+    fn clear_all_dirty(&mut self) {
+        self.dirty = DirtyFlags::NONE;
     }
 
     fn set_id(&mut self, id: TattvaId) {

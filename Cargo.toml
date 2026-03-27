@@ -3,6 +3,10 @@ name = "murali"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["typst_embedded"]
+typst_embedded = ["dep:typst", "dep:typst-as-lib", "dep:typst-svg"]
+
 [dependencies]
 winit = "0.30"
 wgpu = "0.20"
@@ -18,7 +22,7 @@ tokio = { version = "1", features = [
   "full",
 ] } # you already use tokio in examples
 typst = { version = "0.13.1", optional = true } # version may vary; required for embedded Typst
-typst-as-lib = { version = "0.13", optional = true } # optional helper; pick actual maintained wrapper
+typst-as-lib = { version = "0.13", optional = true, features = ["typst-kit-fonts", "typst-kit-embed-fonts"] } # optional helper; pick actual maintained wrapper
 typst-svg = { version = "0.13.1", optional = true } # if available; otherwise use typst APIs
 typst-kit = "0.13.0"
 lru = "0.8"

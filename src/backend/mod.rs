@@ -35,4 +35,19 @@ impl Backend {
             world,
         })
     }
+
+    pub async fn new_headless(width: u32, height: u32) -> anyhow::Result<Self> {
+        let device_mgr = DeviceManager::new_headless(width, height).await?;
+
+        let device_mgr_arc = Arc::new(device_mgr.clone());
+        let renderer = Renderer::new(device_mgr_arc.clone());
+
+        let world = World::new();
+
+        Ok(Self {
+            device_mgr,
+            renderer,
+            world,
+        })
+    }
 }

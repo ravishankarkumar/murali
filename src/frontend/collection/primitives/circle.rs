@@ -1,8 +1,8 @@
 use glam::Vec4;
 
+use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
-use crate::backend::renderer::mesh::{Mesh, MeshInstance};
-use std::sync::Arc;
+use crate::projection::Mesh;
 
 #[derive(Debug, Clone)]
 pub struct Circle {
@@ -39,5 +39,14 @@ impl Project for Circle {
 
         // 2. Emit backend-ready primitive
         ctx.emit(RenderPrimitive::Mesh(mesh));
+    }
+}
+
+impl Bounded for Circle {
+    fn local_bounds(&self) -> Bounds {
+        Bounds::new(
+            glam::vec2(-self.radius, -self.radius),
+            glam::vec2(self.radius, self.radius),
+        )
     }
 }

@@ -129,6 +129,13 @@ This example demonstrates:
 * SVG → RGBA rasterization
 * Rendering Typst text inside Murali
 
+
+``` bash
+cargo run --example primitives_showcase
+cargo run --example axes_and_labels
+cargo run --example animated_motion
+```
+
 ---
 
 ## Design Principles

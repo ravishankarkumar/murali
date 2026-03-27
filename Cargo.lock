@@ -3928,6 +3928,7 @@ dependencies = [
  "ecow",
  "thiserror 2.0.17",
  "typst",
+ "typst-kit",
 ]
 
 [[package]]
@@ -3989,6 +3990,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
+ "typst-assets",
  "typst-library",
  "typst-syntax",
  "typst-timing",

@@ -2,10 +2,16 @@ pub mod builder;
 pub mod camera_animation;
 pub mod camera_animation_builder;
 
+use std::collections::HashMap;
+
 use crate::engine::scene::Scene;
-use crate::frontend::TattvaId;
+use crate::frontend::collection::ai::signal_flow::SignalFlow;
+use crate::frontend::collection::math::equation::{EquationLayout, EquationPart, EquationPartLayout};
+use crate::frontend::collection::math::matrix::{Matrix, MatrixCellLayout};
+use crate::frontend::layout::Anchor;
 use crate::frontend::props::DrawableProps;
-use glam::Vec3;
+use crate::frontend::{DirtyFlags, TattvaId};
+use glam::{Quat, Vec2, Vec3, Vec4};
 
 /// Common easing curves for deterministic interpolation.
 #[derive(Copy, Clone, Debug)]
@@ -36,35 +42,36 @@ impl Ease {
 /// The core trait for all Frontend logic changes over time.
 /// Every implementation must be deterministic.
 pub trait Animation: Send + Sync {
-    /// Initial capture of state (e.g., 'from' positions).
     fn on_start(&mut self, scene: &mut Scene);
-
-    /// Apply interpolation at a normalized time [0, 1].
-    /// The Timeline handles the conversion from absolute time to 0..1.
     fn apply_at(&mut self, scene: &mut Scene, t: f32);
-
     fn on_finish(&mut self, _scene: &mut Scene) {}
+    fn reset(&mut self, _scene: &mut Scene) {}
 }
 
-// ============================================================================
-// Concrete Animation: MoveTo
-// ============================================================================
+fn with_props_mut<F>(scene: &mut Scene, target_id: TattvaId, dirty: DirtyFlags, f: F)
+where
+    F: FnOnce(&mut DrawableProps),
+{
+    if let Some(tattva) = scene.get_tattva_any_mut(target_id) {
+        let mut props = DrawableProps::write(tattva.props());
+        f(&mut props);
+        drop(props);
+        tattva.mark_dirty(dirty);
+    }
+}
 
-/// Translates a Tattva's position property.
 pub struct MoveTo {
     pub target_id: TattvaId,
     pub to: Vec3,
-    pub duration: f32,
     pub ease: Ease,
     from: Option<Vec3>,
 }
 
 impl MoveTo {
-    pub fn new(target_id: TattvaId, to: Vec3, duration: f32, ease: Ease) -> Self {
+    pub fn new(target_id: TattvaId, to: Vec3, ease: Ease) -> Self {
         Self {
             target_id,
             to,
-            duration,
             ease,
             from: None,
         }
@@ -73,7 +80,6 @@ impl MoveTo {
 
 impl Animation for MoveTo {
     fn on_start(&mut self, scene: &mut Scene) {
-        // Capture initial position
         if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
             let props = DrawableProps::read(tattva.props());
             self.from = Some(props.position);
@@ -81,20 +87,781 @@ impl Animation for MoveTo {
     }
 
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
-        let k = self.ease.eval(t);
-        let from = self.from.unwrap_or(self.to);
-        let new_pos = from.lerp(self.to, k);
-
-        if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
-            // let props = tattva.props();
-
-            // Transform-only mutation.
-            // This does NOT mark the Tattva dirty (no reprojection).
-            let props = tattva.props();
-            // let mut props = props.write();
-            // let mut props = props.as_ref().write();
-            let mut props = DrawableProps::write(props);
+        let new_pos = self.from.unwrap_or(self.to).lerp(self.to, self.ease.eval(t));
+        with_props_mut(scene, self.target_id, DirtyFlags::TRANSFORM, |props| {
             props.position = new_pos;
+        });
+    }
+}
+
+pub struct RotateTo {
+    pub target_id: TattvaId,
+    pub to: Quat,
+    pub ease: Ease,
+    from: Option<Quat>,
+}
+
+impl RotateTo {
+    pub fn new(target_id: TattvaId, to: Quat, ease: Ease) -> Self {
+        Self {
+            target_id,
+            to,
+            ease,
+            from: None,
+        }
+    }
+}
+
+impl Animation for RotateTo {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
+            let props = DrawableProps::read(tattva.props());
+            self.from = Some(props.rotation);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(self.to);
+        let rotation = from.slerp(self.to, self.ease.eval(t));
+        with_props_mut(scene, self.target_id, DirtyFlags::TRANSFORM, |props| {
+            props.rotation = rotation;
+        });
+    }
+}
+
+pub struct ScaleTo {
+    pub target_id: TattvaId,
+    pub to: Vec3,
+    pub ease: Ease,
+    from: Option<Vec3>,
+}
+
+impl ScaleTo {
+    pub fn new(target_id: TattvaId, to: Vec3, ease: Ease) -> Self {
+        Self {
+            target_id,
+            to,
+            ease,
+            from: None,
+        }
+    }
+}
+
+impl Animation for ScaleTo {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
+            let props = DrawableProps::read(tattva.props());
+            self.from = Some(props.scale);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let scale = self.from.unwrap_or(self.to).lerp(self.to, self.ease.eval(t));
+        with_props_mut(scene, self.target_id, DirtyFlags::TRANSFORM, |props| {
+            props.scale = scale;
+        });
+    }
+}
+
+pub struct FadeTo {
+    pub target_id: TattvaId,
+    pub to: f32,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl FadeTo {
+    pub fn new(target_id: TattvaId, to: f32, ease: Ease) -> Self {
+        Self {
+            target_id,
+            to: to.clamp(0.0, 1.0),
+            ease,
+            from: None,
+        }
+    }
+}
+
+impl Animation for FadeTo {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
+            let props = DrawableProps::read(tattva.props());
+            self.from = Some(props.opacity);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let opacity = self.from.unwrap_or(self.to) + (self.to - self.from.unwrap_or(self.to)) * self.ease.eval(t);
+        with_props_mut(
+            scene,
+            self.target_id,
+            DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+            |props| {
+                props.visible = opacity > 0.001;
+                props.opacity = opacity.clamp(0.0, 1.0);
+            },
+        );
+    }
+}
+
+pub struct Create {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+    target_opacity: Option<f32>,
+}
+
+impl Create {
+    pub fn new(target_id: TattvaId, ease: Ease) -> Self {
+        Self {
+            target_id,
+            ease,
+            target_opacity: None,
+        }
+    }
+}
+
+impl Animation for Create {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
+            let mut props = DrawableProps::write(tattva.props());
+            self.target_opacity = Some(props.opacity.max(0.001));
+            props.visible = true;
+            props.opacity = 0.0;
+            drop(props);
+            tattva.mark_dirty(DirtyFlags::STYLE | DirtyFlags::VISIBILITY);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let target = self.target_opacity.unwrap_or(1.0);
+        let opacity = target * self.ease.eval(t);
+        with_props_mut(
+            scene,
+            self.target_id,
+            DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+            |props| {
+                props.visible = true;
+                props.opacity = opacity.clamp(0.0, target);
+            },
+        );
+    }
+}
+
+pub struct FollowAnchor {
+    pub follower_id: TattvaId,
+    pub target_id: TattvaId,
+    pub target_anchor: Anchor,
+    pub follower_anchor: Anchor,
+    pub offset: Vec3,
+}
+
+impl FollowAnchor {
+    pub fn new(
+        follower_id: TattvaId,
+        target_id: TattvaId,
+        target_anchor: Anchor,
+        follower_anchor: Anchor,
+        offset: Vec3,
+    ) -> Self {
+        Self {
+            follower_id,
+            target_id,
+            target_anchor,
+            follower_anchor,
+            offset,
+        }
+    }
+
+    fn sync_position(&self, scene: &mut Scene) {
+        let Some(target_point) = scene.anchor_position(self.target_id, self.target_anchor) else {
+            return;
+        };
+        let Some(local_bounds) = scene.local_bounds(self.follower_id) else {
+            return;
+        };
+        let pos = target_point + self.offset.truncate() - local_bounds.anchor(self.follower_anchor);
+        scene.set_position(self.follower_id, pos);
+    }
+}
+
+impl Animation for FollowAnchor {
+    fn on_start(&mut self, scene: &mut Scene) {
+        self.sync_position(scene);
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, _t: f32) {
+        self.sync_position(scene);
+    }
+}
+
+pub struct PropagateSignal {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+    from: Option<f32>,
+    to: f32,
+}
+
+impl PropagateSignal {
+    pub fn new(target_id: TattvaId, to: f32, ease: Ease) -> Self {
+        Self {
+            target_id,
+            ease,
+            from: None,
+            to: to.clamp(0.0, 1.0),
+        }
+    }
+}
+
+impl Animation for PropagateSignal {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(flow) = scene.get_tattva_typed::<SignalFlow>(self.target_id) {
+            self.from = Some(flow.state.progress);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(0.0);
+        let progress = from + (self.to - from) * self.ease.eval(t);
+        if let Some(flow) = scene.get_tattva_typed_mut::<SignalFlow>(self.target_id) {
+            flow.state.progress = progress.clamp(0.0, 1.0);
+            flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(flow) = scene.get_tattva_typed_mut::<SignalFlow>(self.target_id) {
+            flow.state.progress = self.to;
+            flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(flow) = scene.get_tattva_typed_mut::<SignalFlow>(self.target_id) {
+            flow.state.progress = self.from.unwrap_or(0.0);
+            flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+fn safe_div_vec2(numerator: Vec2, denominator: Vec2, fallback: Vec2) -> Vec2 {
+    Vec2::new(
+        if denominator.x.abs() > 1e-5 {
+            numerator.x / denominator.x
+        } else {
+            fallback.x
+        },
+        if denominator.y.abs() > 1e-5 {
+            numerator.y / denominator.y
+        } else {
+            fallback.y
+        },
+    )
+}
+
+#[derive(Clone)]
+struct MatchSnapshot {
+    source: DrawableProps,
+    target: DrawableProps,
+    matched_position: Vec3,
+    matched_scale: Vec3,
+}
+
+fn build_match_snapshot(scene: &Scene, source_id: TattvaId, target_id: TattvaId) -> Option<MatchSnapshot> {
+    let source = scene.get_tattva_any(source_id)?;
+    let target = scene.get_tattva_any(target_id)?;
+    let source_props = DrawableProps::read(source.props()).clone();
+    let target_props = DrawableProps::read(target.props()).clone();
+    let source_bounds = scene.world_bounds(source_id)?;
+    let target_local = target.local_bounds();
+    let target_local_size = target_local.size();
+    let source_size = source_bounds.size();
+
+    let matched_xy = safe_div_vec2(
+        source_size,
+        Vec2::new(target_local_size.x.max(1e-5), target_local_size.y.max(1e-5)),
+        target_props.scale.truncate(),
+    );
+
+    Some(MatchSnapshot {
+        source: source_props.clone(),
+        target: target_props.clone(),
+        matched_position: Vec3::new(
+            source_bounds.center().x,
+            source_bounds.center().y,
+            source_props.position.z,
+        ),
+        matched_scale: Vec3::new(matched_xy.x, matched_xy.y, target_props.scale.z),
+    })
+}
+
+pub struct MatchTransform {
+    pub source_id: TattvaId,
+    pub target_id: TattvaId,
+    pub ease: Ease,
+    snapshot: Option<MatchSnapshot>,
+}
+
+impl MatchTransform {
+    pub fn new(source_id: TattvaId, target_id: TattvaId, ease: Ease) -> Self {
+        Self {
+            source_id,
+            target_id,
+            ease,
+            snapshot: None,
+        }
+    }
+}
+
+impl Animation for MatchTransform {
+    fn on_start(&mut self, scene: &mut Scene) {
+        self.snapshot = build_match_snapshot(scene, self.source_id, self.target_id);
+        let Some(snapshot) = &self.snapshot else {
+            return;
+        };
+
+        with_props_mut(scene, self.target_id, DirtyFlags::TRANSFORM, |props| {
+            props.visible = true;
+            props.position = snapshot.matched_position;
+            props.scale = snapshot.matched_scale;
+            props.rotation = snapshot.source.rotation;
+        });
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let Some(snapshot) = &self.snapshot else {
+            return;
+        };
+        let eased = self.ease.eval(t);
+        with_props_mut(scene, self.target_id, DirtyFlags::TRANSFORM, |props| {
+            props.visible = true;
+            props.position = snapshot.matched_position.lerp(snapshot.target.position, eased);
+            props.scale = snapshot.matched_scale.lerp(snapshot.target.scale, eased);
+            props.rotation = snapshot.source.rotation.slerp(snapshot.target.rotation, eased);
+        });
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(snapshot) = &self.snapshot {
+            with_props_mut(scene, self.target_id, DirtyFlags::TRANSFORM, |props| {
+                *props = snapshot.target.clone();
+            });
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(snapshot) = &self.snapshot {
+            with_props_mut(scene, self.target_id, DirtyFlags::TRANSFORM, |props| {
+                *props = snapshot.target.clone();
+            });
+        }
+    }
+}
+
+pub struct MorphObjects {
+    pub source_id: TattvaId,
+    pub target_id: TattvaId,
+    pub ease: Ease,
+    snapshot: Option<MatchSnapshot>,
+}
+
+impl MorphObjects {
+    pub fn new(source_id: TattvaId, target_id: TattvaId, ease: Ease) -> Self {
+        Self {
+            source_id,
+            target_id,
+            ease,
+            snapshot: None,
+        }
+    }
+}
+
+impl Animation for MorphObjects {
+    fn on_start(&mut self, scene: &mut Scene) {
+        self.snapshot = build_match_snapshot(scene, self.source_id, self.target_id);
+        let Some(snapshot) = &self.snapshot else {
+            return;
+        };
+
+        with_props_mut(
+            scene,
+            self.target_id,
+            DirtyFlags::TRANSFORM | DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+            |props| {
+                props.visible = true;
+                props.position = snapshot.matched_position;
+                props.scale = snapshot.matched_scale;
+                props.rotation = snapshot.source.rotation;
+                props.opacity = 0.0;
+            },
+        );
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let Some(snapshot) = &self.snapshot else {
+            return;
+        };
+        let eased = self.ease.eval(t);
+        with_props_mut(
+            scene,
+            self.target_id,
+            DirtyFlags::TRANSFORM | DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+            |props| {
+                props.visible = true;
+                props.position = snapshot.matched_position.lerp(snapshot.target.position, eased);
+                props.scale = snapshot.matched_scale.lerp(snapshot.target.scale, eased);
+                props.rotation = snapshot.source.rotation.slerp(snapshot.target.rotation, eased);
+                props.opacity = snapshot.target.opacity * eased;
+            },
+        );
+        with_props_mut(
+            scene,
+            self.source_id,
+            DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+            |props| {
+                props.opacity = snapshot.source.opacity * (1.0 - eased);
+                props.visible = props.opacity > 0.001;
+            },
+        );
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(snapshot) = &self.snapshot {
+            with_props_mut(
+                scene,
+                self.target_id,
+                DirtyFlags::TRANSFORM | DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+                |props| {
+                    *props = snapshot.target.clone();
+                },
+            );
+            with_props_mut(
+                scene,
+                self.source_id,
+                DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+                |props| {
+                    props.opacity = 0.0;
+                    props.visible = false;
+                },
+            );
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(snapshot) = &self.snapshot {
+            with_props_mut(
+                scene,
+                self.target_id,
+                DirtyFlags::TRANSFORM | DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+                |props| {
+                    *props = snapshot.target.clone();
+                },
+            );
+            with_props_mut(
+                scene,
+                self.source_id,
+                DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+                |props| {
+                    *props = snapshot.source.clone();
+                },
+            );
+        }
+    }
+}
+
+#[derive(Clone)]
+struct EquationContinuitySnapshot {
+    source_props: DrawableProps,
+    target_props: DrawableProps,
+    source_parts: Vec<EquationPartLayout>,
+    target_parts: Vec<EquationPartLayout>,
+    original_target_parts: Vec<EquationPart>,
+}
+
+pub struct EquationContinuity {
+    pub source_id: TattvaId,
+    pub target_id: TattvaId,
+    pub ease: Ease,
+    snapshot: Option<EquationContinuitySnapshot>,
+}
+
+impl EquationContinuity {
+    pub fn new(source_id: TattvaId, target_id: TattvaId, ease: Ease) -> Self {
+        Self {
+            source_id,
+            target_id,
+            ease,
+            snapshot: None,
+        }
+    }
+}
+
+impl Animation for EquationContinuity {
+    fn on_start(&mut self, scene: &mut Scene) {
+        let source_tattva = match scene.get_tattva_typed::<EquationLayout>(self.source_id) {
+            Some(t) => t,
+            None => return,
+        };
+        let target_tattva = match scene.get_tattva_typed::<EquationLayout>(self.target_id) {
+            Some(t) => t,
+            None => return,
+        };
+
+        self.snapshot = Some(EquationContinuitySnapshot {
+            source_props: DrawableProps::read(&source_tattva.props).clone(),
+            target_props: DrawableProps::read(&target_tattva.props).clone(),
+            source_parts: source_tattva.state.layout_snapshot(),
+            target_parts: target_tattva.state.layout_snapshot(),
+            original_target_parts: target_tattva.state.parts.clone(),
+        });
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let Some(snapshot) = &self.snapshot else {
+            return;
+        };
+        let eased = self.ease.eval(t);
+        let source_by_key: HashMap<&str, &EquationPartLayout> = snapshot
+            .source_parts
+            .iter()
+            .map(|part| (part.key.as_str(), part))
+            .collect();
+
+        let target_props = snapshot.target_props.clone();
+        let source_props = snapshot.source_props.clone();
+
+        if let Some(target) = scene.get_tattva_typed_mut::<EquationLayout>(self.target_id) {
+            for (idx, part) in target.state.parts.iter_mut().enumerate() {
+                let base = &snapshot.original_target_parts[idx];
+                let target_layout = &snapshot.target_parts[idx];
+                *part = base.clone();
+
+                if let Some(source_layout) = source_by_key.get(target_layout.key.as_str()) {
+                    let source_world = source_props.position.truncate()
+                        + source_layout.center.truncate() * source_props.scale.truncate();
+                    let target_local_start = safe_div_vec2(
+                        source_world - target_props.position.truncate(),
+                        target_props.scale.truncate(),
+                        target_layout.center.truncate(),
+                    );
+                    let blended_center = Vec2::new(target_local_start.x, target_local_start.y)
+                        .lerp(target_layout.center.truncate(), eased);
+                    part.offset += Vec3::new(
+                        blended_center.x - target_layout.center.x,
+                        blended_center.y - target_layout.center.y,
+                        0.0,
+                    );
+                    part.scale = source_layout.scale + (target_layout.scale - source_layout.scale) * eased;
+                    part.opacity = source_layout.opacity + (target_layout.opacity - source_layout.opacity) * eased;
+                } else {
+                    part.offset += Vec3::new(0.0, (1.0 - eased) * target_layout.height * 0.35, 0.0);
+                    part.opacity = target_layout.opacity * eased;
+                    part.scale = 0.9 + 0.1 * eased;
+                }
+            }
+            target.mark_dirty(DirtyFlags::TEXT_LAYOUT | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+
+        with_props_mut(
+            scene,
+            self.source_id,
+            DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+            |props| {
+                props.opacity = snapshot.source_props.opacity * (1.0 - eased);
+                props.visible = props.opacity > 0.001;
+            },
+        );
+        with_props_mut(
+            scene,
+            self.target_id,
+            DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+            |props| {
+                props.visible = true;
+                props.opacity = snapshot.target_props.opacity;
+            },
+        );
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(snapshot) = &self.snapshot {
+            if let Some(target) = scene.get_tattva_typed_mut::<EquationLayout>(self.target_id) {
+                target.state.parts = snapshot.original_target_parts.clone();
+                target.mark_dirty(DirtyFlags::TEXT_LAYOUT | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+            }
+            with_props_mut(
+                scene,
+                self.source_id,
+                DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+                |props| {
+                    props.opacity = 0.0;
+                    props.visible = false;
+                },
+            );
+            with_props_mut(
+                scene,
+                self.target_id,
+                DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+                |props| {
+                    *props = snapshot.target_props.clone();
+                },
+            );
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(snapshot) = &self.snapshot {
+            if let Some(target) = scene.get_tattva_typed_mut::<EquationLayout>(self.target_id) {
+                target.state.parts = snapshot.original_target_parts.clone();
+                target.mark_dirty(DirtyFlags::TEXT_LAYOUT | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+            }
+            with_props_mut(
+                scene,
+                self.source_id,
+                DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+                |props| {
+                    *props = snapshot.source_props.clone();
+                },
+            );
+            with_props_mut(
+                scene,
+                self.target_id,
+                DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+                |props| {
+                    *props = snapshot.target_props.clone();
+                },
+            );
+        }
+    }
+}
+
+#[derive(Clone)]
+enum MatrixSelection {
+    Cells(Vec<(usize, usize)>),
+    Row(usize),
+    Column(usize),
+}
+
+#[derive(Clone)]
+struct MatrixStepSnapshot {
+    original: Matrix,
+}
+
+pub struct MatrixStep {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+    pub highlight: Vec4,
+    pub dim_opacity: f32,
+    selection: MatrixSelection,
+    snapshot: Option<MatrixStepSnapshot>,
+}
+
+impl MatrixStep {
+    pub fn cells(
+        target_id: TattvaId,
+        cells: Vec<(usize, usize)>,
+        highlight: Vec4,
+        dim_opacity: f32,
+        ease: Ease,
+    ) -> Self {
+        Self {
+            target_id,
+            ease,
+            highlight,
+            dim_opacity,
+            selection: MatrixSelection::Cells(cells),
+            snapshot: None,
+        }
+    }
+
+    pub fn row(
+        target_id: TattvaId,
+        row: usize,
+        highlight: Vec4,
+        dim_opacity: f32,
+        ease: Ease,
+    ) -> Self {
+        Self {
+            target_id,
+            ease,
+            highlight,
+            dim_opacity,
+            selection: MatrixSelection::Row(row),
+            snapshot: None,
+        }
+    }
+
+    pub fn column(
+        target_id: TattvaId,
+        col: usize,
+        highlight: Vec4,
+        dim_opacity: f32,
+        ease: Ease,
+    ) -> Self {
+        Self {
+            target_id,
+            ease,
+            highlight,
+            dim_opacity,
+            selection: MatrixSelection::Column(col),
+            snapshot: None,
+        }
+    }
+
+    fn is_selected(&self, layout: &MatrixCellLayout) -> bool {
+        match &self.selection {
+            MatrixSelection::Cells(cells) => cells.contains(&(layout.row, layout.col)),
+            MatrixSelection::Row(row) => layout.row == *row,
+            MatrixSelection::Column(col) => layout.col == *col,
+        }
+    }
+}
+
+impl Animation for MatrixStep {
+    fn on_start(&mut self, scene: &mut Scene) {
+        let Some(matrix) = scene.get_tattva_typed::<Matrix>(self.target_id) else {
+            return;
+        };
+        self.snapshot = Some(MatrixStepSnapshot {
+            original: matrix.state.clone(),
+        });
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let Some(snapshot) = &self.snapshot else {
+            return;
+        };
+        let eased = self.ease.eval(t);
+        let layout = snapshot.original.layout_snapshot();
+
+        if let Some(matrix) = scene.get_tattva_typed_mut::<Matrix>(self.target_id) {
+            matrix.state = snapshot.original.clone();
+            for cell_layout in &layout {
+                let Some(cell) = matrix.state.cell_mut(cell_layout.row, cell_layout.col) else {
+                    continue;
+                };
+                if self.is_selected(cell_layout) {
+                    let mut highlight = self.highlight;
+                    highlight.w *= eased;
+                    cell.highlight = Some(highlight);
+                    cell.scale = cell.scale + 0.12 * eased;
+                    cell.opacity = cell.opacity + (1.0 - cell.opacity) * (eased * 0.35);
+                } else {
+                    cell.highlight = None;
+                    cell.opacity = cell.opacity + (self.dim_opacity.clamp(0.1, 1.0) - cell.opacity) * eased;
+                }
+            }
+            matrix.mark_dirty(DirtyFlags::TEXT_LAYOUT | DirtyFlags::BOUNDS | DirtyFlags::STYLE | DirtyFlags::GEOMETRY);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        self.apply_at(scene, 1.0);
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(snapshot) = &self.snapshot {
+            if let Some(matrix) = scene.get_tattva_typed_mut::<Matrix>(self.target_id) {
+                matrix.state = snapshot.original.clone();
+                matrix.mark_dirty(DirtyFlags::TEXT_LAYOUT | DirtyFlags::BOUNDS | DirtyFlags::STYLE | DirtyFlags::GEOMETRY);
+            }
         }
     }
 }

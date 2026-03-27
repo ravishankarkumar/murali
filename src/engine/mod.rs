@@ -1,6 +1,8 @@
 // src/engine/mod.rs
 
 pub mod app;
+pub mod export;
+pub mod doctor;
 pub mod scene;
 pub mod timeline;
 pub mod config;
@@ -44,6 +46,7 @@ impl Engine {
             self.sync_boundary.sync_tattva(
                 &mut self.backend.world,
                 device,
+                &self.backend.renderer,
                 tattva.as_mut(),
             );
         }
@@ -67,5 +70,19 @@ impl Engine {
             backend,
             sync_boundary: SyncBoundary::new(),
         }
+    }
+
+    pub async fn new_headless_with_scene(
+        scene: Scene,
+        width: u32,
+        height: u32,
+    ) -> Result<Self, anyhow::Error> {
+        let backend = Backend::new_headless(width, height).await?;
+
+        Ok(Self {
+            scene,
+            backend,
+            sync_boundary: SyncBoundary::new(),
+        })
     }
 }

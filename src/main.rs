@@ -1,10 +1,17 @@
 use glam::{Vec3, Vec4};
 use murali::App;
+use murali::engine::doctor::DoctorReport;
 use murali::engine::scene::Scene;
 use murali::frontend::Tattva;
 use murali::frontend::collection::primitives::square::Square;
 
 fn main() -> anyhow::Result<()> {
+    if matches!(std::env::args().nth(1).as_deref(), Some("doctor")) {
+        let report = DoctorReport::gather();
+        println!("{}", report.render_text());
+        return Ok(());
+    }
+
     let scene = {
         let mut scene = Scene::new();
 

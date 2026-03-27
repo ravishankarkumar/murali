@@ -1,5 +1,6 @@
 use glam::Vec4;
 
+use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 
 /// Frontend Typst object.
@@ -40,6 +41,14 @@ impl Project for Typst {
             source: self.source.clone(),
             height: self.world_height,
             color: self.color,
+            offset: glam::Vec3::ZERO,
         });
+    }
+}
+
+impl Bounded for Typst {
+    fn local_bounds(&self) -> Bounds {
+        let width = self.source.chars().count() as f32 * self.world_height * 0.55;
+        Bounds::from_center_size(glam::Vec2::ZERO, glam::vec2(width.max(self.world_height), self.world_height))
     }
 }

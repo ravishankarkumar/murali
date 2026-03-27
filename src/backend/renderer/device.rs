@@ -6,8 +6,8 @@ use winit::window::Window;
 /// A small wrapper containing the wgpu Device/Queue and the Surface config.
 #[derive(Clone)]
 pub struct DeviceManager {
-    _window: Arc<winit::window::Window>,
-    pub surface: Arc<wgpu::Surface<'static>>,
+    _window: Option<Arc<winit::window::Window>>,
+    pub surface: Option<Arc<wgpu::Surface<'static>>>,
     pub device: Arc<wgpu::Device>,
     pub queue: Arc<wgpu::Queue>,
     // pub config: wgpu::SurfaceConfiguration,
@@ -76,11 +76,72 @@ impl DeviceManager {
         surface.configure(&device, &config);
 
         Ok(Self {
-            _window: window,
-            surface: Arc::new(surface),
+            _window: Some(window),
+            surface: Some(Arc::new(surface)),
             device,
             queue,
             // config,
+            config: std::cell::RefCell::new(config),
+        })
+    }
+
+    pub async fn new_headless(width: u32, height: u32) -> Result<Self> {
+        let instance = wgpu::Instance::new(InstanceDescriptor {
+            backends: Backends::all(),
+            ..Default::default()
+        });
+
+        let adapter = if let Some(adapter) = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: None,
+                force_fallback_adapter: false,
+            })
+            .await
+        {
+            adapter
+        } else if let Some(adapter) = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::LowPower,
+                compatible_surface: None,
+                force_fallback_adapter: true,
+            })
+            .await
+        {
+            adapter
+        } else {
+            return Err(anyhow::anyhow!(
+                "No suitable GPU adapters found for headless export"
+            ));
+        };
+
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: Some("murali-headless-device"),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
+                },
+                None,
+            )
+            .await?;
+
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            width: width.max(1),
+            height: height.max(1),
+            present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            view_formats: vec![],
+            desired_maximum_frame_latency: 2,
+        };
+
+        Ok(Self {
+            _window: None,
+            surface: None,
+            device: Arc::new(device),
+            queue: Arc::new(queue),
             config: std::cell::RefCell::new(config),
         })
     }
@@ -95,7 +156,9 @@ impl DeviceManager {
             let mut config = self.config.borrow_mut(); // 🔑 Borrow interiorly
             config.width = new_size.width;
             config.height = new_size.height;
-            self.surface.configure(&self.device, &config);
+            if let Some(surface) = &self.surface {
+                surface.configure(&self.device, &config);
+            }
         }
     }
 
@@ -103,7 +166,11 @@ impl DeviceManager {
     pub fn acquire_frame(
         &self,
     ) -> Result<(wgpu::SurfaceTexture, wgpu::TextureView), SurfaceError> {
-        let frame = self.surface.get_current_texture()?;
+        let surface = self
+            .surface
+            .as_ref()
+            .expect("surface-backed rendering requires a windowed DeviceManager");
+        let frame = surface.get_current_texture()?;
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());

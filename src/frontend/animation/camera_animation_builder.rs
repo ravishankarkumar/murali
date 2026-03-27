@@ -54,6 +54,11 @@ impl<'a> CameraAnimationBuilder<'a> {
         self
     }
 
+    pub fn frame_to(mut self, position: Vec3, target: Vec3) -> Self {
+        self.spec.kind = Some(CameraAnimKind::FrameTo { position, target });
+        self
+    }
+
     /// Orbit or translate the camera position.
     pub fn move_to(mut self, to: Vec3) -> Self {
         self.spec.kind = Some(CameraAnimKind::MoveTo { to });
@@ -83,17 +88,20 @@ impl<'a> CameraAnimationBuilder<'a> {
         let spec = self.spec;
 
         let anim: Box<dyn Animation> = match spec.kind {
+            Some(CameraAnimKind::FrameTo { position, target }) => {
+                Box::new(CameraAnimate::new_frame(position, target, spec.ease))
+            }
             Some(CameraAnimKind::MoveTo { to }) => {
-                Box::new(CameraAnimate::new_move(to, spec.duration, spec.ease))
+                Box::new(CameraAnimate::new_move(to, spec.ease))
             }
             Some(CameraAnimKind::LookAt { target }) => {
-                Box::new(CameraAnimate::new_lookat(target, spec.duration, spec.ease))
+                Box::new(CameraAnimate::new_lookat(target, spec.ease))
             }
             Some(CameraAnimKind::ZoomTo { zoom }) => {
-                Box::new(CameraAnimate::new_zoom(zoom, spec.duration, spec.ease))
+                Box::new(CameraAnimate::new_zoom(zoom, spec.ease))
             }
             Some(CameraAnimKind::FovTo { fov_y_rad }) => {
-                Box::new(CameraAnimate::new_fov(fov_y_rad, spec.duration, spec.ease))
+                Box::new(CameraAnimate::new_fov(fov_y_rad, spec.ease))
             }
             None => panic!(
                 "Murali Error: CameraAnimationBuilder requires a kind (e.g., .look_at()) before .spawn()"

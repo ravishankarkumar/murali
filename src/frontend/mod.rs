@@ -5,18 +5,70 @@ pub mod layout;
 pub mod animation;
 pub mod collection;
 pub mod tattva_trait;
+pub mod theme;
 
-use props::DrawableProps;
 use crate::frontend::props::SharedProps;
-use std::sync::Arc;
+use std::ops::{BitOr, BitOrAssign};
 
 pub type TattvaId = usize;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct DirtyFlags(u8);
+
+impl DirtyFlags {
+    pub const NONE: Self = Self(0);
+    pub const TRANSFORM: Self = Self(1 << 0);
+    pub const GEOMETRY: Self = Self(1 << 1);
+    pub const STYLE: Self = Self(1 << 2);
+    pub const TEXT_LAYOUT: Self = Self(1 << 3);
+    pub const RASTER: Self = Self(1 << 4);
+    pub const BOUNDS: Self = Self(1 << 5);
+    pub const VISIBILITY: Self = Self(1 << 6);
+    pub const REBUILD: Self =
+        Self(Self::GEOMETRY.0 | Self::TEXT_LAYOUT.0 | Self::RASTER.0 | Self::BOUNDS.0);
+
+    pub const fn contains(self, other: Self) -> bool {
+        (self.0 & other.0) == other.0
+    }
+
+    pub const fn intersects(self, other: Self) -> bool {
+        (self.0 & other.0) != 0
+    }
+
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    pub const fn without(self, other: Self) -> Self {
+        Self(self.0 & !other.0)
+    }
+}
+
+impl Default for DirtyFlags {
+    fn default() -> Self {
+        Self::NONE
+    }
+}
+
+impl BitOr for DirtyFlags {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl BitOrAssign for DirtyFlags {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
 
 pub struct Tattva<T> {
     pub id: TattvaId,
     pub state: T,
     pub props: SharedProps,
-    dirty: bool,
+    dirty: DirtyFlags,
 }
 
 impl<T> Tattva<T> {
@@ -25,20 +77,28 @@ impl<T> Tattva<T> {
             id,
             state,
             props: SharedProps::default(),
-            dirty: true, // New objects are always dirty
+            dirty: DirtyFlags::GEOMETRY,
         }
     }
 
-    pub fn mark_dirty(&mut self) {
-        self.dirty = true;
+    pub fn mark_dirty(&mut self, flags: DirtyFlags) {
+        self.dirty |= flags;
     }
 
-    pub fn is_dirty(&self) -> bool {
+    pub fn dirty_flags(&self) -> DirtyFlags {
         self.dirty
     }
 
-    pub fn clear_dirty(&mut self) {
-        self.dirty = false;
+    pub fn has_any_dirty(&self) -> bool {
+        !self.dirty.is_empty()
+    }
+
+    pub fn clear_dirty(&mut self, flags: DirtyFlags) {
+        self.dirty = self.dirty.without(flags);
+    }
+
+    pub fn clear_all_dirty(&mut self) {
+        self.dirty = DirtyFlags::NONE;
     }
 
     pub fn update<F>(&mut self, f: F)
@@ -46,6 +106,6 @@ impl<T> Tattva<T> {
         F: FnOnce(&mut T),
     {
         f(&mut self.state);
-        self.mark_dirty();
+        self.mark_dirty(DirtyFlags::GEOMETRY);
     }
 }

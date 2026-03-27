@@ -1,6 +1,6 @@
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
-use crate::backend::renderer::mesh::Mesh;
-use std::sync::Arc;
+use crate::frontend::layout::{Bounded, Bounds};
+use crate::projection::Mesh;
 use glam::{Vec3, Vec4};
 
 #[derive(Debug, Clone)]
@@ -41,5 +41,15 @@ impl Project for Line {
         );
 
         ctx.emit(RenderPrimitive::Mesh(mesh));
+    }
+}
+
+impl Bounded for Line {
+    fn local_bounds(&self) -> Bounds {
+        let half = self.thickness * 0.5;
+        Bounds::new(
+            glam::vec2(self.start.x.min(self.end.x) - half, self.start.y.min(self.end.y) - half),
+            glam::vec2(self.start.x.max(self.end.x) + half, self.start.y.max(self.end.y) + half),
+        )
     }
 }

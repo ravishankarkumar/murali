@@ -2,9 +2,14 @@
 
 use fontdue::Font;
 
+pub const LABEL_FONT_RASTER_PX: f32 = 64.0;
+
 /// Font metrics normalized to font units.
 #[derive(Debug, Clone, Copy)]
 pub struct FontMetrics {
+    /// Canonical raster size used for both atlas generation and layout metrics.
+    pub raster_px: f32,
+
     /// Distance from baseline to top of capital letters
     pub cap_height: f32,
 
@@ -50,18 +55,19 @@ impl LabelFont {
 
     /// Internal: compute normalized font metrics.
     fn compute_metrics(font: &Font) -> FontMetrics {
-        // Use a canonical font size for metric extraction.
-        // We will scale later into world space.
-        let px = 100.0;
+        // Use the same canonical raster size everywhere in the regular text pipeline.
+        let px = LABEL_FONT_RASTER_PX;
 
         let m = font.metrics('H', px);
 
-        // fontdue gives ascent/descent via bounding box + baseline
-        let ascent = m.bounds.height + m.bounds.ymin.abs();
-        let descent = m.bounds.ymin.abs();
+        // `height` is the actual rasterized pixel height.
+        let cap_height = m.height as f32;
+        let ascent = cap_height + m.ymin.max(0) as f32;
+        let descent = (-m.ymin).max(0) as f32;
 
         FontMetrics {
-            cap_height: ascent,
+            raster_px: px,
+            cap_height,
             ascent,
             descent,
             line_height: ascent + descent,

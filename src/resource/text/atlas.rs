@@ -2,9 +2,7 @@
 
 use std::collections::HashMap;
 
-use fontdue::Font;
-
-use crate::resource::text::font::LabelFont;
+use crate::resource::text::font::{LABEL_FONT_RASTER_PX, LabelFont};
 
 /// Information required to render a glyph quad.
 #[derive(Debug, Clone)]
@@ -27,8 +25,8 @@ pub struct GlyphAtlas {
 impl GlyphAtlas {
     /// Build a glyph atlas for ASCII characters.
     pub fn build(font: &LabelFont) -> Self {
-        // Canonical raster size (pixels)
-        let px = 64.0;
+        // Canonical raster size (pixels), shared with layout metrics.
+        let px = LABEL_FONT_RASTER_PX;
 
         let mut glyph_bitmaps = Vec::new();
         let mut max_row_height = 0u32;
@@ -38,7 +36,6 @@ impl GlyphAtlas {
             let ch = ch as char;
             let (metrics, bitmap) = font.font().rasterize(ch, px);
 
-            let w = metrics.width as u32;
             let h = metrics.height as u32;
 
             max_row_height = max_row_height.max(h);
@@ -96,7 +93,7 @@ impl GlyphAtlas {
             x += w;
         }
 
-        let cap_height_px = px;
+        let cap_height_px = font.metrics().cap_height;
 
         Self {
             width: atlas_width,

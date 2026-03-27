@@ -2,8 +2,9 @@
 
 use std::sync::Arc;
 
-use crate::backend::renderer::mesh::{Mesh, MeshData};
 use crate::backend::renderer::vertex::text::TextVertex;
+use crate::projection::{Mesh, MeshData};
+use glam::Vec4;
 
 /// Build a world-space quad from raster dimensions.
 ///
@@ -14,6 +15,7 @@ pub fn build_textured_quad(
     width_px: u32,
     height_px: u32,
     world_height: f32,
+    color: Vec4,
 ) -> Arc<Mesh> {
     let w_px = width_px as f32;
     let h_px = height_px as f32;
@@ -29,21 +31,25 @@ pub fn build_textured_quad(
         TextVertex {
             position: [-hw, -hh, 0.0],
             uv: [0.0, 1.0],
+            color: color.into(),
         },
         // bottom-right
         TextVertex {
             position: [ hw, -hh, 0.0],
             uv: [1.0, 1.0],
+            color: color.into(),
         },
         // top-right
         TextVertex {
             position: [ hw,  hh, 0.0],
             uv: [1.0, 0.0],
+            color: color.into(),
         },
         // top-left
         TextVertex {
             position: [-hw,  hh, 0.0],
             uv: [0.0, 0.0],
+            color: color.into(),
         },
     ];
 

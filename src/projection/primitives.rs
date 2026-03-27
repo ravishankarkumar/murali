@@ -1,6 +1,6 @@
 use glam::{Vec3, Vec4};
 use std::sync::Arc;
-use crate::backend::renderer::mesh::Mesh;
+use crate::projection::mesh::Mesh;
 
 /// CPU-side render primitives produced by the Projection layer.
 /// These are later materialized into GPU resources by the Backend.
@@ -21,6 +21,7 @@ pub enum RenderPrimitive {
         content: String,
         height: f32,
         color: Vec4,
+        offset: Vec3,
     },
 
     /// LaTeX primitive (resolved by LaTeX system)
@@ -28,6 +29,7 @@ pub enum RenderPrimitive {
         source: String,
         height: f32,
         color: Vec4,
+        offset: Vec3,
     },
 
     /// Typst primitive (resolved by Typst system)
@@ -35,5 +37,6 @@ pub enum RenderPrimitive {
         source: String,
         height: f32,
         color: Vec4,
+        offset: Vec3,
     },
 }

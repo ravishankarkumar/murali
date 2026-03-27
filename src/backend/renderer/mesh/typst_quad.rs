@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use crate::backend::renderer::mesh::{Mesh, MeshData};
 use crate::backend::renderer::vertex::text::TextVertex;
+use crate::projection::{Mesh, MeshData};
 
 /// Build a world-space textured quad mesh suitable for text rendering.
 ///
@@ -16,10 +16,10 @@ pub fn make_textured_quad_mesh_for_raster(
     let hh = height * 0.5;
 
     let vertices = vec![
-        TextVertex { position: [-hw, -hh, 0.0], uv: [0.0, 1.0] },
-        TextVertex { position: [ hw, -hh, 0.0], uv: [1.0, 1.0] },
-        TextVertex { position: [ hw,  hh, 0.0], uv: [1.0, 0.0] },
-        TextVertex { position: [-hw,  hh, 0.0], uv: [0.0, 0.0] },
+        TextVertex { position: [-hw, -hh, 0.0], uv: [0.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+        TextVertex { position: [ hw, -hh, 0.0], uv: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+        TextVertex { position: [ hw,  hh, 0.0], uv: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
+        TextVertex { position: [-hw,  hh, 0.0], uv: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
     ];
 
     let indices = vec![0, 1, 2, 2, 3, 0];
