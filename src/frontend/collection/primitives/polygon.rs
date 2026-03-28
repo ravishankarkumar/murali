@@ -1,19 +1,20 @@
-use glam::{Vec2, Vec4};
+use glam::{vec3, Vec2, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
+use crate::frontend::style::{Style, StrokeParams};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 use crate::projection::Mesh;
 
 #[derive(Debug, Clone)]
 pub struct Polygon {
     pub vertices: Vec<Vec2>,
-    pub color: Vec4,
+    pub style: Style,
 }
 
 impl Polygon {
     pub fn new(vertices: Vec<Vec2>, color: Vec4) -> Self {
         Self {
             vertices,
-            color,
+            style: Style::new().with_fill(color),
         }
     }
 
@@ -26,12 +27,48 @@ impl Polygon {
         }
         Self::new(vertices, color)
     }
+
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub fn with_stroke(mut self, thickness: f32, color: Vec4) -> Self {
+        self.style.stroke = Some(StrokeParams {
+            thickness,
+            color,
+            ..Default::default()
+        });
+        self
+    }
 }
 
 impl Project for Polygon {
     fn project(&self, ctx: &mut ProjectionCtx) {
-        let mesh = Mesh::polygon(self.vertices.clone(), self.color);
-        ctx.emit(RenderPrimitive::Mesh(mesh));
+        // Fill
+        if let Some(fill) = &self.style.fill {
+            let mesh = Mesh::polygon(self.vertices.clone(), fill.clone());
+            ctx.emit(RenderPrimitive::Mesh(mesh));
+        }
+
+        // Stroke
+        if let Some(stroke) = &self.style.stroke {
+            let n = self.vertices.len();
+            if n >= 2 {
+                for i in 0..n {
+                    let j = (i + 1) % n;
+                    ctx.emit(RenderPrimitive::Line {
+                        start: vec3(self.vertices[i].x, self.vertices[i].y, 0.0),
+                        end: vec3(self.vertices[j].x, self.vertices[j].y, 0.0),
+                        thickness: stroke.thickness,
+                        color: stroke.color,
+                        dash_length: stroke.dash_length,
+                        gap_length: stroke.gap_length,
+                        dash_offset: stroke.dash_offset,
+                    });
+                }
+            }
+        }
     }
 }
 

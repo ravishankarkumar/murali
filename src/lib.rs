@@ -1,3 +1,4 @@
+pub mod prelude;
 pub mod backend;
 pub mod engine;
 pub mod math;
@@ -9,3 +10,4 @@ pub mod frontend;
 pub use engine::app::App;
 pub use engine::scene::Scene;
 pub use frontend::Tattva;
+pub use engine::render::RenderOptions;

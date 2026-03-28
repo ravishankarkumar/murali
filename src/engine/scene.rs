@@ -215,6 +215,12 @@ impl Scene {
     pub fn camera_mut(&mut self) -> &mut Camera {
         &mut self.camera
     }
+
+    /// Replaces the implementation of an existing Tattva.
+    /// This is used for shape morphing where we swap types (e.g., Circle -> Path).
+    pub fn replace_tattva(&mut self, id: TattvaId, tattva: Box<dyn TattvaTrait>) {
+        self.tattvas.insert(id, tattva);
+    }
 }
 
 impl Default for Scene {

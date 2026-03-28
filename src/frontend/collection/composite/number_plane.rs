@@ -47,6 +47,9 @@ impl Project for NumberPlane {
                     end: Vec3::new(x, self.y_range.1, 0.0),
                     thickness: if is_axis { self.axis_thickness } else { self.grid_thickness },
                     color: if is_axis { self.axis_color } else { self.grid_color },
+                    dash_length: 0.0,
+                    gap_length: 0.0,
+                    dash_offset: 0.0,
                 });
                 x += self.x_step;
             }
@@ -61,6 +64,9 @@ impl Project for NumberPlane {
                     end: Vec3::new(self.x_range.1, y, 0.0),
                     thickness: if is_axis { self.axis_thickness } else { self.grid_thickness },
                     color: if is_axis { self.axis_color } else { self.grid_color },
+                    dash_length: 0.0,
+                    gap_length: 0.0,
+                    dash_offset: 0.0,
                 });
                 y += self.y_step;
             }

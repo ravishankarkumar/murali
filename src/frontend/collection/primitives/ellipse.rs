@@ -1,5 +1,6 @@
-use glam::{vec2, Vec4};
+use glam::{vec2, vec3, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
+use crate::frontend::style::{Style, StrokeParams};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 use crate::projection::Mesh;
 
@@ -8,7 +9,7 @@ pub struct Ellipse {
     pub radius_x: f32,
     pub radius_y: f32,
     pub segments: u32,
-    pub color: Vec4,
+    pub style: Style,
 }
 
 impl Ellipse {
@@ -17,7 +18,7 @@ impl Ellipse {
             radius_x,
             radius_y,
             segments: 32,
-            color,
+            style: Style::new().with_fill(color),
         }
     }
 
@@ -25,12 +26,50 @@ impl Ellipse {
         self.segments = segments;
         self
     }
+
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub fn with_stroke(mut self, thickness: f32, color: Vec4) -> Self {
+        self.style.stroke = Some(StrokeParams {
+            thickness,
+            color,
+            ..Default::default()
+        });
+        self
+    }
 }
 
 impl Project for Ellipse {
     fn project(&self, ctx: &mut ProjectionCtx) {
-        let mesh = Mesh::ellipse(self.radius_x, self.radius_y, self.segments, self.color);
-        ctx.emit(RenderPrimitive::Mesh(mesh));
+        // Fill
+        if let Some(fill) = &self.style.fill {
+            let mesh = Mesh::ellipse(self.radius_x, self.radius_y, self.segments, fill.clone());
+            ctx.emit(RenderPrimitive::Mesh(mesh));
+        }
+
+        // Stroke
+        if let Some(stroke) = &self.style.stroke {
+            let seg = self.segments.max(3);
+            for i in 0..seg {
+                let t0 = (i as f32 / seg as f32) * std::f32::consts::TAU;
+                let t1 = ((i + 1) as f32 / seg as f32) * std::f32::consts::TAU;
+                let p0 = glam::vec2(self.radius_x * t0.cos(), self.radius_y * t0.sin());
+                let p1 = glam::vec2(self.radius_x * t1.cos(), self.radius_y * t1.sin());
+                
+                ctx.emit(RenderPrimitive::Line {
+                    start: vec3(p0.x, p0.y, 0.0),
+                    end: vec3(p1.x, p1.y, 0.0),
+                    thickness: stroke.thickness,
+                    color: stroke.color,
+                    dash_length: stroke.dash_length,
+                    gap_length: stroke.gap_length,
+                    dash_offset: stroke.dash_offset,
+                });
+            }
+        }
     }
 }
 

@@ -127,11 +127,17 @@ impl SyncBoundary {
                     end,
                     thickness,
                     color,
+                    dash_length,
+                    gap_length,
+                    dash_offset,
                 } => Some(world.spawn((
                     LineComponent {
                         start,
                         end,
                         thickness,
+                        dash_length,
+                        gap_length,
+                        dash_offset,
                     },
                     ColorComponent(color),
                     tattva.props().clone(),

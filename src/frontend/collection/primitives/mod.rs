@@ -6,3 +6,4 @@ pub mod ellipse;
 pub mod line;
 pub mod cube;
 pub mod path;
+pub mod to_path;

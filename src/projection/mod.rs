@@ -1,3 +1,4 @@
+pub mod style;
 pub mod context;
 pub mod mesh;
 pub mod primitives;

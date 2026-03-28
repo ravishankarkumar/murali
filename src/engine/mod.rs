@@ -7,6 +7,7 @@ pub mod scene;
 pub mod timeline;
 pub mod config;
 pub mod camera;
+pub mod render;
 
 use crate::backend::Backend;
 use crate::backend::sync::SyncBoundary;

@@ -47,6 +47,9 @@ impl TransformerBlockDiagram {
                 end: b,
                 thickness: self.line_thickness,
                 color,
+                dash_length: 0.0,
+                gap_length: 0.0,
+                dash_offset: 0.0,
             });
         }
     }
@@ -80,6 +83,9 @@ impl Project for TransformerBlockDiagram {
                     end: Vec3::new(0.0, next_y + self.block_height * 0.5, 0.0),
                     thickness: self.line_thickness,
                     color: self.frame_color,
+                    dash_length: 0.0,
+                    gap_length: 0.0,
+                    dash_offset: 0.0,
                 });
             }
         }

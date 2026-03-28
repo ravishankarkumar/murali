@@ -2,22 +2,25 @@
 use glam::Vec3;
 use bytemuck::{Pod, Zeroable};
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+#[derive(Copy, Clone, Debug)]
 pub struct LineComponent {
     pub start: Vec3,
-    pub _pad1: f32,
     pub end: Vec3,
     pub thickness: f32,
+    pub dash_length: f32,
+    pub gap_length: f32,
+    pub dash_offset: f32,
 }
 
 impl LineComponent {
     pub fn new(start: Vec3, end: Vec3, thickness: f32) -> Self {
         Self {
             start,
-            _pad1: 0.0,
             end,
             thickness,
+            dash_length: 0.0,
+            gap_length: 0.0,
+            dash_offset: 0.0,
         }
     }
 }

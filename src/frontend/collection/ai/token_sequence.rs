@@ -61,6 +61,9 @@ impl Project for TokenSequence {
                     end: b,
                     thickness: self.line_thickness,
                     color: self.box_color,
+                    dash_length: 0.0,
+                    gap_length: 0.0,
+                    dash_offset: 0.0,
                 });
             }
 

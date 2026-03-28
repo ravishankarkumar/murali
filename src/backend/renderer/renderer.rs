@@ -645,9 +645,9 @@ impl Renderer {
                 color.0.z,
                 color.0.w * props.opacity,
                 line.thickness,
-                0.0,
-                0.0,
-                0.0,
+                line.dash_length,
+                line.gap_length,
+                line.dash_offset,
             ]));
             line_count += 1;
         }

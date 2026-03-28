@@ -1,13 +1,13 @@
-use glam::Vec4;
-
+use glam::{vec2, vec3, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
+use crate::frontend::style::{Style, StrokeParams};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 use crate::projection::Mesh;
 
 #[derive(Debug, Clone)]
 pub struct Square {
     pub size: f32,
-    pub color: Vec4,
+    pub style: Style,
 }
 
 impl Square {
@@ -15,25 +15,61 @@ impl Square {
     pub fn new(size: f32, color: Vec4) -> Self {
         Self {
             size,
-            color,
+            style: Style::new().with_fill(color),
         }
     }
 
+    /// Convenience default
     pub fn default_unit() -> Self {
         Self::new(1.0, Vec4::new(1.0, 1.0, 1.0, 1.0))
+    }
+
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub fn with_stroke(mut self, thickness: f32, color: Vec4) -> Self {
+        self.style.stroke = Some(StrokeParams {
+            thickness,
+            color,
+            ..Default::default()
+        });
+        self
     }
 }
 
 impl Project for Square {
     fn project(&self, ctx: &mut ProjectionCtx) {
-        // We generate the 2D square mesh on demand.
-        // Note: size here usually refers to the side length.
-        let mesh = Mesh::square(
-            self.size, 
-            self.color
-        );
+        let half = self.size * 0.5;
 
-        ctx.emit(RenderPrimitive::Mesh(mesh));
+        // Fill
+        if let Some(fill) = &self.style.fill {
+            let mesh = Mesh::square(self.size, fill.clone());
+            ctx.emit(RenderPrimitive::Mesh(mesh));
+        }
+
+        // Stroke
+        if let Some(stroke) = &self.style.stroke {
+            let pts = [
+                vec2(-half, -half),
+                vec2(half, -half),
+                vec2(half, half),
+                vec2(-half, half),
+            ];
+            for i in 0..4 {
+                let j = (i + 1) % 4;
+                ctx.emit(RenderPrimitive::Line {
+                    start: vec3(pts[i].x, pts[i].y, 0.0),
+                    end: vec3(pts[j].x, pts[j].y, 0.0),
+                    thickness: stroke.thickness,
+                    color: stroke.color,
+                    dash_length: stroke.dash_length,
+                    gap_length: stroke.gap_length,
+                    dash_offset: stroke.dash_offset,
+                });
+            }
+        }
     }
 }
 

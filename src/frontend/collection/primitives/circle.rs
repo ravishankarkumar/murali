@@ -1,6 +1,6 @@
-use glam::Vec4;
-
+use glam::{vec3, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
+use crate::frontend::style::{Style, StrokeParams};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 use crate::projection::Mesh;
 
@@ -8,7 +8,7 @@ use crate::projection::Mesh;
 pub struct Circle {
     pub radius: f32,
     pub segments: u32,
-    pub color: Vec4,
+    pub style: Style,
 }
 
 impl Circle {
@@ -17,7 +17,7 @@ impl Circle {
         Self {
             radius,
             segments,
-            color,
+            style: Style::new().with_fill(color),
         }
     }
 
@@ -25,20 +25,50 @@ impl Circle {
     pub fn default_unit() -> Self {
         Self::new(1.0, 32, Vec4::new(1.0, 1.0, 1.0, 1.0))
     }
+
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub fn with_stroke(mut self, thickness: f32, color: Vec4) -> Self {
+        self.style.stroke = Some(StrokeParams {
+            thickness,
+            color,
+            ..Default::default()
+        });
+        self
+    }
 }
 
 impl Project for Circle {
     fn project(&self, ctx: &mut ProjectionCtx) {
-        // 1. Build CPU-side geometry
-        let mesh = Mesh::circle(
-            self.radius,
-            self.segments,
-            self.color, // drop alpha for mesh
-        );
+        // Fill
+        if let Some(fill) = &self.style.fill {
+            let mesh = Mesh::circle(self.radius, self.segments, fill.clone());
+            ctx.emit(RenderPrimitive::Mesh(mesh));
+        }
 
-
-        // 2. Emit backend-ready primitive
-        ctx.emit(RenderPrimitive::Mesh(mesh));
+        // Stroke
+        if let Some(stroke) = &self.style.stroke {
+            let seg = self.segments.max(3);
+            for i in 0..seg {
+                let t0 = (i as f32 / seg as f32) * std::f32::consts::TAU;
+                let t1 = ((i + 1) as f32 / seg as f32) * std::f32::consts::TAU;
+                let p0 = glam::vec2(self.radius * t0.cos(), self.radius * t0.sin());
+                let p1 = glam::vec2(self.radius * t1.cos(), self.radius * t1.sin());
+                
+                ctx.emit(RenderPrimitive::Line {
+                    start: vec3(p0.x, p0.y, 0.0),
+                    end: vec3(p1.x, p1.y, 0.0),
+                    thickness: stroke.thickness,
+                    color: stroke.color,
+                    dash_length: stroke.dash_length,
+                    gap_length: stroke.gap_length,
+                    dash_offset: stroke.dash_offset,
+                });
+            }
+        }
     }
 }
 

@@ -108,6 +108,132 @@ impl Timeline {
         CameraAnimationBuilder::new(self)
     }
 
+    pub fn morph_matching(
+        &mut self,
+        sources: Vec<TattvaId>,
+        targets: Vec<TattvaId>,
+        scene: &crate::engine::scene::Scene,
+        start_time: f32,
+        duration: f32,
+        ease: crate::frontend::animation::Ease,
+    ) {
+        use std::collections::HashMap;
+        use crate::frontend::props::DrawableProps;
+
+        let mut unmatched_sources = sources.clone();
+        let mut unmatched_targets = targets.clone();
+        let mut pairs = Vec::new();
+
+        // 1. Match by Tag (Identity)
+        let mut source_tags: HashMap<String, Vec<TattvaId>> = HashMap::new();
+        for &id in &sources {
+            if let Some(t) = scene.get_tattva_any(id) {
+                if let Some(tag) = &DrawableProps::read(t.props()).tag {
+                    source_tags.entry(tag.clone()).or_default().push(id);
+                }
+            }
+        }
+
+        let mut still_unmatched_targets = Vec::new();
+        for &id in &targets {
+            let mut matched = false;
+            if let Some(t) = scene.get_tattva_any(id) {
+                if let Some(tag) = &DrawableProps::read(t.props()).tag {
+                    if let Some(ids) = source_tags.get_mut(tag) {
+                        if let Some(source_id) = ids.pop() {
+                            pairs.push((source_id, id));
+                            unmatched_sources.retain(|&x| x != source_id);
+                            matched = true;
+                        }
+                    }
+                }
+            }
+            if !matched {
+                still_unmatched_targets.push(id);
+            }
+        }
+        unmatched_targets = still_unmatched_targets;
+
+        // 2. Match by spatial proximity for the remainder
+        let mut final_unmatched_targets = Vec::new();
+        for &target_id in &unmatched_targets {
+            let target_pos = scene.get_tattva_any(target_id)
+                .map(|t| DrawableProps::read(t.props()).position)
+                .unwrap_or_default();
+
+            let mut best_source = None;
+            let mut min_dist = f32::MAX;
+
+            for (idx, &source_id) in unmatched_sources.iter().enumerate() {
+                let source_pos = scene.get_tattva_any(source_id)
+                    .map(|t| DrawableProps::read(t.props()).position)
+                    .unwrap_or_default();
+                
+                let dist = (target_pos - source_pos).length_squared();
+                if dist < min_dist {
+                    min_dist = dist;
+                    best_source = Some(idx);
+                }
+            }
+
+            if let Some(idx) = best_source {
+                let source_id = unmatched_sources.remove(idx);
+                pairs.push((source_id, target_id));
+            } else {
+                final_unmatched_targets.push(target_id);
+            }
+        }
+
+        // 3. Bake animations into the timeline
+        for (src, tgt) in pairs {
+            // Morph geometry
+            self.animate(tgt)
+                .at(start_time)
+                .for_duration(duration)
+                .ease(ease)
+                .morph_from(src)
+                .spawn();
+            
+            // Move position to target
+            let source_pos = scene.get_tattva_any(src).map(|t| DrawableProps::read(t.props()).position).unwrap_or_default();
+            let target_pos = scene.get_tattva_any(tgt).map(|t| DrawableProps::read(t.props()).position).unwrap_or_default();
+            
+            self.animate(tgt)
+                .at(start_time)
+                .for_duration(duration)
+                .ease(ease)
+                .move_to(target_pos)
+                .from_vec3(source_pos)
+                .spawn();
+                
+            // Also ensure it fades in if it was hidden
+            self.animate(tgt)
+                .at(start_time)
+                .for_duration(duration * 0.2)
+                .fade_to(1.0)
+                .from(0.0)
+                .spawn();
+        }
+
+        // Fade out unmatched sources
+        for src in unmatched_sources {
+            self.animate(src)
+                .at(start_time)
+                .for_duration(duration * 0.5)
+                .fade_to(0.0)
+                .spawn();
+        }
+
+        // Fade in unmatched targets (new symbols)
+        for tgt in final_unmatched_targets {
+            self.animate(tgt)
+                .at(start_time + duration * 0.5)
+                .for_duration(duration * 0.5)
+                .create()
+                .spawn();
+        }
+    }
+
     pub fn end_time(&self) -> f32 {
         self.scheduled
             .iter()

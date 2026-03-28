@@ -221,18 +221,27 @@ impl Project for Matrix {
                 end: Vec3::new(x, y_top, 0.0),
                 thickness: self.bracket_thickness,
                 color: self.bracket_color,
+                dash_length: 0.0,
+                gap_length: 0.0,
+                dash_offset: 0.0,
             });
             ctx.emit(RenderPrimitive::Line {
                 start: Vec3::new(x, y_top, 0.0),
                 end: Vec3::new(x + arm * sign, y_top, 0.0),
                 thickness: self.bracket_thickness,
                 color: self.bracket_color,
+                dash_length: 0.0,
+                gap_length: 0.0,
+                dash_offset: 0.0,
             });
             ctx.emit(RenderPrimitive::Line {
                 start: Vec3::new(x, y_bottom, 0.0),
                 end: Vec3::new(x + arm * sign, y_bottom, 0.0),
                 thickness: self.bracket_thickness,
                 color: self.bracket_color,
+                dash_length: 0.0,
+                gap_length: 0.0,
+                dash_offset: 0.0,
             });
         }
     }

@@ -14,6 +14,9 @@ pub enum RenderPrimitive {
         end: Vec3,
         thickness: f32,
         color: Vec4,
+        dash_length: f32,
+        gap_length: f32,
+        dash_offset: f32,
     },
 
     /// Text primitive (resolved by text system)

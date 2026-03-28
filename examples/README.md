@@ -32,3 +32,24 @@ aiunderthehood-ready presentation template with branded defaults.
 
 `cargo run --example export_aiu_attention`
 Deterministic export example. Writes PNG frames and, if `ffmpeg` is available, an MP4.
+
+`cargo run --example morph_and_move`
+Simultaneous morphing and translation. Demonstrates a square moving across the screen while turning into a circle.
+
+`cargo run --example morph_showcase`
+Dedicated example for shape morphing (geometry transform) between Square, Circle, Rectangle, and Triangle.
+
+`cargo run --example styling_showcase`
+Comprehensive styling engine demonstration: fills, strokes, GPU dashes, and linear gradients.
+
+`cargo run --example blog_showcase`
+A 2-second animation containing neural networks, code blocks, and labels formatted for AI Under The Hood.
+
+`cargo run --example bezier_showcase`
+Demonstration of smooth Quadratic and Cubic Bézier curves using the new `Path` Tattva.
+
+`cargo run --example shapes_extended`
+Showcase of new primitive shapes: Rectangles, Polygons, and Ellipses.
+
+`cargo run --example axes_and_labels`
+Common math visualizations: building coordinate systems with axis labels.

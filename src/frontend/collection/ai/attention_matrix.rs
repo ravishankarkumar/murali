@@ -62,6 +62,9 @@ impl Project for AttentionMatrix {
                 end: Vec3::new(x, height * 0.5, 0.0),
                 thickness: self.grid_thickness,
                 color: self.grid_color,
+                dash_length: 0.0,
+                gap_length: 0.0,
+                dash_offset: 0.0,
             });
         }
         for r in 0..=rows {
@@ -71,6 +74,9 @@ impl Project for AttentionMatrix {
                 end: Vec3::new(left + width, y, 0.0),
                 thickness: self.grid_thickness,
                 color: self.grid_color,
+                dash_length: 0.0,
+                gap_length: 0.0,
+                dash_offset: 0.0,
             });
         }
 

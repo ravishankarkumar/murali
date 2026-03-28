@@ -66,6 +66,9 @@ impl Project for Axes {
             end: Vec3::new(self.x_range.1, 0.0, 0.0),
             thickness: self.thickness,
             color: color_rgb,
+            dash_length: 0.0,
+            gap_length: 0.0,
+            dash_offset: 0.0,
         });
 
         // 2. Project Y-Axis Main Line
@@ -74,6 +77,9 @@ impl Project for Axes {
             end: Vec3::new(0.0, self.y_range.1, 0.0),
             thickness: self.thickness,
             color: color_rgb,
+            dash_length: 0.0,
+            gap_length: 0.0,
+            dash_offset: 0.0,
         });
 
         // 3. Project X Ticks
@@ -86,6 +92,9 @@ impl Project for Axes {
                         end: Vec3::new(x, self.tick_size * 0.5, 0.0),
                         thickness: self.thickness * 0.6,
                         color: color_rgb,
+                        dash_length: 0.0,
+                        gap_length: 0.0,
+                        dash_offset: 0.0,
                     });
                 }
                 x += self.x_step;
@@ -102,6 +111,9 @@ impl Project for Axes {
                         end: Vec3::new(self.tick_size * 0.5, y, 0.0),
                         thickness: self.thickness * 0.6,
                         color: color_rgb,
+                        dash_length: 0.0,
+                        gap_length: 0.0,
+                        dash_offset: 0.0,
                     });
                 }
                 y += self.y_step;

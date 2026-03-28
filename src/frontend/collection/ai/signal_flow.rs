@@ -90,6 +90,9 @@ impl Project for SignalFlow {
                     end,
                     thickness: self.edge_thickness,
                     color: self.edge_color,
+                    dash_length: 0.0,
+                    gap_length: 0.0,
+                    dash_offset: 0.0,
                 });
             } else if idx == current_idx && self.progress < 1.0 {
                 ctx.emit(RenderPrimitive::Line {
@@ -97,6 +100,9 @@ impl Project for SignalFlow {
                     end: start.lerp(end, segment_t),
                     thickness: self.edge_thickness,
                     color: self.edge_color,
+                    dash_length: 0.0,
+                    gap_length: 0.0,
+                    dash_offset: 0.0,
                 });
             }
         }

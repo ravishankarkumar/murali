@@ -8,18 +8,33 @@ use crate::engine::scene::Scene;
 use crate::frontend::collection::ai::signal_flow::SignalFlow;
 use crate::frontend::collection::math::equation::{EquationLayout, EquationPart, EquationPartLayout};
 use crate::frontend::collection::math::matrix::{Matrix, MatrixCellLayout};
-use crate::frontend::layout::Anchor;
+use crate::frontend::collection::primitives::circle::Circle;
+use crate::frontend::collection::primitives::ellipse::Ellipse;
+use crate::frontend::collection::primitives::line::Line;
+use crate::frontend::collection::primitives::path::Path;
+use crate::frontend::collection::primitives::polygon::Polygon;
+use crate::frontend::collection::primitives::rectangle::Rectangle;
+use crate::frontend::collection::primitives::square::Square;
+use crate::frontend::collection::primitives::to_path::ToPath;
+use crate::frontend::layout::{Anchor, Bounded, Bounds};
 use crate::frontend::props::DrawableProps;
-use crate::frontend::{DirtyFlags, TattvaId};
+use crate::frontend::tattva_trait::TattvaTrait;
+use crate::frontend::{DirtyFlags, Tattva, TattvaId};
+use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use crate::resource::text::layout::measure_label;
 use glam::{Quat, Vec2, Vec3, Vec4};
 
 /// Common easing curves for deterministic interpolation.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub enum Ease {
+    #[default]
     Linear,
     InQuad,
     OutQuad,
     InOutQuad,
+    InCubic,
+    OutCubic,
+    InOutCubic,
 }
 
 impl Ease {
@@ -33,6 +48,15 @@ impl Ease {
                     2.0 * t * t
                 } else {
                     1.0 - (-2.0 * t + 2.0).powi(2) / 2.0
+                }
+            }
+            Ease::InCubic => t * t * t,
+            Ease::OutCubic => 1.0 - (1.0 - t).powi(3),
+            Ease::InOutCubic => {
+                if t < 0.5 {
+                    4.0 * t * t * t
+                } else {
+                    1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
                 }
             }
         }
@@ -76,13 +100,20 @@ impl MoveTo {
             from: None,
         }
     }
+
+    pub fn with_from(mut self, from: Vec3) -> Self {
+        self.from = Some(from);
+        self
+    }
 }
 
 impl Animation for MoveTo {
     fn on_start(&mut self, scene: &mut Scene) {
-        if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
-            let props = DrawableProps::read(tattva.props());
-            self.from = Some(props.position);
+        if self.from.is_none() {
+            if let Some(tattva) = scene.get_tattva_any(self.target_id) {
+                let props = DrawableProps::read(tattva.props());
+                self.from = Some(props.position);
+            }
         }
     }
 
@@ -110,13 +141,20 @@ impl RotateTo {
             from: None,
         }
     }
+
+    pub fn with_from(mut self, from: Quat) -> Self {
+        self.from = Some(from);
+        self
+    }
 }
 
 impl Animation for RotateTo {
     fn on_start(&mut self, scene: &mut Scene) {
-        if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
-            let props = DrawableProps::read(tattva.props());
-            self.from = Some(props.rotation);
+        if self.from.is_none() {
+            if let Some(tattva) = scene.get_tattva_any(self.target_id) {
+                let props = DrawableProps::read(tattva.props());
+                self.from = Some(props.rotation);
+            }
         }
     }
 
@@ -145,13 +183,20 @@ impl ScaleTo {
             from: None,
         }
     }
+
+    pub fn with_from(mut self, from: Vec3) -> Self {
+        self.from = Some(from);
+        self
+    }
 }
 
 impl Animation for ScaleTo {
     fn on_start(&mut self, scene: &mut Scene) {
-        if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
-            let props = DrawableProps::read(tattva.props());
-            self.from = Some(props.scale);
+        if self.from.is_none() {
+            if let Some(tattva) = scene.get_tattva_any(self.target_id) {
+                let props = DrawableProps::read(tattva.props());
+                self.from = Some(props.scale);
+            }
         }
     }
 
@@ -179,13 +224,20 @@ impl FadeTo {
             from: None,
         }
     }
+
+    pub fn with_from(mut self, from: f32) -> Self {
+        self.from = Some(from);
+        self
+    }
 }
 
 impl Animation for FadeTo {
     fn on_start(&mut self, scene: &mut Scene) {
-        if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
-            let props = DrawableProps::read(tattva.props());
-            self.from = Some(props.opacity);
+        if self.from.is_none() {
+            if let Some(tattva) = scene.get_tattva_any(self.target_id) {
+                let props = DrawableProps::read(tattva.props());
+                self.from = Some(props.opacity);
+            }
         }
     }
 
@@ -861,6 +913,139 @@ impl Animation for MatrixStep {
             if let Some(matrix) = scene.get_tattva_typed_mut::<Matrix>(self.target_id) {
                 matrix.state = snapshot.original.clone();
                 matrix.mark_dirty(DirtyFlags::TEXT_LAYOUT | DirtyFlags::BOUNDS | DirtyFlags::STYLE | DirtyFlags::GEOMETRY);
+            }
+        }
+    }
+}
+
+pub struct MorphGeometry {
+    pub source_id: TattvaId,
+    pub target_id: TattvaId,
+    pub ease: Ease,
+    source_path: Option<Path>,
+    target_path: Option<Path>,
+    original_target_tattva: Option<Box<dyn TattvaTrait>>,
+}
+
+impl MorphGeometry {
+    pub fn new(source_id: TattvaId, target_id: TattvaId, ease: Ease) -> Self {
+        Self {
+            source_id,
+            target_id,
+            ease,
+            source_path: None,
+            target_path: None,
+            original_target_tattva: None,
+        }
+    }
+
+    fn try_get_path(scene: &Scene, id: TattvaId) -> Option<Path> {
+        let tattva = scene.get_tattva_any(id)?;
+        let any = tattva.as_any();
+
+        // Check if it's already a Path
+        if let Some(p) = any.downcast_ref::<Tattva<Path>>() {
+            return Some(p.state.clone());
+        }
+
+        // Try common primitives
+        if let Some(p) = any.downcast_ref::<Tattva<Rectangle>>() { return Some(p.state.to_path()); }
+        if let Some(p) = any.downcast_ref::<Tattva<Circle>>() { return Some(p.state.to_path()); }
+        if let Some(p) = any.downcast_ref::<Tattva<Square>>() { return Some(p.state.to_path()); }
+        if let Some(p) = any.downcast_ref::<Tattva<Ellipse>>() { return Some(p.state.to_path()); }
+        if let Some(p) = any.downcast_ref::<Tattva<Polygon>>() { return Some(p.state.to_path()); }
+        if let Some(p) = any.downcast_ref::<Tattva<Line>>() { return Some(p.state.to_path()); }
+
+        None
+    }
+}
+
+impl Animation for MorphGeometry {
+    fn on_start(&mut self, scene: &mut Scene) {
+        let mut source_path = match Self::try_get_path(scene, self.source_id) {
+            Some(p) => p,
+            None => {
+                println!("Error: Could not get path for source {}", self.source_id);
+                return;
+            }
+        };
+        let mut target_path = match Self::try_get_path(scene, self.target_id) {
+            Some(p) => p,
+            None => {
+                println!("Error: Could not get path for target {}", self.target_id);
+                return;
+            }
+        };
+
+        // Align segments counts
+        let max_segments = source_path.segments.len().max(target_path.segments.len());
+        source_path.resample(max_segments);
+        target_path.resample(max_segments);
+
+        // Align starting points to minimize travel distance
+        source_path = source_path.align_to(&target_path);
+
+        self.source_path = Some(source_path.clone());
+        self.target_path = Some(target_path);
+
+        // Displace the current target with a Path Tattva
+        if let Some(tattva_box) = scene.tattvas.remove(&self.target_id) {
+            let shared_props = tattva_box.props().clone();
+            
+            // Ensure target is visible and opaque via the SHARED props
+            {
+                let mut props = shared_props.write();
+                props.visible = true;
+                props.opacity = 1.0;
+            }
+            
+            // Create a new Tattva<Path> but REUSE the original SharedProps Arc
+            let intermediate = Tattva {
+                id: self.target_id,
+                state: source_path,
+                props: shared_props,
+                dirty: DirtyFlags::ALL,
+            };
+            
+            // Hide the source shape
+            if let Some(source) = scene.get_tattva_any_mut(self.source_id) {
+                let mut s_props = source.props().write();
+                s_props.visible = false;
+                s_props.opacity = 0.0;
+            }
+
+            // We have to store the original and replace it in the scene
+            self.original_target_tattva = Some(tattva_box);
+            scene.replace_tattva(self.target_id, Box::new(intermediate));
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let (Some(s_path), Some(t_path)) = (&self.source_path, &self.target_path) else {
+            return;
+        };
+
+        let current_path = s_path.lerp(t_path, self.ease.eval(t));
+
+        if let Some(tattva) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
+            tattva.state = current_path;
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        // Swap back the original target Tattva
+        if let Some(original) = self.original_target_tattva.take() {
+            scene.replace_tattva(self.target_id, original);
+            
+            // Marks geometry as dirty since it's back to original type
+            if let Some(t) = scene.get_tattva_any_mut(self.target_id) {
+                {
+                    let mut props = t.props().write();
+                    props.visible = true;
+                    props.opacity = 1.0;
+                }
+                t.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
             }
         }
     }

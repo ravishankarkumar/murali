@@ -30,12 +30,18 @@ impl Project for ScatterPlot {
                 end: Vec3::new(p.x + self.point_radius, p.y, 0.0),
                 thickness: self.thickness,
                 color: self.color,
+                dash_length: 0.0,
+                gap_length: 0.0,
+                dash_offset: 0.0,
             });
             ctx.emit(RenderPrimitive::Line {
                 start: Vec3::new(p.x, p.y - self.point_radius, 0.0),
                 end: Vec3::new(p.x, p.y + self.point_radius, 0.0),
                 thickness: self.thickness,
                 color: self.color,
+                dash_length: 0.0,
+                gap_length: 0.0,
+                dash_offset: 0.0,
             });
         }
     }

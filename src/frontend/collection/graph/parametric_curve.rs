@@ -51,6 +51,9 @@ impl Project for ParametricCurve {
                 end: Vec3::new(b.x, b.y, 0.0),
                 thickness: self.thickness,
                 color: self.color,
+                dash_length: 0.0,
+                gap_length: 0.0,
+                dash_offset: 0.0,
             });
         }
     }

@@ -95,12 +95,18 @@ impl NeuralNetworkDiagram {
                     end: Vec3::new(x, y, 0.0),
                     thickness,
                     color,
+                    dash_length: 0.0,
+                    gap_length: 0.0,
+                    dash_offset: 0.0,
                 });
                 ctx.emit(RenderPrimitive::Line {
                     start: Vec3::new(x, y, 0.0),
                     end: Vec3::new(x + size, y + size, 0.0),
                     thickness,
                     color,
+                    dash_length: 0.0,
+                    gap_length: 0.0,
+                    dash_offset: 0.0,
                 });
             }
             ActivationFunc::Sigmoid => {
@@ -119,6 +125,9 @@ impl NeuralNetworkDiagram {
                         end: Vec3::new(x1, y1, 0.0),
                         thickness,
                         color,
+                        dash_length: 0.0,
+                        gap_length: 0.0,
+                        dash_offset: 0.0,
                     });
                 }
             }
@@ -141,6 +150,9 @@ impl Project for NeuralNetworkDiagram {
                         end: Vec3::new(x1, self.node_y(to_count, j), 0.0),
                         thickness: self.edge_thickness,
                         color: self.edge_color,
+                        dash_length: 0.0,
+                        gap_length: 0.0,
+                        dash_offset: 0.0,
                     });
                 }
             }

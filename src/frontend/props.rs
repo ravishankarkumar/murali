@@ -16,6 +16,7 @@ pub struct DrawableProps {
     pub scale: Vec3,
     pub visible: bool,
     pub opacity: f32,
+    pub tag: Option<String>,
 }
 
 impl Default for DrawableProps {
@@ -26,6 +27,7 @@ impl Default for DrawableProps {
             scale: Vec3::ONE,
             visible: true,
             opacity: 1.0,
+            tag: None,
         }
     }
 }
@@ -39,6 +41,7 @@ impl DrawableProps {
             scale: Vec3::ONE,
             visible: true,
             opacity: 1.0,
+            tag: None,
         }
     }
 

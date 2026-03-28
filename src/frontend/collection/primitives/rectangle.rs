@@ -1,5 +1,6 @@
-use glam::{vec2, Vec4};
+use glam::{vec2, vec3, Vec2, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
+use crate::frontend::style::{Style, StrokeParams};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 use crate::projection::Mesh;
 
@@ -7,7 +8,7 @@ use crate::projection::Mesh;
 pub struct Rectangle {
     pub width: f32,
     pub height: f32,
-    pub color: Vec4,
+    pub style: Style,
 }
 
 impl Rectangle {
@@ -15,15 +16,57 @@ impl Rectangle {
         Self {
             width,
             height,
-            color,
+            style: Style::new().with_fill(color),
         }
+    }
+
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub fn with_stroke(mut self, thickness: f32, color: Vec4) -> Self {
+        self.style.stroke = Some(StrokeParams {
+            thickness,
+            color,
+            ..Default::default()
+        });
+        self
     }
 }
 
 impl Project for Rectangle {
     fn project(&self, ctx: &mut ProjectionCtx) {
-        let mesh = Mesh::rectangle(self.width, self.height, self.color);
-        ctx.emit(RenderPrimitive::Mesh(mesh));
+        let hw = self.width * 0.5;
+        let hh = self.height * 0.5;
+
+        // Fill
+        if let Some(fill) = &self.style.fill {
+            let mesh = Mesh::rectangle(self.width, self.height, fill.clone());
+            ctx.emit(RenderPrimitive::Mesh(mesh));
+        }
+
+        // Stroke
+        if let Some(stroke) = &self.style.stroke {
+            let pts = [
+                vec2(-hw, -hh),
+                vec2(hw, -hh),
+                vec2(hw, hh),
+                vec2(-hw, hh),
+            ];
+            for i in 0..4 {
+                let j = (i + 1) % 4;
+                ctx.emit(RenderPrimitive::Line {
+                    start: vec3(pts[i].x, pts[i].y, 0.0),
+                    end: vec3(pts[j].x, pts[j].y, 0.0),
+                    thickness: stroke.thickness,
+                    color: stroke.color,
+                    dash_length: stroke.dash_length,
+                    gap_length: stroke.gap_length,
+                    dash_offset: stroke.dash_offset,
+                });
+            }
+        }
     }
 }
 

@@ -11,6 +11,9 @@ pub struct LineComponent {
     pub start: Vec3,
     pub end: Vec3,
     pub thickness: f32,
+    pub dash_length: f32,
+    pub gap_length: f32,
+    pub dash_offset: f32,
 }
 
 /// Stores a color for the shader to use.

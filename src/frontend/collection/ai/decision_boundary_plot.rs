@@ -70,6 +70,9 @@ impl DecisionBoundaryPlot {
                             end: Vec3::new(x, y, 0.0),
                             thickness: 0.025,
                             color: self.boundary_color,
+                            dash_length: 0.0,
+                            gap_length: 0.0,
+                            dash_offset: 0.0,
                         });
                     }
                     prev = Some(vec2(x, y));
