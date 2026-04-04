@@ -1,3 +1,4 @@
+pub mod agentic_flow_chart;
 pub mod attention_matrix;
 pub mod decision_boundary_plot;
 pub mod neural_network_diagram;

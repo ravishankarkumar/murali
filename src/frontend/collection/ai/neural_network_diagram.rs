@@ -1,4 +1,5 @@
 use glam::{Vec2, Vec3, Vec4, vec2};
+use std::collections::HashSet;
 
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Mesh, Project, ProjectionCtx, RenderPrimitive};
@@ -14,6 +15,9 @@ pub struct NeuralNetworkDiagram {
     pub edge_thickness: f32,
     pub layer_labels: Option<Vec<String>>,
     pub activation: ActivationFunc,
+    pub inactive_nodes: HashSet<(usize, usize)>,
+    pub inactive_node_color: Vec4,
+    pub inactive_edge_color: Vec4,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -35,6 +39,9 @@ impl NeuralNetworkDiagram {
             edge_thickness: 0.015,
             layer_labels: None,
             activation: ActivationFunc::None,
+            inactive_nodes: HashSet::new(),
+            inactive_node_color: Vec4::new(0.26, 0.30, 0.36, 0.95),
+            inactive_edge_color: Vec4::new(0.28, 0.32, 0.38, 0.45),
         }
     }
 
@@ -46,6 +53,36 @@ impl NeuralNetworkDiagram {
     pub fn with_activation(mut self, func: ActivationFunc) -> Self {
         self.activation = func;
         self
+    }
+
+    pub fn with_deactivated_nodes(
+        mut self,
+        nodes: impl IntoIterator<Item = (usize, usize)>,
+    ) -> Self {
+        self.inactive_nodes = nodes.into_iter().collect();
+        self
+    }
+
+    pub fn deactivate_node(mut self, layer_idx: usize, node_idx: usize) -> Self {
+        self.inactive_nodes.insert((layer_idx, node_idx));
+        self
+    }
+
+    pub fn is_node_active(&self, layer_idx: usize, node_idx: usize) -> bool {
+        self.layers
+            .get(layer_idx)
+            .map(|count| node_idx < *count && !self.inactive_nodes.contains(&(layer_idx, node_idx)))
+            .unwrap_or(false)
+    }
+
+    pub fn is_edge_active(
+        &self,
+        from_layer_idx: usize,
+        from_node_idx: usize,
+        to_layer_idx: usize,
+        _to_node_idx: usize,
+    ) -> bool {
+        self.is_node_active(from_layer_idx, from_node_idx) && to_layer_idx == from_layer_idx + 1
     }
 
     fn layer_x(&self, idx: usize) -> f32 {
@@ -77,6 +114,62 @@ impl NeuralNetworkDiagram {
 
         let mut points = Vec::with_capacity(node_indices_per_layer.len());
         for (layer_idx, node_idx) in node_indices_per_layer.iter().copied().enumerate() {
+            if !self.is_node_active(layer_idx, node_idx) {
+                return None;
+            }
+            points.push(self.node_position(layer_idx, node_idx)?);
+        }
+        Some(points)
+    }
+
+    pub fn all_path_points(&self) -> Vec<Vec<Vec3>> {
+        if self.layers.is_empty() {
+            return Vec::new();
+        }
+
+        let mut all_paths = Vec::new();
+        let mut node_choices = Vec::with_capacity(self.layers.len());
+        self.collect_paths(0, &mut node_choices, &mut all_paths);
+        all_paths
+    }
+
+    fn collect_paths(
+        &self,
+        layer_idx: usize,
+        node_choices: &mut Vec<usize>,
+        all_paths: &mut Vec<Vec<Vec3>>,
+    ) {
+        let Some(&count) = self.layers.get(layer_idx) else {
+            return;
+        };
+
+        for node_idx in 0..count {
+            node_choices.push(node_idx);
+            let should_stop =
+                !self.is_node_active(layer_idx, node_idx) || layer_idx + 1 == self.layers.len();
+
+            if should_stop {
+                if let Some(path) = self.partial_path_points(node_choices) {
+                    all_paths.push(path);
+                }
+            } else {
+                self.collect_paths(layer_idx + 1, node_choices, all_paths);
+            }
+            node_choices.pop();
+        }
+    }
+
+    fn partial_path_points(&self, node_indices_per_layer: &[usize]) -> Option<Vec<Vec3>> {
+        if node_indices_per_layer.is_empty() || node_indices_per_layer.len() > self.layers.len() {
+            return None;
+        }
+
+        let mut points = Vec::with_capacity(node_indices_per_layer.len());
+        for (layer_idx, node_idx) in node_indices_per_layer.iter().copied().enumerate() {
+            let count = *self.layers.get(layer_idx)?;
+            if node_idx >= count {
+                return None;
+            }
             points.push(self.node_position(layer_idx, node_idx)?);
         }
         Some(points)
@@ -145,11 +238,16 @@ impl Project for NeuralNetworkDiagram {
             let x1 = self.layer_x(layer_idx + 1);
             for i in 0..from_count {
                 for j in 0..to_count {
+                    let active = self.is_edge_active(layer_idx, i, layer_idx + 1, j);
                     ctx.emit(RenderPrimitive::Line {
                         start: Vec3::new(x0, self.node_y(from_count, i), 0.0),
                         end: Vec3::new(x1, self.node_y(to_count, j), 0.0),
                         thickness: self.edge_thickness,
-                        color: self.edge_color,
+                        color: if active {
+                            self.edge_color
+                        } else {
+                            self.inactive_edge_color
+                        },
                         dash_length: 0.0,
                         gap_length: 0.0,
                         dash_offset: 0.0,
@@ -161,7 +259,12 @@ impl Project for NeuralNetworkDiagram {
         for (layer_idx, count) in self.layers.iter().copied().enumerate() {
             let x = self.layer_x(layer_idx);
             for node_idx in 0..count {
-                let mesh = Mesh::circle(self.node_radius, 24, self.node_color)
+                let node_color = if self.is_node_active(layer_idx, node_idx) {
+                    self.node_color
+                } else {
+                    self.inactive_node_color
+                };
+                let mesh = Mesh::circle(self.node_radius, 24, node_color)
                     .as_ref()
                     .translated(Vec3::new(x, self.node_y(count, node_idx), 0.0));
                 ctx.emit(RenderPrimitive::Mesh(mesh));

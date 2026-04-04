@@ -5,6 +5,7 @@ pub mod camera_animation_builder;
 use std::collections::HashMap;
 
 use crate::engine::scene::Scene;
+use crate::frontend::collection::ai::agentic_flow_chart::AgenticFlowChart;
 use crate::frontend::collection::ai::signal_flow::SignalFlow;
 use crate::frontend::collection::math::equation::{
     EquationLayout, EquationPart, EquationPartLayout,
@@ -376,6 +377,8 @@ impl Animation for PropagateSignal {
     fn on_start(&mut self, scene: &mut Scene) {
         if let Some(flow) = scene.get_tattva_typed::<SignalFlow>(self.target_id) {
             self.from = Some(flow.state.progress);
+        } else if let Some(flow) = scene.get_tattva_typed::<AgenticFlowChart>(self.target_id) {
+            self.from = Some(flow.state.progress);
         }
     }
 
@@ -385,6 +388,9 @@ impl Animation for PropagateSignal {
         if let Some(flow) = scene.get_tattva_typed_mut::<SignalFlow>(self.target_id) {
             flow.state.progress = progress.clamp(0.0, 1.0);
             flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        } else if let Some(flow) = scene.get_tattva_typed_mut::<AgenticFlowChart>(self.target_id) {
+            flow.state.progress = progress.clamp(0.0, 1.0);
+            flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 
@@ -392,11 +398,17 @@ impl Animation for PropagateSignal {
         if let Some(flow) = scene.get_tattva_typed_mut::<SignalFlow>(self.target_id) {
             flow.state.progress = self.to;
             flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        } else if let Some(flow) = scene.get_tattva_typed_mut::<AgenticFlowChart>(self.target_id) {
+            flow.state.progress = self.to;
+            flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 
     fn reset(&mut self, scene: &mut Scene) {
         if let Some(flow) = scene.get_tattva_typed_mut::<SignalFlow>(self.target_id) {
+            flow.state.progress = self.from.unwrap_or(0.0);
+            flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        } else if let Some(flow) = scene.get_tattva_typed_mut::<AgenticFlowChart>(self.target_id) {
             flow.state.progress = self.from.unwrap_or(0.0);
             flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }

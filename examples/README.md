@@ -21,6 +21,9 @@ AI teaching primitives in one scene.
 `cargo run --example neural_signal_flow`
 Signal propagation through a neural-network path.
 
+`cargo run --example neural_network_v2`
+Deactivated-node behavior, multi-path propagation, and signal playback modes.
+
 `cargo run --example latex_showcase`
 Dedicated LaTeX text-path regression scene.
 

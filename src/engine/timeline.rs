@@ -1,7 +1,7 @@
 use crate::engine::scene::Scene;
 use crate::frontend::TattvaId;
 use crate::frontend::animation::{
-    Animation, builder::AnimationBuilder, camera_animation_builder::CameraAnimationBuilder,
+    Animation, Ease, builder::AnimationBuilder, camera_animation_builder::CameraAnimationBuilder,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -36,6 +36,52 @@ impl ScheduledAnimation {
 pub struct Timeline {
     pub scheduled: Vec<ScheduledAnimation>,
     next_order: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SignalPlaybackMode {
+    Once,
+    RoundTrip,
+    Loop { repeats: usize },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct SignalPlayback {
+    pub start_time: f32,
+    pub duration: f32,
+    pub ease: Ease,
+    pub mode: SignalPlaybackMode,
+}
+
+impl SignalPlayback {
+    pub fn once(start_time: f32, duration: f32, ease: Ease) -> Self {
+        Self {
+            start_time,
+            duration,
+            ease,
+            mode: SignalPlaybackMode::Once,
+        }
+    }
+
+    pub fn round_trip(start_time: f32, duration: f32, ease: Ease) -> Self {
+        Self {
+            start_time,
+            duration,
+            ease,
+            mode: SignalPlaybackMode::RoundTrip,
+        }
+    }
+
+    pub fn looped(start_time: f32, duration: f32, repeats: usize, ease: Ease) -> Self {
+        Self {
+            start_time,
+            duration,
+            ease,
+            mode: SignalPlaybackMode::Loop {
+                repeats: repeats.max(1),
+            },
+        }
+    }
 }
 
 impl Timeline {
@@ -108,6 +154,54 @@ impl Timeline {
 
     pub fn animate_camera(&mut self) -> CameraAnimationBuilder<'_> {
         CameraAnimationBuilder::new(self)
+    }
+
+    pub fn play_signal(&mut self, id: TattvaId, playback: SignalPlayback) {
+        match playback.mode {
+            SignalPlaybackMode::Once => {
+                self.animate(id)
+                    .at(playback.start_time)
+                    .for_duration(playback.duration)
+                    .ease(playback.ease)
+                    .propagate()
+                    .spawn();
+            }
+            SignalPlaybackMode::RoundTrip => {
+                self.animate(id)
+                    .at(playback.start_time)
+                    .for_duration(playback.duration)
+                    .ease(playback.ease)
+                    .propagate()
+                    .spawn();
+
+                self.animate(id)
+                    .at(playback.start_time + playback.duration)
+                    .for_duration(playback.duration)
+                    .ease(playback.ease)
+                    .propagate_to(0.0)
+                    .spawn();
+            }
+            SignalPlaybackMode::Loop { repeats } => {
+                for i in 0..repeats {
+                    let cycle_start = playback.start_time + i as f32 * playback.duration;
+                    self.animate(id)
+                        .at(cycle_start)
+                        .for_duration(playback.duration)
+                        .ease(playback.ease)
+                        .propagate()
+                        .spawn();
+
+                    if i + 1 < repeats {
+                        self.animate(id)
+                            .at(cycle_start + playback.duration)
+                            .for_duration(0.0)
+                            .ease(playback.ease)
+                            .propagate_to(0.0)
+                            .spawn();
+                    }
+                }
+            }
+        }
     }
 
     pub fn morph_matching(

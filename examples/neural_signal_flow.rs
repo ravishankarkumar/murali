@@ -1,7 +1,7 @@
 use glam::{Vec3, Vec4};
 use murali::App;
 use murali::engine::scene::Scene;
-use murali::engine::timeline::Timeline;
+use murali::engine::timeline::{SignalPlayback, Timeline};
 use murali::frontend::animation::Ease;
 use murali::frontend::collection::ai::{
     neural_network_diagram::NeuralNetworkDiagram, signal_flow::SignalFlow,
@@ -19,15 +19,15 @@ fn main() -> anyhow::Result<()> {
     let title_id = scene.tattvas.keys().copied().max().unwrap();
     scene.to_edge(title_id, Direction::Up, 0.35);
 
-    let diagram = NeuralNetworkDiagram::new(vec![3, 5, 4, 2]);
-    let flow_points = diagram
-        .path_points(&[1, 3, 1, 0])
-        .expect("signal flow path should match layer count");
+    let diagram = NeuralNetworkDiagram::new(vec![3, 5, 4, 2])
+        .deactivate_node(1, 2)
+        .deactivate_node(2, 3);
+    let flow_paths = diagram.all_path_points();
 
     let network_id = scene.add_tattva(diagram, Vec3::new(0.0, 0.4, 0.0));
 
     let signal_id = scene.add_tattva(
-        SignalFlow::new(flow_points)
+        SignalFlow::from_paths(flow_paths)
             .with_progress(0.0)
             .with_edge_color(Vec4::new(0.98, 0.74, 0.28, 0.95))
             .with_pulse_color(Vec4::new(1.0, 0.96, 0.82, 1.0)),
@@ -35,27 +35,19 @@ fn main() -> anyhow::Result<()> {
     );
 
     scene.add_tattva(
-        Label::new("A pulse travels along one selected activation path.", 0.22)
-            .with_color(Vec4::new(0.79, 0.83, 0.88, 1.0)),
+        Label::new(
+            "All active paths propagate together; deactivated nodes stop outgoing flow.",
+            0.22,
+        )
+        .with_color(Vec4::new(0.79, 0.83, 0.88, 1.0)),
         Vec3::new(0.0, -3.0, 0.0),
     );
 
     let mut timeline = Timeline::new();
-    timeline
-        .animate(signal_id)
-        .at(0.2)
-        .for_duration(1.8)
-        .ease(Ease::InOutQuad)
-        .propagate()
-        .spawn();
-
-    timeline
-        .animate(signal_id)
-        .at(2.4)
-        .for_duration(1.6)
-        .ease(Ease::InOutQuad)
-        .propagate_to(0.0)
-        .spawn();
+    timeline.play_signal(
+        signal_id,
+        SignalPlayback::round_trip(0.2, 1.8, Ease::InOutQuad),
+    );
 
     scene.timelines.insert("main".to_string(), timeline);
     scene.camera_mut().position = Vec3::new(0.0, 0.0, 9.5);
