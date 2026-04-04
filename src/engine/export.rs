@@ -2,7 +2,7 @@ use std::fs;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use glam::Vec4;
@@ -11,7 +11,10 @@ use image::ImageEncoder;
 use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 
 use crate::engine::Engine;
+use crate::engine::config::export_config::ExportConfig;
+use crate::engine::render::RenderOptions;
 use crate::engine::scene::Scene;
+use crate::frontend::collection::utility::screenshot_marker::ScreenshotMarker;
 
 #[derive(Debug, Clone)]
 pub struct ExportSettings {
@@ -43,6 +46,65 @@ impl Default for ExportSettings {
 }
 
 impl ExportSettings {
+    pub fn from_scene(scene: &Scene) -> Self {
+        Self {
+            duration_seconds: infer_duration(scene),
+            ..Self::default()
+        }
+    }
+
+    pub fn from_project_config(scene: &Scene, options: &RenderOptions) -> Result<Self> {
+        let cwd = std::env::current_dir()?;
+        let cfg = ExportConfig::load_nearest_project_file(cwd)?;
+
+        let mut settings = Self::from_scene(scene);
+        settings.width = options
+            .resolution
+            .map(|(w, _)| w)
+            .or(cfg.width)
+            .unwrap_or(settings.width);
+        settings.height = options
+            .resolution
+            .map(|(_, h)| h)
+            .or(cfg.height)
+            .unwrap_or(settings.height);
+        settings.fps = options.fps.or(cfg.fps).unwrap_or(settings.fps);
+        settings.duration_seconds = cfg.duration_seconds.unwrap_or(settings.duration_seconds);
+        if let Some(output_dir) = cfg.output_dir {
+            settings.output_dir = output_dir;
+        }
+        if let Some(basename) = cfg.basename {
+            settings.basename = basename;
+        }
+        if let Some(clear_color) = cfg.clear_color {
+            settings.clear_color = Vec4::new(
+                clear_color[0],
+                clear_color[1],
+                clear_color[2],
+                clear_color[3],
+            );
+        }
+
+        settings.video_path = if options.video_enabled() {
+            resolve_video_output_path(
+                options
+                    .output
+                    .as_ref()
+                    .map(PathBuf::from)
+                    .or(cfg.video_path),
+            )
+        } else {
+            None
+        };
+
+        settings.gif_path = cfg.gif_path;
+        if !options.frames_enabled() {
+            settings.output_dir = PathBuf::from("renders/frames");
+        }
+
+        Ok(settings)
+    }
+
     pub fn total_frames(&self) -> u32 {
         ((self.duration_seconds.max(0.0) * self.fps.max(1) as f32).round() as u32).saturating_add(1)
     }
@@ -54,6 +116,61 @@ impl ExportSettings {
     pub fn frame_path(&self, index: u32) -> PathBuf {
         self.output_dir
             .join(format!("{}_{index:05}.png", self.basename))
+    }
+}
+
+fn resolve_video_output_path(path: Option<PathBuf>) -> Option<PathBuf> {
+    let path = path.unwrap_or_else(|| PathBuf::from("renders/output.mp4"));
+    if looks_like_directory_path(&path) {
+        let stem = infer_default_export_stem();
+        return Some(path.join(format!("{stem}.mp4")));
+    }
+
+    Some(path)
+}
+
+fn looks_like_directory_path(path: &Path) -> bool {
+    if path.as_os_str().is_empty() {
+        return true;
+    }
+    if path.exists() {
+        return path.is_dir();
+    }
+    path.extension().is_none()
+}
+
+fn infer_default_export_stem() -> String {
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(stem) = exe_path.file_stem().and_then(|s| s.to_str()) {
+            if !stem.is_empty() {
+                return sanitize_stem(stem);
+            }
+        }
+    }
+
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    format!("murali_export_{ts}")
+}
+
+fn sanitize_stem(stem: &str) -> String {
+    let sanitized: String = stem
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect();
+
+    if sanitized.is_empty() {
+        "murali_output".to_string()
+    } else {
+        sanitized
     }
 }
 
@@ -120,6 +237,13 @@ pub fn export_scene(scene: Scene, settings: &ExportSettings) -> Result<()> {
                 render_start.elapsed()
             );
         }
+
+        save_requested_screenshots(&image, &mut engine.scene, settings).with_context(|| {
+            format!(
+                "Failed to save requested screenshot at frame {}",
+                next_frame
+            )
+        })?;
 
         let save_start = Instant::now();
         save_png_fast(&image, &settings.frame_path(next_frame))
@@ -261,6 +385,46 @@ fn clear_existing_frame_outputs(settings: &ExportSettings) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn save_requested_screenshots(
+    image: &image::RgbaImage,
+    scene: &mut Scene,
+    settings: &ExportSettings,
+) -> Result<()> {
+    let marker_ids: Vec<_> = scene
+        .tattvas
+        .iter()
+        .filter_map(|(id, tattva)| {
+            tattva
+                .as_any()
+                .downcast_ref::<crate::frontend::Tattva<ScreenshotMarker>>()
+                .and_then(|marker| marker.state.should_capture().then_some(*id))
+        })
+        .collect();
+
+    for id in marker_ids {
+        let Some(marker) = scene.get_tattva_typed_mut::<ScreenshotMarker>(id) else {
+            continue;
+        };
+
+        let path = resolve_screenshot_path(settings, &marker.state.output_path);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        save_png_fast(image, &path)?;
+        marker.state.mark_captured();
+    }
+
+    Ok(())
+}
+
+fn resolve_screenshot_path(settings: &ExportSettings, requested: &Path) -> PathBuf {
+    if requested.is_absolute() {
+        requested.to_path_buf()
+    } else {
+        settings.output_dir.join(requested)
+    }
 }
 
 fn save_png_fast(image: &image::RgbaImage, path: &Path) -> Result<()> {

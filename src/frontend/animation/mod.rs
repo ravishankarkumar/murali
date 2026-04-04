@@ -19,6 +19,7 @@ use crate::frontend::collection::primitives::polygon::Polygon;
 use crate::frontend::collection::primitives::rectangle::Rectangle;
 use crate::frontend::collection::primitives::square::Square;
 use crate::frontend::collection::primitives::to_path::ToPath;
+use crate::frontend::collection::utility::screenshot_marker::ScreenshotMarker;
 use crate::frontend::layout::{Anchor, Bounded, Bounds};
 use crate::frontend::props::DrawableProps;
 use crate::frontend::tattva_trait::TattvaTrait;
@@ -411,6 +412,34 @@ impl Animation for PropagateSignal {
         } else if let Some(flow) = scene.get_tattva_typed_mut::<AgenticFlowChart>(self.target_id) {
             flow.state.progress = self.from.unwrap_or(0.0);
             flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+pub struct TriggerCapture {
+    pub target_id: TattvaId,
+}
+
+impl TriggerCapture {
+    pub fn new(target_id: TattvaId) -> Self {
+        Self { target_id }
+    }
+}
+
+impl Animation for TriggerCapture {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(marker) = scene.get_tattva_typed_mut::<ScreenshotMarker>(self.target_id) {
+            marker.state.arm();
+            marker.mark_dirty(DirtyFlags::STYLE | DirtyFlags::VISIBILITY);
+        }
+    }
+
+    fn apply_at(&mut self, _scene: &mut Scene, _t: f32) {}
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(marker) = scene.get_tattva_typed_mut::<ScreenshotMarker>(self.target_id) {
+            marker.state.reset_capture();
+            marker.mark_dirty(DirtyFlags::STYLE | DirtyFlags::VISIBILITY);
         }
     }
 }

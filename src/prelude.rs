@@ -8,6 +8,7 @@ pub use crate::frontend::collection::primitives::path::Path;
 pub use crate::frontend::collection::primitives::polygon::Polygon;
 pub use crate::frontend::collection::primitives::rectangle::Rectangle;
 pub use crate::frontend::collection::primitives::square::Square;
+pub use crate::frontend::collection::utility::screenshot_marker::ScreenshotMarker;
 pub use crate::frontend::layout::{Bounded, Bounds};
 pub use crate::frontend::style::{ColorSource, StrokeParams, Style};
 pub use crate::frontend::{IntoTattva, Tattva};

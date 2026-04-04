@@ -2,7 +2,7 @@ use crate::engine::timeline::Timeline;
 use crate::frontend::TattvaId;
 use crate::frontend::animation::{
     Animation, Create, Ease, EquationContinuity, FadeTo, FollowAnchor, MatchTransform, MatrixStep,
-    MorphGeometry, MorphObjects, MoveTo, PropagateSignal, RotateTo, ScaleTo,
+    MorphGeometry, MorphObjects, MoveTo, PropagateSignal, RotateTo, ScaleTo, TriggerCapture,
 };
 use crate::frontend::layout::Anchor;
 use glam::{Quat, Vec3, Vec4};
@@ -56,6 +56,7 @@ pub enum AnimKind {
         follower_anchor: Anchor,
         offset: Vec3,
     },
+    CaptureFrame,
     Propagate {
         to: f32,
     },
@@ -237,6 +238,11 @@ impl<'a> AnimationBuilder<'a> {
         self
     }
 
+    pub fn capture_frame(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::CaptureFrame);
+        self
+    }
+
     pub fn propagate_to(mut self, to: f32) -> Self {
         self.spec.kind = Some(AnimKind::Propagate {
             to: to.clamp(0.0, 1.0),
@@ -332,6 +338,7 @@ impl<'a> AnimationBuilder<'a> {
                 follower_anchor,
                 offset,
             )),
+            Some(AnimKind::CaptureFrame) => Box::new(TriggerCapture::new(spec.target_id)),
             Some(AnimKind::Propagate { to }) => {
                 Box::new(PropagateSignal::new(spec.target_id, to, ease))
             }

@@ -24,6 +24,9 @@ Signal propagation through a neural-network path.
 `cargo run --example neural_network_v2`
 Deactivated-node behavior, multi-path propagation, and signal playback modes.
 
+`cargo run --example screenshot_markers`
+Scene markers that save screenshots when timeline control reaches them.
+
 `cargo run --example latex_showcase`
 Dedicated LaTeX text-path regression scene.
 

@@ -16,12 +16,16 @@ use crate::engine::Engine;
 use crate::engine::camera::controller::{
     ActiveCameraController, orbit::OrbitCameraController, pan_zoom::PanZoomCameraController,
 };
+use crate::engine::export::{ExportSettings, export_scene};
+use crate::engine::render::RenderOptions;
 use crate::engine::scene::Scene;
 
 pub struct App {
     window: Option<Arc<Window>>,
     engine: Option<Engine>,
     pending_scene: Option<Scene>,
+    explicit_export_settings: Option<ExportSettings>,
+    render_options: RenderOptions,
     camera_controller: ActiveCameraController,
     is_left_mouse_down: bool,
     last_cursor_position: Option<(f64, f64)>,
@@ -33,6 +37,8 @@ impl App {
             window: None,
             engine: None,
             pending_scene: None,
+            explicit_export_settings: None,
+            render_options: RenderOptions::default(),
             camera_controller: ActiveCameraController::Orbit(OrbitCameraController::new(10.0)),
             is_left_mouse_down: false,
             last_cursor_position: None,
@@ -40,11 +46,46 @@ impl App {
     }
 
     pub fn run_app(mut self) -> Result<()> {
-        print_camera_help();
-        let event_loop = EventLoop::new()?;
-        event_loop
-            .run_app(&mut self)
-            .map_err(|e| anyhow::anyhow!(e))
+        let args: Vec<String> = std::env::args().collect();
+        if should_preview(&args, &self.render_options) {
+            print_camera_help();
+            let event_loop = EventLoop::new()?;
+            return event_loop
+                .run_app(&mut self)
+                .map_err(|e| anyhow::anyhow!(e));
+        }
+
+        let scene = self.pending_scene.take().unwrap_or_else(Scene::new);
+        let settings = match self.explicit_export_settings.take() {
+            Some(settings) => settings,
+            None => ExportSettings::from_project_config(&scene, &self.render_options)?,
+        };
+        export_scene(scene, &settings)
+    }
+
+    pub fn with_render_options(mut self, options: RenderOptions) -> Self {
+        self.render_options = options;
+        self
+    }
+
+    pub fn with_preview(mut self) -> Self {
+        self.render_options.video = Some(false);
+        self
+    }
+
+    pub fn with_video_export(mut self) -> Self {
+        self.render_options.video = Some(true);
+        self
+    }
+
+    pub fn with_frames_export(mut self, enabled: bool) -> Self {
+        self.render_options.frames = Some(enabled);
+        self
+    }
+
+    pub fn with_export_settings(mut self, settings: ExportSettings) -> Self {
+        self.explicit_export_settings = Some(settings);
+        self
     }
 
     pub fn with_scene(mut self, scene: Scene) -> Self {
@@ -175,4 +216,14 @@ fn enforce_16_9(size: PhysicalSize<u32>) -> PhysicalSize<u32> {
 
 fn print_camera_help() {
     println!("\n🎥 Controls: [O] Orbit | [P] PanZoom | [Drag] Move | [Wheel] Zoom\n");
+}
+
+fn should_preview(args: &[String], options: &RenderOptions) -> bool {
+    if args.iter().any(|arg| arg == "--preview") {
+        return true;
+    }
+    if args.iter().any(|arg| arg == "--export") {
+        return false;
+    }
+    !options.video_enabled()
 }

@@ -12,7 +12,7 @@
 use anyhow::Result;
 use std::path::Path;
 
-mod export_config;
+pub(crate) mod export_config;
 mod preview_config;
 
 use export_config::ExportConfig;
