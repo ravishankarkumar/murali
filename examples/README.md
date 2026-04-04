@@ -59,3 +59,9 @@ Showcase of new primitive shapes: Rectangles, Polygons, and Ellipses.
 
 `cargo run --example axes_and_labels`
 Common math visualizations: building coordinate systems with axis labels.
+
+`cargo run --example graph_on_axes`
+Dedicated example showing a plotted function and sampled points on 2D axes.
+
+`cargo run --example graph_draw_3d_camera`
+Graph is progressively drawn while the camera moves in perspective to reveal spatial depth.

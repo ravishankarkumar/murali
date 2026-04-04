@@ -37,8 +37,10 @@ fn vs_main(
     let dash_params = line.props.yzw;
 
     let dir = normalize(end - start);
-    let up = vec3<f32>(0.0, 0.0, 1.0);
-    let side = normalize(cross(dir, up)) * (thickness * 0.5);
+    let world_up = vec3<f32>(0.0, 0.0, 1.0);
+    let fallback_up = vec3<f32>(0.0, 1.0, 0.0);
+    let basis_up = select(world_up, fallback_up, abs(dot(dir, world_up)) > 0.98);
+    let side = normalize(cross(dir, basis_up)) * (thickness * 0.5);
 
     var pos: vec3<f32>;
     var dist: f32;
