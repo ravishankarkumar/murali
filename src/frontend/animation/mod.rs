@@ -15,6 +15,7 @@ use crate::frontend::collection::primitives::circle::Circle;
 use crate::frontend::collection::primitives::ellipse::Ellipse;
 use crate::frontend::collection::primitives::line::Line;
 use crate::frontend::collection::primitives::noisy_circle::NoisyCircle;
+use crate::frontend::collection::primitives::particle_belt::ParticleBelt;
 use crate::frontend::collection::primitives::path::Path;
 use crate::frontend::collection::primitives::polygon::Polygon;
 use crate::frontend::collection::primitives::rectangle::Rectangle;
@@ -599,6 +600,164 @@ impl Animation for NoiseEvolve {
         if let Some(circle) = scene.get_tattva_typed_mut::<NoisyCircle>(self.target_id) {
             circle.state.phase = self.from.unwrap_or(0.0);
             circle.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+pub struct BeltPhaseTo {
+    pub target_id: TattvaId,
+    pub to: f32,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl BeltPhaseTo {
+    pub fn new(target_id: TattvaId, to: f32, ease: Ease) -> Self {
+        Self {
+            target_id,
+            to,
+            ease,
+            from: None,
+        }
+    }
+}
+
+impl Animation for BeltPhaseTo {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(belt) = scene.get_tattva_typed::<ParticleBelt>(self.target_id) {
+            self.from = Some(belt.state.phase);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(self.to);
+        let phase = from + (self.to - from) * self.ease.eval(t);
+        if let Some(belt) = scene.get_tattva_typed_mut::<ParticleBelt>(self.target_id) {
+            belt.state.phase = phase;
+            belt.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(belt) = scene.get_tattva_typed_mut::<ParticleBelt>(self.target_id) {
+            belt.state.phase = self.to;
+            belt.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(belt) = scene.get_tattva_typed_mut::<ParticleBelt>(self.target_id) {
+            belt.state.phase = self.from.unwrap_or(0.0);
+            belt.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+pub struct BeltPhaseBy {
+    pub target_id: TattvaId,
+    pub delta: f32,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl BeltPhaseBy {
+    pub fn new(target_id: TattvaId, delta: f32, ease: Ease) -> Self {
+        Self {
+            target_id,
+            delta,
+            ease,
+            from: None,
+        }
+    }
+}
+
+impl Animation for BeltPhaseBy {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(belt) = scene.get_tattva_typed::<ParticleBelt>(self.target_id) {
+            self.from = Some(belt.state.phase);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(0.0);
+        let phase = from + self.delta * self.ease.eval(t);
+        if let Some(belt) = scene.get_tattva_typed_mut::<ParticleBelt>(self.target_id) {
+            belt.state.phase = phase;
+            belt.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        let from = self.from.unwrap_or(0.0);
+        if let Some(belt) = scene.get_tattva_typed_mut::<ParticleBelt>(self.target_id) {
+            belt.state.phase = from + self.delta;
+            belt.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(belt) = scene.get_tattva_typed_mut::<ParticleBelt>(self.target_id) {
+            belt.state.phase = self.from.unwrap_or(0.0);
+            belt.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+pub struct BeltEvolve {
+    pub target_id: TattvaId,
+    pub duration: f32,
+    pub speed_override: Option<f32>,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl BeltEvolve {
+    pub fn new(
+        target_id: TattvaId,
+        duration: f32,
+        speed_override: Option<f32>,
+        ease: Ease,
+    ) -> Self {
+        Self {
+            target_id,
+            duration,
+            speed_override,
+            ease,
+            from: None,
+        }
+    }
+}
+
+impl Animation for BeltEvolve {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(belt) = scene.get_tattva_typed::<ParticleBelt>(self.target_id) {
+            self.from = Some(belt.state.phase);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(0.0);
+        if let Some(belt) = scene.get_tattva_typed_mut::<ParticleBelt>(self.target_id) {
+            let speed = self.speed_override.unwrap_or(belt.state.orbit_speed);
+            let phase = from + speed * self.duration * self.ease.eval(t);
+            belt.state.phase = phase;
+            belt.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        let from = self.from.unwrap_or(0.0);
+        if let Some(belt) = scene.get_tattva_typed_mut::<ParticleBelt>(self.target_id) {
+            let speed = self.speed_override.unwrap_or(belt.state.orbit_speed);
+            belt.state.phase = from + speed * self.duration;
+            belt.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(belt) = scene.get_tattva_typed_mut::<ParticleBelt>(self.target_id) {
+            belt.state.phase = self.from.unwrap_or(0.0);
+            belt.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 }

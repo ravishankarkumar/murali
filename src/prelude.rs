@@ -8,6 +8,7 @@ pub use crate::frontend::collection::primitives::noisy_circle::{
     NoisyCircle, NoisyCircleColorMode, NoisyCircleGradient, PerlinNoiseCircle,
     PerlinNoiseCircleColorMode, PerlinNoiseCircleGradient,
 };
+pub use crate::frontend::collection::primitives::particle_belt::{AsteroidBelt, ParticleBelt};
 pub use crate::frontend::collection::primitives::path::Path;
 pub use crate::frontend::collection::primitives::polygon::Polygon;
 pub use crate::frontend::collection::primitives::rectangle::Rectangle;

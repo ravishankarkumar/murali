@@ -30,6 +30,9 @@ Scene markers that save screenshots when timeline control reaches them.
 `cargo run --example noisy_circle`
 Circular outline driven by polar Perlin noise and animated over time.
 
+`cargo run --example particle_belt`
+Colored particles orbit in a living circular band, like a stylized asteroid belt.
+
 `cargo run --example latex_showcase`
 Dedicated LaTeX text-path regression scene.
 

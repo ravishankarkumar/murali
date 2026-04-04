@@ -1,9 +1,9 @@
 use crate::engine::timeline::Timeline;
 use crate::frontend::TattvaId;
 use crate::frontend::animation::{
-    Animation, Create, Ease, EquationContinuity, FadeTo, FollowAnchor, MatchTransform, MatrixStep,
-    MorphGeometry, MorphObjects, MoveTo, NoiseEvolve, NoisePhaseBy, NoisePhaseTo, PropagateSignal,
-    RotateTo, ScaleTo, TriggerCapture,
+    Animation, BeltEvolve, BeltPhaseBy, BeltPhaseTo, Create, Ease, EquationContinuity, FadeTo,
+    FollowAnchor, MatchTransform, MatrixStep, MorphGeometry, MorphObjects, MoveTo, NoiseEvolve,
+    NoisePhaseBy, NoisePhaseTo, PropagateSignal, RotateTo, ScaleTo, TriggerCapture,
 };
 use crate::frontend::layout::Anchor;
 use glam::{Quat, Vec3, Vec4};
@@ -64,6 +64,15 @@ pub enum AnimKind {
         delta: f32,
     },
     NoiseEvolve {
+        speed: Option<f32>,
+    },
+    BeltPhaseTo {
+        to: f32,
+    },
+    BeltPhaseBy {
+        delta: f32,
+    },
+    BeltEvolve {
         speed: Option<f32>,
     },
     CaptureFrame,
@@ -273,6 +282,26 @@ impl<'a> AnimationBuilder<'a> {
         self
     }
 
+    pub fn belt_phase_to(mut self, to: f32) -> Self {
+        self.spec.kind = Some(AnimKind::BeltPhaseTo { to });
+        self
+    }
+
+    pub fn belt_phase_by(mut self, delta: f32) -> Self {
+        self.spec.kind = Some(AnimKind::BeltPhaseBy { delta });
+        self
+    }
+
+    pub fn belt_evolve(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::BeltEvolve { speed: None });
+        self
+    }
+
+    pub fn belt_evolve_with_speed(mut self, speed: f32) -> Self {
+        self.spec.kind = Some(AnimKind::BeltEvolve { speed: Some(speed) });
+        self
+    }
+
     pub fn propagate_to(mut self, to: f32) -> Self {
         self.spec.kind = Some(AnimKind::Propagate {
             to: to.clamp(0.0, 1.0),
@@ -377,6 +406,15 @@ impl<'a> AnimationBuilder<'a> {
             }
             Some(AnimKind::NoiseEvolve { speed }) => {
                 Box::new(NoiseEvolve::new(spec.target_id, spec.duration, speed, ease))
+            }
+            Some(AnimKind::BeltPhaseTo { to }) => {
+                Box::new(BeltPhaseTo::new(spec.target_id, to, ease))
+            }
+            Some(AnimKind::BeltPhaseBy { delta }) => {
+                Box::new(BeltPhaseBy::new(spec.target_id, delta, ease))
+            }
+            Some(AnimKind::BeltEvolve { speed }) => {
+                Box::new(BeltEvolve::new(spec.target_id, spec.duration, speed, ease))
             }
             Some(AnimKind::Propagate { to }) => {
                 Box::new(PropagateSignal::new(spec.target_id, to, ease))
