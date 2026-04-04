@@ -2,7 +2,8 @@ use crate::engine::timeline::Timeline;
 use crate::frontend::TattvaId;
 use crate::frontend::animation::{
     Animation, Create, Ease, EquationContinuity, FadeTo, FollowAnchor, MatchTransform, MatrixStep,
-    MorphGeometry, MorphObjects, MoveTo, PropagateSignal, RotateTo, ScaleTo, TriggerCapture,
+    MorphGeometry, MorphObjects, MoveTo, NoiseEvolve, NoisePhaseBy, NoisePhaseTo, PropagateSignal,
+    RotateTo, ScaleTo, TriggerCapture,
 };
 use crate::frontend::layout::Anchor;
 use glam::{Quat, Vec3, Vec4};
@@ -55,6 +56,15 @@ pub enum AnimKind {
         target_anchor: Anchor,
         follower_anchor: Anchor,
         offset: Vec3,
+    },
+    NoisePhaseTo {
+        to: f32,
+    },
+    NoisePhaseBy {
+        delta: f32,
+    },
+    NoiseEvolve {
+        speed: Option<f32>,
     },
     CaptureFrame,
     Propagate {
@@ -243,6 +253,26 @@ impl<'a> AnimationBuilder<'a> {
         self
     }
 
+    pub fn noise_phase_to(mut self, to: f32) -> Self {
+        self.spec.kind = Some(AnimKind::NoisePhaseTo { to });
+        self
+    }
+
+    pub fn noise_phase_by(mut self, delta: f32) -> Self {
+        self.spec.kind = Some(AnimKind::NoisePhaseBy { delta });
+        self
+    }
+
+    pub fn noise_evolve(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::NoiseEvolve { speed: None });
+        self
+    }
+
+    pub fn noise_evolve_with_speed(mut self, speed: f32) -> Self {
+        self.spec.kind = Some(AnimKind::NoiseEvolve { speed: Some(speed) });
+        self
+    }
+
     pub fn propagate_to(mut self, to: f32) -> Self {
         self.spec.kind = Some(AnimKind::Propagate {
             to: to.clamp(0.0, 1.0),
@@ -339,6 +369,15 @@ impl<'a> AnimationBuilder<'a> {
                 offset,
             )),
             Some(AnimKind::CaptureFrame) => Box::new(TriggerCapture::new(spec.target_id)),
+            Some(AnimKind::NoisePhaseTo { to }) => {
+                Box::new(NoisePhaseTo::new(spec.target_id, to, ease))
+            }
+            Some(AnimKind::NoisePhaseBy { delta }) => {
+                Box::new(NoisePhaseBy::new(spec.target_id, delta, ease))
+            }
+            Some(AnimKind::NoiseEvolve { speed }) => {
+                Box::new(NoiseEvolve::new(spec.target_id, spec.duration, speed, ease))
+            }
             Some(AnimKind::Propagate { to }) => {
                 Box::new(PropagateSignal::new(spec.target_id, to, ease))
             }

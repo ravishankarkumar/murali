@@ -2,6 +2,7 @@ pub mod circle;
 pub mod cube;
 pub mod ellipse;
 pub mod line;
+pub mod noisy_circle;
 pub mod path;
 pub mod polygon;
 pub mod rectangle;

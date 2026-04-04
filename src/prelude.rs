@@ -4,6 +4,10 @@ pub use crate::frontend::collection::prelude::{HStack, VStack};
 pub use crate::frontend::collection::primitives::circle::Circle;
 pub use crate::frontend::collection::primitives::ellipse::Ellipse;
 pub use crate::frontend::collection::primitives::line::Line;
+pub use crate::frontend::collection::primitives::noisy_circle::{
+    NoisyCircle, NoisyCircleColorMode, NoisyCircleGradient, PerlinNoiseCircle,
+    PerlinNoiseCircleColorMode, PerlinNoiseCircleGradient,
+};
 pub use crate::frontend::collection::primitives::path::Path;
 pub use crate::frontend::collection::primitives::polygon::Polygon;
 pub use crate::frontend::collection::primitives::rectangle::Rectangle;

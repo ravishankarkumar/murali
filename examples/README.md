@@ -27,6 +27,9 @@ Deactivated-node behavior, multi-path propagation, and signal playback modes.
 `cargo run --example screenshot_markers`
 Scene markers that save screenshots when timeline control reaches them.
 
+`cargo run --example noisy_circle`
+Circular outline driven by polar Perlin noise and animated over time.
+
 `cargo run --example latex_showcase`
 Dedicated LaTeX text-path regression scene.
 
