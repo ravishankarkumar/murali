@@ -1,6 +1,6 @@
+use crate::projection::mesh::Mesh;
 use glam::{Vec3, Vec4};
 use std::sync::Arc;
-use crate::projection::mesh::Mesh;
 
 /// CPU-side render primitives produced by the Projection layer.
 /// These are later materialized into GPU resources by the Backend.

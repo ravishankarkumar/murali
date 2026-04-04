@@ -1,8 +1,8 @@
-use glam::{vec2, vec3, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
-use crate::frontend::style::{Style, StrokeParams};
-use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use crate::frontend::style::{StrokeParams, Style};
 use crate::projection::Mesh;
+use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use glam::{Vec4, vec2, vec3};
 
 #[derive(Debug, Clone)]
 pub struct Ellipse {
@@ -58,7 +58,7 @@ impl Project for Ellipse {
                 let t1 = ((i + 1) as f32 / seg as f32) * std::f32::consts::TAU;
                 let p0 = glam::vec2(self.radius_x * t0.cos(), self.radius_y * t0.sin());
                 let p1 = glam::vec2(self.radius_x * t1.cos(), self.radius_y * t1.sin());
-                
+
                 ctx.emit(RenderPrimitive::Line {
                     start: vec3(p0.x, p0.y, 0.0),
                     end: vec3(p1.x, p1.y, 0.0),

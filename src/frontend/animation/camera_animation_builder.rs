@@ -1,9 +1,9 @@
 // src/frontend/animation/camera_animation_builder.rs
 
-use glam::Vec3;
-use crate::frontend::animation::{Ease, Animation};
-use crate::frontend::animation::camera_animation::{CameraAnimKind, CameraAnimate};
 use crate::engine::timeline::Timeline;
+use crate::frontend::animation::camera_animation::{CameraAnimKind, CameraAnimate};
+use crate::frontend::animation::{Animation, Ease};
+use glam::Vec3;
 
 /// Data container for the camera's animation lifecycle.
 #[derive(Debug, Clone)]
@@ -91,9 +91,7 @@ impl<'a> CameraAnimationBuilder<'a> {
             Some(CameraAnimKind::FrameTo { position, target }) => {
                 Box::new(CameraAnimate::new_frame(position, target, spec.ease))
             }
-            Some(CameraAnimKind::MoveTo { to }) => {
-                Box::new(CameraAnimate::new_move(to, spec.ease))
-            }
+            Some(CameraAnimKind::MoveTo { to }) => Box::new(CameraAnimate::new_move(to, spec.ease)),
             Some(CameraAnimKind::LookAt { target }) => {
                 Box::new(CameraAnimate::new_lookat(target, spec.ease))
             }

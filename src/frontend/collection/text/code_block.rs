@@ -1,6 +1,6 @@
-use glam::Vec4;
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use glam::Vec4;
 
 /// A Tattva for displaying syntax-highlighted code blocks.
 /// Leverages the Typst backend for high-quality rendering and highlighting.
@@ -33,14 +33,11 @@ impl Project for CodeBlock {
     fn project(&self, ctx: &mut ProjectionCtx) {
         // We wrap the code in a Typst raw block.
         // The Sync Boundary handles the actual compilation/rasterization.
-        let escaped_code = self.code
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"");
+        let escaped_code = self.code.replace("\\", "\\\\").replace("\"", "\\\"");
 
         let typst_source = format!(
             "#raw(\"{}\", lang: \"{}\", block: true)",
-            escaped_code,
-            self.language
+            escaped_code, self.language
         );
 
         ctx.emit(RenderPrimitive::Typst {
@@ -55,17 +52,22 @@ impl Project for CodeBlock {
 impl Bounded for CodeBlock {
     fn local_bounds(&self) -> Bounds {
         // Estimate bounds based on line count and max width.
-        // Typst's auto-paging will handle the actual layout, but we need 
+        // Typst's auto-paging will handle the actual layout, but we need
         // a reasonable bounding box for alignment/camera framing.
         let lines = self.code.lines().count().max(1) as f32;
-        let max_line_len = self.code.lines().map(|l| l.chars().count()).max().unwrap_or(0) as f32;
-        
+        let max_line_len = self
+            .code
+            .lines()
+            .map(|l| l.chars().count())
+            .max()
+            .unwrap_or(0) as f32;
+
         let char_width_ratio = 0.6; // Mono-space estimate
         let line_height_ratio = 1.3;
-        
+
         let width = max_line_len * self.world_height * char_width_ratio;
         let height = lines * self.world_height * line_height_ratio;
-        
+
         Bounds::from_center_size(glam::Vec2::ZERO, glam::vec2(width, height))
     }
 }

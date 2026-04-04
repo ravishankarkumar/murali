@@ -1,16 +1,6 @@
 # The requirements and feature requests
 
-## Add tattva util to be provided as a part of the library itself
-
-## Digesting a config file, that is a sibling of client's Cargo.toml for video resolution etc configs
-
-## Video export by default. 
-
-## A construct to add in scene that will request a scheenshot saving when control flow reaches them. Whenever this construct is executed, a scheenshot at that point in time will be saves.
-
-## Add an example where graph is being shown drawn on a 2d/3d axes.
-
-## Support to have an image or a construct(preferrably AUTH logo) to be optionally permanently visible in a corner, maybe upper right (configurable)
+## add_tattva  -> Add tattva util to be provided as a part of the library itself
 
 ## Agentic loop/ flow chart
 
@@ -30,3 +20,16 @@ This should be configurable to allow vertical as well as horizontal placement of
 ## Neural network v2
 ABility to deactivate some node in the neural network.
 Also ability to pass SignalFLow through all the path in the neural network simultaneously. The deactivated node will not have paths and signalFlow coming out of them.
+
+
+
+## Digesting a config file, that is a sibling of client's Cargo.toml for video resolution etc configs
+
+## Video export by default. 
+
+## A construct to add in scene that will request a scheenshot saving when control flow reaches them. Whenever this construct is executed, a scheenshot at that point in time will be saves.
+
+## Add an example where graph is being shown drawn on a 2d/3d axes.
+
+## Support to have an image or a construct(preferrably AUTH logo) to be optionally permanently visible in a corner, maybe upper right (configurable)
+

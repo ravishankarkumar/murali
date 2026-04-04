@@ -1,4 +1,4 @@
-use glam::{vec2, Vec2};
+use glam::{Vec2, vec2};
 
 #[derive(Copy, Clone, Debug)]
 pub enum Place {

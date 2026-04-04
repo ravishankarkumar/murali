@@ -1,12 +1,12 @@
 // src/frontend/mod.rs
 
-pub mod props;
-pub mod layout;
 pub mod animation;
 pub mod collection;
+pub mod layout;
+pub mod props;
+pub mod style;
 pub mod tattva_trait;
 pub mod theme;
-pub mod style;
 
 use crate::frontend::props::SharedProps;
 use std::ops::{BitOr, BitOrAssign};

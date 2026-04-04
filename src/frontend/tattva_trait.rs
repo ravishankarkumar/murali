@@ -1,9 +1,9 @@
 use std::any::Any;
 
 use crate::frontend::layout::Bounds;
-use crate::projection::ProjectionCtx;
-use crate::frontend::{DirtyFlags, Tattva, TattvaId};
 use crate::frontend::props::SharedProps;
+use crate::frontend::{DirtyFlags, Tattva, TattvaId};
+use crate::projection::ProjectionCtx;
 
 /// Object-safe interface for all Tattvas.
 /// Scene, Animation, and SyncBoundary talk ONLY through this.

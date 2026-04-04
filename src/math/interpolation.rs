@@ -1,4 +1,4 @@
-use glam::{Vec3, Vec4, Quat};
+use glam::{Quat, Vec3, Vec4};
 
 pub trait Interpolate {
     fn interpolate(&self, other: &Self, t: f32) -> Self;

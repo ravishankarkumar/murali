@@ -1,18 +1,30 @@
 use crate::engine::timeline::Timeline;
+use crate::frontend::TattvaId;
 use crate::frontend::animation::{
-    Animation, Create, Ease, EquationContinuity, FadeTo, FollowAnchor, MatchTransform,
-    MatrixStep, MorphGeometry, MorphObjects, MoveTo, PropagateSignal, RotateTo, ScaleTo,
+    Animation, Create, Ease, EquationContinuity, FadeTo, FollowAnchor, MatchTransform, MatrixStep,
+    MorphGeometry, MorphObjects, MoveTo, PropagateSignal, RotateTo, ScaleTo,
 };
 use crate::frontend::layout::Anchor;
-use crate::frontend::TattvaId;
 use glam::{Quat, Vec3, Vec4};
 
 #[derive(Debug, Clone)]
 pub enum AnimKind {
-    MoveTo { to: Vec3, from: Option<Vec3> },
-    RotateTo { to: Quat, from: Option<Quat> },
-    ScaleTo { to: Vec3, from: Option<Vec3> },
-    FadeTo { opacity: f32, from: Option<f32> },
+    MoveTo {
+        to: Vec3,
+        from: Option<Vec3>,
+    },
+    RotateTo {
+        to: Quat,
+        from: Option<Quat>,
+    },
+    ScaleTo {
+        to: Vec3,
+        from: Option<Vec3>,
+    },
+    FadeTo {
+        opacity: f32,
+        from: Option<f32>,
+    },
     Create,
     MatchTransform {
         source_id: TattvaId,
@@ -110,7 +122,10 @@ impl<'a> AnimationBuilder<'a> {
     }
 
     pub fn fade_to(mut self, opacity: f32) -> Self {
-        self.spec.kind = Some(AnimKind::FadeTo { opacity, from: None });
+        self.spec.kind = Some(AnimKind::FadeTo {
+            opacity,
+            from: None,
+        });
         self
     }
 
@@ -236,34 +251,42 @@ impl<'a> AnimationBuilder<'a> {
         let anim: Box<dyn Animation> = match spec.kind {
             Some(AnimKind::MoveTo { to, from }) => {
                 let mut m = MoveTo::new(spec.target_id, to, ease);
-                if let Some(f) = from { m = m.with_from(f); }
+                if let Some(f) = from {
+                    m = m.with_from(f);
+                }
                 Box::new(m)
             }
             Some(AnimKind::RotateTo { to, from }) => {
                 let mut m = RotateTo::new(spec.target_id, to, ease);
-                if let Some(f) = from { m = m.with_from(f); }
+                if let Some(f) = from {
+                    m = m.with_from(f);
+                }
                 Box::new(m)
             }
             Some(AnimKind::ScaleTo { to, from }) => {
                 let mut m = ScaleTo::new(spec.target_id, to, ease);
-                if let Some(f) = from { m = m.with_from(f); }
+                if let Some(f) = from {
+                    m = m.with_from(f);
+                }
                 Box::new(m)
             }
             Some(AnimKind::FadeTo { opacity, from }) => {
                 let mut m = FadeTo::new(spec.target_id, opacity, ease);
-                if let Some(f) = from { m = m.with_from(f); }
+                if let Some(f) = from {
+                    m = m.with_from(f);
+                }
                 Box::new(m)
             }
             Some(AnimKind::Create) => Box::new(Create::new(spec.target_id, ease)),
-            Some(AnimKind::MatchTransform { source_id }) => Box::new(
-                MatchTransform::new(spec.target_id, source_id, ease),
-            ),
-            Some(AnimKind::MorphFrom { source_id }) => Box::new(
-                MorphGeometry::new(source_id, spec.target_id, ease),
-            ),
-            Some(AnimKind::EquationContinuityFrom { source_id }) => Box::new(
-                EquationContinuity::new(source_id, spec.target_id, ease),
-            ),
+            Some(AnimKind::MatchTransform { source_id }) => {
+                Box::new(MatchTransform::new(spec.target_id, source_id, ease))
+            }
+            Some(AnimKind::MorphFrom { source_id }) => {
+                Box::new(MorphGeometry::new(source_id, spec.target_id, ease))
+            }
+            Some(AnimKind::EquationContinuityFrom { source_id }) => {
+                Box::new(EquationContinuity::new(source_id, spec.target_id, ease))
+            }
             Some(AnimKind::MatrixStepCells {
                 cells,
                 highlight,
@@ -312,9 +335,7 @@ impl<'a> AnimationBuilder<'a> {
             Some(AnimKind::Propagate { to }) => {
                 Box::new(PropagateSignal::new(spec.target_id, to, ease))
             }
-            None => panic!(
-                "Murali Error: AnimationBuilder requires a kind before .spawn()"
-            ),
+            None => panic!("Murali Error: AnimationBuilder requires a kind before .spawn()"),
         };
 
         self.timeline

@@ -3,8 +3,8 @@
 pub mod orbit;
 pub mod pan_zoom;
 
-use glam::Vec2;
 use crate::engine::camera::Camera;
+use glam::Vec2;
 
 use orbit::OrbitCameraController;
 use pan_zoom::PanZoomCameraController;

@@ -15,8 +15,8 @@ impl TypstBackend {
         {
             use typst::layout::PagedDocument;
             use typst_as_lib::TypstEngine;
-            use typst_svg::svg;
             use typst_as_lib::typst_kit_options::TypstKitFontOptions;
+            use typst_svg::svg;
 
             let effective_font_size = if _font_size > 0.0 { _font_size } else { 11.0 };
             let bottom_margin_pt = effective_font_size * 0.3;

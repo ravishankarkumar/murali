@@ -1,7 +1,7 @@
+use sha2::{Digest, Sha256};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::fs;
-use sha2::{Sha256, Digest};
 
 use crate::resource::latex_resource::error::LatexError; // Updated paths
 use crate::resource::latex_resource::template::latex_document;
@@ -12,7 +12,7 @@ pub struct LatexResource {
     pub svg_path: PathBuf,
 }
 
-/// Compiles LaTeX source to SVG. 
+/// Compiles LaTeX source to SVG.
 /// Now designed to be called by the Resource Cache, not the Frontend.
 pub fn compile_latex(latex_src: &str, cache_dir: &Path) -> Result<LatexResource, LatexError> {
     // 1. Generate a unique hash for this source to avoid redundant work
@@ -20,7 +20,7 @@ pub fn compile_latex(latex_src: &str, cache_dir: &Path) -> Result<LatexResource,
     hasher.update("murali-latex-v2-displaystyle");
     hasher.update(latex_src);
     let hash = format!("{:x}", hasher.finalize());
-    
+
     let work_dir = cache_dir.join(&hash);
     fs::create_dir_all(&work_dir)?;
 
@@ -31,7 +31,11 @@ pub fn compile_latex(latex_src: &str, cache_dir: &Path) -> Result<LatexResource,
     // 2. Check if we already compiled this in a previous run
     if svg_path.exists() {
         let svg_content = fs::read_to_string(&svg_path)?;
-        return Ok(LatexResource { svg_content, hash, svg_path });
+        return Ok(LatexResource {
+            svg_content,
+            hash,
+            svg_path,
+        });
     }
 
     // 3. Write .tex using the template
@@ -65,8 +69,12 @@ pub fn compile_latex(latex_src: &str, cache_dir: &Path) -> Result<LatexResource,
     }
 
     let svg_content = fs::read_to_string(&svg_path)?;
-    
-    Ok(LatexResource { svg_content, hash, svg_path })
+
+    Ok(LatexResource {
+        svg_content,
+        hash,
+        svg_path,
+    })
 }
 
 #[derive(Debug, Default, Clone)]

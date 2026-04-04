@@ -1,14 +1,14 @@
-use glam::{vec2, vec3, Vec2, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
-use crate::frontend::style::{Style, StrokeParams};
-use crate::math::bezier::{quadratic_bezier, cubic_bezier};
+use crate::frontend::style::{StrokeParams, Style};
+use crate::math::bezier::{cubic_bezier, quadratic_bezier};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use glam::{Vec2, Vec4, vec2, vec3};
 
 #[derive(Debug, Clone, Copy)]
 pub enum PathSegment {
     MoveTo(Vec2),
     LineTo(Vec2),
-    QuadTo(Vec2, Vec2),     // control, end
+    QuadTo(Vec2, Vec2),        // control, end
     CubicTo(Vec2, Vec2, Vec2), // control1, control2, end
 }
 
@@ -73,11 +73,7 @@ impl PathSegment {
         let (s_c1, s_c2, s_end) = self.to_cubic(start);
         let (o_c1, o_c2, o_end) = other.to_cubic(other_start);
 
-        PathSegment::CubicTo(
-            s_c1.lerp(o_c1, t),
-            s_c2.lerp(o_c2, t),
-            s_end.lerp(o_end, t),
-        )
+        PathSegment::CubicTo(s_c1.lerp(o_c1, t), s_c2.lerp(o_c2, t), s_end.lerp(o_end, t))
     }
 }
 
@@ -161,7 +157,7 @@ impl Path {
             let mut new_segments = Vec::with_capacity(target_count);
             let needed = target_count - self.segments.len();
             let mut split_this_round = 0;
-            
+
             let split_ratio = if needed >= self.segments.len() {
                 self.segments.len()
             } else {
@@ -180,9 +176,11 @@ impl Path {
                 }
                 current = seg.end_point();
             }
-            
+
             self.segments = new_segments;
-            if split_this_round == 0 { break; } 
+            if split_this_round == 0 {
+                break;
+            }
         }
     }
 
@@ -221,7 +219,7 @@ impl Path {
 
         // Perform the cyclic shift
         let mut new_segments = Vec::with_capacity(n);
-        
+
         // The point before the new start becomes the new MoveTo
         let new_start_idx = (best_shift + n) % n;
         let start_point = if new_start_idx == 0 {
@@ -241,7 +239,7 @@ impl Path {
                 _ => new_segments.push(seg),
             }
         }
-        
+
         let mut new_path = self.clone();
         new_path.segments = new_segments;
         new_path
@@ -376,11 +374,11 @@ impl Project for Path {
 
         // Handle Fill using Lyon Tessellator for robust triangulation
         if let Some(fill) = &self.style.fill {
+            use crate::backend::renderer::vertex::mesh::MeshVertex;
             use lyon_tessellation as lyon;
             use lyon_tessellation::path::Path as LyonPath;
             use lyon_tessellation::{FillOptions, FillTessellator, VertexBuffers};
-            use crate::backend::renderer::vertex::mesh::MeshVertex;
-            
+
             let mut builder = LyonPath::builder();
             let mut current_pos = vec2(0.0, 0.0);
             let mut in_contour = false;
@@ -396,7 +394,7 @@ impl Project for Path {
                         in_contour = true;
                     }
                     PathSegment::LineTo(p) => {
-                        if !in_contour { 
+                        if !in_contour {
                             builder.begin(lyon::math::point(current_pos.x, current_pos.y));
                             in_contour = true;
                         }
@@ -404,25 +402,25 @@ impl Project for Path {
                         current_pos = p;
                     }
                     PathSegment::QuadTo(ctrl, end) => {
-                        if !in_contour { 
+                        if !in_contour {
                             builder.begin(lyon::math::point(current_pos.x, current_pos.y));
                             in_contour = true;
                         }
                         builder.quadratic_bezier_to(
-                            lyon::math::point(ctrl.x, ctrl.y), 
-                            lyon::math::point(end.x, end.y)
+                            lyon::math::point(ctrl.x, ctrl.y),
+                            lyon::math::point(end.x, end.y),
                         );
                         current_pos = end;
                     }
                     PathSegment::CubicTo(ctrl1, ctrl2, end) => {
-                        if !in_contour { 
+                        if !in_contour {
                             builder.begin(lyon::math::point(current_pos.x, current_pos.y));
                             in_contour = true;
                         }
                         builder.cubic_bezier_to(
-                            lyon::math::point(ctrl1.x, ctrl1.y), 
-                            lyon::math::point(ctrl2.x, ctrl2.y), 
-                            lyon::math::point(end.x, end.y)
+                            lyon::math::point(ctrl1.x, ctrl1.y),
+                            lyon::math::point(ctrl2.x, ctrl2.y),
+                            lyon::math::point(end.x, end.y),
                         );
                         current_pos = end;
                     }
@@ -431,7 +429,7 @@ impl Project for Path {
             if in_contour {
                 builder.end(self.closed);
             }
-            
+
             let lpath = builder.build();
             let mut tessellator = FillTessellator::new();
             let mut geometry: VertexBuffers<lyon::math::Point, u16> = VertexBuffers::new();
@@ -447,19 +445,30 @@ impl Project for Path {
                 let get_color = |pos: [f32; 2]| -> [f32; 4] {
                     match &color_source {
                         crate::projection::style::ColorSource::Solid(c) => [c[0], c[1], c[2], c[3]],
-                        crate::projection::style::ColorSource::LinearGradient { start, end, stops } => {
-                            let c = crate::projection::Mesh::evaluate_gradient(glam::vec2(pos[0], pos[1]), *start, *end, stops);
+                        crate::projection::style::ColorSource::LinearGradient {
+                            start,
+                            end,
+                            stops,
+                        } => {
+                            let c = crate::projection::Mesh::evaluate_gradient(
+                                glam::vec2(pos[0], pos[1]),
+                                *start,
+                                *end,
+                                stops,
+                            );
                             [c[0], c[1], c[2], c[3]]
                         }
                     }
                 };
 
-                let vertices: Vec<MeshVertex> = geometry.vertices.iter().map(|v| {
-                    MeshVertex {
+                let vertices: Vec<MeshVertex> = geometry
+                    .vertices
+                    .iter()
+                    .map(|v| MeshVertex {
                         position: [v.x, v.y, 0.0],
                         color: get_color([v.x, v.y]),
-                    }
-                }).collect();
+                    })
+                    .collect();
 
                 let mesh = crate::projection::Mesh::from_tessellation(vertices, geometry.indices);
                 ctx.emit(RenderPrimitive::Mesh(mesh));

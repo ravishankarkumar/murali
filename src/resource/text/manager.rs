@@ -1,5 +1,5 @@
-use crate::resource::text::font::LabelFont;
 use crate::resource::text::atlas::{GlyphAtlas, GlyphInfo};
+use crate::resource::text::font::LabelFont;
 
 /// Renamed from FontResourceManager to match the 'app.rs' expectation.
 /// This acts as the "Baker" for all text metrics in the engine.
@@ -14,10 +14,7 @@ impl LabelResources {
         let font = LabelFont::load();
         let atlas = GlyphAtlas::build(&font);
 
-        Self {
-            font,
-            atlas,
-        }
+        Self { font, atlas }
     }
 
     /// Helper for the Layout engine to find where a character sits.

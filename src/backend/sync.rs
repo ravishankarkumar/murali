@@ -1,12 +1,12 @@
 use crate::backend::ecs::components::*;
+use crate::backend::renderer::Renderer;
 use crate::backend::renderer::mesh::latex_quad::build_textured_quad;
 use crate::backend::renderer::mesh::{MeshInstance, MeshPipelineKind};
-use crate::backend::renderer::Renderer;
 use crate::frontend::DirtyFlags;
-use crate::projection::MeshData;
-use crate::projection::{ProjectionCtx, RenderPrimitive};
 use crate::frontend::TattvaId;
 use crate::frontend::tattva_trait::TattvaTrait;
+use crate::projection::MeshData;
+use crate::projection::{ProjectionCtx, RenderPrimitive};
 use crate::resource::latex_resource::backend::compile_latex;
 use crate::resource::latex_resource::raster::{normalized_world_height, rasterize_svg};
 use crate::resource::text::layout::layout_label;
@@ -14,7 +14,9 @@ use crate::resource::text::manager::LabelResources;
 use crate::resource::text::mesh::build_label_mesh;
 use crate::resource::typst_resource::cache::{TypstRaster, TypstRasterCache};
 use crate::resource::typst_resource::compiler::TypstBackend;
-use crate::resource::typst_resource::raster::{normalized_world_height_from_metrics as normalized_typst_world_height, rasterize_svg_to_rgba};
+use crate::resource::typst_resource::raster::{
+    normalized_world_height_from_metrics as normalized_typst_world_height, rasterize_svg_to_rgba,
+};
 use hecs::{Entity, World};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -116,12 +118,14 @@ impl SyncBoundary {
 
         for primitive in primitives {
             let entity = match primitive {
-                RenderPrimitive::Mesh(mesh) => upload_mesh(device, mesh.as_ref(), None).map(|mesh_instance| {
-                    world.spawn((
-                        MeshComponent(Arc::new(mesh_instance)),
-                        tattva.props().clone(),
-                    ))
-                }),
+                RenderPrimitive::Mesh(mesh) => {
+                    upload_mesh(device, mesh.as_ref(), None).map(|mesh_instance| {
+                        world.spawn((
+                            MeshComponent(Arc::new(mesh_instance)),
+                            tattva.props().clone(),
+                        ))
+                    })
+                }
                 RenderPrimitive::Line {
                     start,
                     end,
@@ -151,10 +155,10 @@ impl SyncBoundary {
                     .build_label_instance(device, renderer, &content, height, color, offset)
                     .map(|mesh_instance| {
                         world.spawn((
-                        MeshComponent(Arc::new(mesh_instance)),
-                        tattva.props().clone(),
-                    ))
-                }),
+                            MeshComponent(Arc::new(mesh_instance)),
+                            tattva.props().clone(),
+                        ))
+                    }),
                 RenderPrimitive::Latex {
                     source,
                     height,
@@ -206,11 +210,15 @@ impl SyncBoundary {
         let resources = self.label_resources.as_ref()?;
 
         if self.text_bind_group.is_none() {
-            self.text_bind_group = Some(renderer.create_text_bind_group_from_raster(
-                &resources.atlas.rgba,
-                resources.atlas.width,
-                resources.atlas.height,
-            ).into());
+            self.text_bind_group = Some(
+                renderer
+                    .create_text_bind_group_from_raster(
+                        &resources.atlas.rgba,
+                        resources.atlas.width,
+                        resources.atlas.height,
+                    )
+                    .into(),
+            );
         }
 
         let layout = layout_label(&resources.font, content, height);
@@ -231,37 +239,31 @@ impl SyncBoundary {
         let latex = match compile_latex(source, &self.latex_cache_dir) {
             Ok(latex) => latex,
             Err(error) => {
-                self.report_once(format!("latex-compile::{error}"), format!(
-                    "LaTeX compile failed for `{source}`: {error}"
-                ));
+                self.report_once(
+                    format!("latex-compile::{error}"),
+                    format!("LaTeX compile failed for `{source}`: {error}"),
+                );
                 return None;
             }
         };
 
         let raster = match rasterize_svg(
             &latex.svg_path,
-            renderer
-                .device_mgr
-                .config
-                .borrow()
-                .height as f32
-                / 4.0,
+            renderer.device_mgr.config.borrow().height as f32 / 4.0,
             renderer.device_mgr.max_texture_size(),
         ) {
             Ok(raster) => raster,
             Err(error) => {
-                self.report_once(format!("latex-raster::{error}"), format!(
-                    "LaTeX rasterization failed for `{source}`: {error}"
-                ));
+                self.report_once(
+                    format!("latex-raster::{error}"),
+                    format!("LaTeX rasterization failed for `{source}`: {error}"),
+                );
                 return None;
             }
         };
 
-        let bind_group = renderer.create_text_bind_group_from_raster(
-            &raster.rgba,
-            raster.width,
-            raster.height,
-        );
+        let bind_group =
+            renderer.create_text_bind_group_from_raster(&raster.rgba, raster.width, raster.height);
         let world_height = normalized_world_height(height, &raster);
         let mesh = build_textured_quad(raster.width, raster.height, world_height, color);
         let mesh = translate_mesh(mesh.as_ref(), offset);
@@ -298,21 +300,24 @@ impl SyncBoundary {
             let svg = match backend.render_to_svg(source, height * 36.0) {
                 Ok(svg) => svg,
                 Err(error) => {
-                    self.report_once(format!("typst-compile::{error}"), format!(
-                        "Typst compilation failed for `{source}`: {error}"
-                    ));
+                    self.report_once(
+                        format!("typst-compile::{error}"),
+                        format!("Typst compilation failed for `{source}`: {error}"),
+                    );
                     return None;
                 }
             };
 
-            let scale = ((renderer.device_mgr.config.borrow().height as f32) / 4.0 / height.max(0.1))
-                .clamp(1.0, 8.0);
+            let scale =
+                ((renderer.device_mgr.config.borrow().height as f32) / 4.0 / height.max(0.1))
+                    .clamp(1.0, 8.0);
             let rasterized = match rasterize_svg_to_rgba(&svg, scale) {
                 Ok(result) => result,
                 Err(error) => {
-                    self.report_once(format!("typst-raster::{error}"), format!(
-                        "Typst rasterization failed for `{source}`: {error}"
-                    ));
+                    self.report_once(
+                        format!("typst-raster::{error}"),
+                        format!("Typst rasterization failed for `{source}`: {error}"),
+                    );
                     return None;
                 }
             };
@@ -330,11 +335,8 @@ impl SyncBoundary {
             self.typst_cache.get(&cache_key)?
         };
 
-        let bind_group = renderer.create_text_bind_group_from_raster(
-            &raster.rgba,
-            raster.width,
-            raster.height,
-        );
+        let bind_group =
+            renderer.create_text_bind_group_from_raster(&raster.rgba, raster.width, raster.height);
         let world_height =
             normalized_typst_world_height(height, raster.height, raster.normalized_height_px);
         let mesh = build_textured_quad(raster.width, raster.height, world_height, color);

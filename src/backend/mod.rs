@@ -2,12 +2,12 @@ pub mod ecs;
 pub mod renderer;
 pub mod sync;
 
-use crate::backend::renderer::device::DeviceManager;
 use crate::backend::renderer::Renderer;
+use crate::backend::renderer::device::DeviceManager;
 
 use hecs::World;
-use winit::window::Window;
 use std::sync::Arc;
+use winit::window::Window;
 
 /// Backend owns all GPU-side systems and the ECS world.
 pub struct Backend {

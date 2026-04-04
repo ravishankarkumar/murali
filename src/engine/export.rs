@@ -75,7 +75,13 @@ pub fn export_scene(scene: Scene, settings: &ExportSettings) -> Result<()> {
         settings.width,
         settings.height,
     ))?;
-    engine.backend.renderer.resize(winit::dpi::PhysicalSize::new(settings.width, settings.height));
+    engine
+        .backend
+        .renderer
+        .resize(winit::dpi::PhysicalSize::new(
+            settings.width,
+            settings.height,
+        ));
     engine.backend.renderer.clear_color = wgpu::Color {
         r: settings.clear_color.x as f64,
         g: settings.clear_color.y as f64,
@@ -85,10 +91,10 @@ pub fn export_scene(scene: Scene, settings: &ExportSettings) -> Result<()> {
 
     for next_frame in 0..settings.total_frames() {
         let dt = if next_frame == 0 {
-                0.0
-            } else {
-                settings.frame_dt()
-            };
+            0.0
+        } else {
+            settings.frame_dt()
+        };
 
         let frame_start = Instant::now();
         if next_frame == 0 {
@@ -129,10 +135,7 @@ pub fn export_scene(scene: Scene, settings: &ExportSettings) -> Result<()> {
             );
         }
 
-        if next_frame == 0
-            || next_frame + 1 == settings.total_frames()
-            || next_frame % 10 == 0
-        {
+        if next_frame == 0 || next_frame + 1 == settings.total_frames() || next_frame % 10 == 0 {
             eprintln!(
                 "Export progress: frame {}/{}",
                 next_frame + 1,

@@ -1,6 +1,6 @@
-use glam::{Vec3, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use glam::{Vec3, Vec4};
 
 /// Frontend Axes.
 /// A composite Tattva that projects into multiple lines and (eventually) labels.

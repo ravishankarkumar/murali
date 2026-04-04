@@ -1,7 +1,7 @@
-pub mod style;
 pub mod context;
 pub mod mesh;
 pub mod primitives;
+pub mod style;
 
 pub use context::ProjectionCtx;
 pub use mesh::{Mesh, MeshData};

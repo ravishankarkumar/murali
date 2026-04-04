@@ -49,7 +49,11 @@ pub fn rasterize_svg_to_rgba(svg: &str, scale: f32) -> Result<TypstRasterized> {
 }
 
 pub fn normalized_world_height(requested_height: f32, raster: &TypstRasterized) -> f32 {
-    normalized_world_height_from_metrics(requested_height, raster.height, raster.normalized_height_px)
+    normalized_world_height_from_metrics(
+        requested_height,
+        raster.height,
+        raster.normalized_height_px,
+    )
 }
 
 pub fn normalized_world_height_from_metrics(
@@ -66,11 +70,7 @@ pub fn normalized_world_height_from_metrics(
     requested_height * scale
 }
 
-fn normalize_typst_raster(
-    rgba: Vec<u8>,
-    width: u32,
-    height: u32,
-) -> (Vec<u8>, u32, u32, f32) {
+fn normalize_typst_raster(rgba: Vec<u8>, width: u32, height: u32) -> (Vec<u8>, u32, u32, f32) {
     let (cropped, cropped_w, cropped_h) = crop_transparent_bounds(rgba, width, height);
     let masked = convert_to_alpha_mask(cropped);
     let dilated = dilate_alpha_mask(masked, cropped_w, cropped_h, TYPST_DILATION_RADIUS);
@@ -78,11 +78,7 @@ fn normalize_typst_raster(
     (dilated, cropped_w, cropped_h, normalized_height_px)
 }
 
-fn crop_transparent_bounds(
-    rgba: Vec<u8>,
-    width: u32,
-    height: u32,
-) -> (Vec<u8>, u32, u32) {
+fn crop_transparent_bounds(rgba: Vec<u8>, width: u32, height: u32) -> (Vec<u8>, u32, u32) {
     let mut min_x = width;
     let mut min_y = height;
     let mut max_x = 0u32;

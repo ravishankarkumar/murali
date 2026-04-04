@@ -1,4 +1,4 @@
-use glam::{vec2, Vec2, Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4, vec2};
 
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Mesh, Project, ProjectionCtx, RenderPrimitive};

@@ -36,7 +36,5 @@ fn main() -> anyhow::Result<()> {
         scene
     };
 
-    App::new()?
-        .with_scene(scene)
-        .run_app()
+    App::new()?.with_scene(scene).run_app()
 }

@@ -1,10 +1,10 @@
-use crate::frontend::collection::primitives::path::{Path, PathSegment};
-use crate::frontend::collection::primitives::rectangle::Rectangle;
 use crate::frontend::collection::primitives::circle::Circle;
-use crate::frontend::collection::primitives::square::Square;
 use crate::frontend::collection::primitives::ellipse::Ellipse;
-use crate::frontend::collection::primitives::polygon::Polygon;
 use crate::frontend::collection::primitives::line::Line;
+use crate::frontend::collection::primitives::path::{Path, PathSegment};
+use crate::frontend::collection::primitives::polygon::Polygon;
+use crate::frontend::collection::primitives::rectangle::Rectangle;
+use crate::frontend::collection::primitives::square::Square;
 use glam::vec2;
 
 pub trait ToPath {
@@ -53,25 +53,25 @@ impl ToPath for Circle {
         let r = self.radius;
         // Standard Cubic Bezier circle split into 8 segments (2 per quadrant) for better alignment
         let k = 4.0 / 3.0 * (std::f32::consts::PI / 16.0).tan() * r;
-        
+
         let mut path = Path::new().move_to(vec2(r, 0.0));
         let segments = 8;
         for i in 0..segments {
             let a1 = (i as f32 / segments as f32) * std::f32::consts::TAU;
             let a2 = ((i + 1) as f32 / segments as f32) * std::f32::consts::TAU;
-            
+
             // Re-calculate control points for the 1/8 segment
             let mid_a = (a1 + a2) / 2.0;
             let h = 4.0 / 3.0 * ((a2 - a1) / 4.0).tan() * r;
-            
+
             let p1 = vec2(a1.cos(), a1.sin()) * r;
             let p2 = vec2(a2.cos(), a2.sin()) * r;
             let c1 = p1 + vec2(-a1.sin(), a1.cos()) * h;
             let c2 = p2 - vec2(-a2.sin(), a2.cos()) * h;
-            
+
             path = path.cubic_to(c1, c2, p2);
         }
-        
+
         path.close().with_style(self.style.clone())
     }
 }
@@ -80,23 +80,23 @@ impl ToPath for Ellipse {
     fn to_path(&self) -> Path {
         let rx = self.radius_x;
         let ry = self.radius_y;
-        
+
         let mut path = Path::new().move_to(vec2(rx, 0.0));
         let segments = 8;
         for i in 0..segments {
             let a1 = (i as f32 / segments as f32) * std::f32::consts::TAU;
             let a2 = ((i + 1) as f32 / segments as f32) * std::f32::consts::TAU;
-            
+
             let h = 4.0 / 3.0 * ((a2 - a1) / 4.0).tan();
-            
+
             let p1 = vec2(a1.cos() * rx, a1.sin() * ry);
             let p2 = vec2(a2.cos() * rx, a2.sin() * ry);
             let c1 = p1 + vec2(-a1.sin() * rx, a1.cos() * ry) * h;
             let c2 = p2 - vec2(-a2.sin() * rx, a2.cos() * ry) * h;
-            
+
             path = path.cubic_to(c1, c2, p2);
         }
-        
+
         path.close().with_style(self.style.clone())
     }
 }

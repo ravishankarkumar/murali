@@ -5,8 +5,8 @@ use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 
 /// Frontend Typst object.
 /// Used for rich document layout and advanced typesetting.
-/// 
-/// The actual compilation and rasterization are handled by 
+///
+/// The actual compilation and rasterization are handled by
 /// the Typst compiler within the Resource layer.
 #[derive(Debug, Clone)]
 pub struct Typst {
@@ -49,6 +49,9 @@ impl Project for Typst {
 impl Bounded for Typst {
     fn local_bounds(&self) -> Bounds {
         let width = self.source.chars().count() as f32 * self.world_height * 0.55;
-        Bounds::from_center_size(glam::Vec2::ZERO, glam::vec2(width.max(self.world_height), self.world_height))
+        Bounds::from_center_size(
+            glam::Vec2::ZERO,
+            glam::vec2(width.max(self.world_height), self.world_height),
+        )
     }
 }

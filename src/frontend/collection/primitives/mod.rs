@@ -1,9 +1,9 @@
 pub mod circle;
-pub mod square;
-pub mod rectangle;
-pub mod polygon;
+pub mod cube;
 pub mod ellipse;
 pub mod line;
-pub mod cube;
 pub mod path;
+pub mod polygon;
+pub mod rectangle;
+pub mod square;
 pub mod to_path;

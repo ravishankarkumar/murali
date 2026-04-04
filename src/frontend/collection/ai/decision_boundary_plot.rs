@@ -1,4 +1,4 @@
-use glam::{vec2, Vec2, Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4, vec2};
 
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Mesh, Project, ProjectionCtx, RenderPrimitive};
@@ -48,7 +48,11 @@ impl DecisionBoundaryPlot {
                 let cx = self.x_range.0 + (ix as f32 + 0.5) * dx;
                 let cy = self.y_range.0 + (iy as f32 + 0.5) * dy;
                 let v = (self.classifier)(vec2(cx, cy));
-                let color = if v >= 0.0 { self.class_a_color } else { self.class_b_color };
+                let color = if v >= 0.0 {
+                    self.class_a_color
+                } else {
+                    self.class_b_color
+                };
                 let mesh = Mesh::square(dx.max(dy) * 0.95, color)
                     .as_ref()
                     .translated(Vec3::new(cx, cy, 0.0));
@@ -60,8 +64,10 @@ impl DecisionBoundaryPlot {
         let mut prev: Option<Vec2> = None;
         for ix in 0..=steps {
             for iy in 0..=steps {
-                let x = self.x_range.0 + (self.x_range.1 - self.x_range.0) * ix as f32 / steps as f32;
-                let y = self.y_range.0 + (self.y_range.1 - self.y_range.0) * iy as f32 / steps as f32;
+                let x =
+                    self.x_range.0 + (self.x_range.1 - self.x_range.0) * ix as f32 / steps as f32;
+                let y =
+                    self.y_range.0 + (self.y_range.1 - self.y_range.0) * iy as f32 / steps as f32;
                 let v = (self.classifier)(vec2(x, y));
                 if v.abs() < 0.04 {
                     if let Some(p) = prev {
@@ -81,7 +87,11 @@ impl DecisionBoundaryPlot {
         }
 
         for point in points {
-            let color = if point.class == 0 { self.class_a_color } else { self.class_b_color };
+            let color = if point.class == 0 {
+                self.class_a_color
+            } else {
+                self.class_b_color
+            };
             let mesh = Mesh::circle(self.point_radius, 20, color)
                 .as_ref()
                 .translated(Vec3::new(point.point.x, point.point.y, 0.0));
@@ -98,6 +108,9 @@ impl Project for DecisionBoundaryPlot {
 
 impl Bounded for DecisionBoundaryPlot {
     fn local_bounds(&self) -> Bounds {
-        Bounds::new(vec2(self.x_range.0, self.y_range.0), vec2(self.x_range.1, self.y_range.1))
+        Bounds::new(
+            vec2(self.x_range.0, self.y_range.0),
+            vec2(self.x_range.1, self.y_range.1),
+        )
     }
 }

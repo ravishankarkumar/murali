@@ -1,46 +1,26 @@
 use glam::{Vec3, Vec4};
+use murali::App;
 use murali::engine::scene::Scene;
 use murali::engine::timeline::Timeline;
 use murali::frontend::animation::Ease;
 use murali::frontend::collection::primitives::{circle::Circle, square::Square};
 use murali::frontend::collection::text::label::Label;
-use murali::frontend::Tattva;
-use murali::App;
-
-fn add_tattva<T>(scene: &mut Scene, state: T, position: Vec3) -> usize
-where
-    T: murali::projection::Project + murali::frontend::layout::Bounded + Send + Sync + 'static,
-{
-    let tattva = Tattva::new(0, state);
-    let id = scene.add(tattva);
-
-    if let Some(t) = scene.get_tattva_any_mut(id) {
-        let mut props = t.props().write();
-        props.position = position;
-    }
-
-    id
-}
 
 fn main() -> anyhow::Result<()> {
     let mut scene = Scene::new();
 
-    let square_id = add_tattva(
-        &mut scene,
+    let square_id = scene.add_tattva(
         Square::new(1.2, Vec4::new(0.92, 0.33, 0.29, 1.0)),
         Vec3::new(-4.0, 0.0, 0.0),
     );
 
-    let circle_id = add_tattva(
-        &mut scene,
+    let circle_id = scene.add_tattva(
         Circle::new(0.65, 48, Vec4::new(0.18, 0.65, 0.34, 1.0)),
         Vec3::new(4.0, -1.5, 0.0),
     );
 
-    add_tattva(
-        &mut scene,
-        Label::new("Timeline regression scene", 0.32)
-            .with_color(Vec4::new(0.92, 0.93, 0.94, 1.0)),
+    scene.add_tattva(
+        Label::new("Timeline regression scene", 0.32).with_color(Vec4::new(0.92, 0.93, 0.94, 1.0)),
         Vec3::new(0.0, 3.0, 0.0),
     );
 

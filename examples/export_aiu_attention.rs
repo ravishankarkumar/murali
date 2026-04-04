@@ -4,39 +4,20 @@ use murali::engine::scene::Scene;
 use murali::frontend::collection::ai::templates::AiUnderTheHoodTemplates;
 use murali::frontend::collection::text::label::Label;
 use murali::frontend::theme::Theme;
-use murali::frontend::Tattva;
-
-fn add_tattva<T>(scene: &mut Scene, state: T, position: Vec3) -> usize
-where
-    T: murali::projection::Project + murali::frontend::layout::Bounded + Send + Sync + 'static,
-{
-    let tattva = Tattva::new(0, state);
-    let id = scene.add(tattva);
-
-    if let Some(t) = scene.get_tattva_any_mut(id) {
-        let mut props = t.props().write();
-        props.position = position;
-    }
-
-    id
-}
 
 fn build_scene() -> Scene {
     let theme = Theme::ai_under_the_hood();
     let mut scene = Scene::new();
 
-    add_tattva(
-        &mut scene,
+    scene.add_tattva(
         Label::new("Attention export template", 0.32).with_color(theme.text_primary),
         Vec3::new(0.0, 3.0, 0.0),
     );
-    add_tattva(
-        &mut scene,
+    scene.add_tattva(
         AiUnderTheHoodTemplates::token_sequence(vec!["query", "key", "value"], 0.30),
         Vec3::new(0.0, 1.95, 0.0),
     );
-    add_tattva(
-        &mut scene,
+    scene.add_tattva(
         AiUnderTheHoodTemplates::attention_matrix(
             vec![
                 vec![0.72, 0.18, 0.10],
@@ -47,8 +28,7 @@ fn build_scene() -> Scene {
         ),
         Vec3::new(-2.3, -0.5, 0.0),
     );
-    add_tattva(
-        &mut scene,
+    scene.add_tattva(
         AiUnderTheHoodTemplates::neural_network(vec![3, 4, 2]),
         Vec3::new(2.6, -0.4, 0.0),
     );

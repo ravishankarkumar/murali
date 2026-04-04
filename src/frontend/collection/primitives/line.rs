@@ -1,6 +1,6 @@
-use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 use crate::frontend::layout::{Bounded, Bounds};
-use crate::frontend::style::{Style, StrokeParams};
+use crate::frontend::style::{StrokeParams, Style};
+use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 use glam::{Vec3, Vec4};
 
 #[derive(Debug, Clone)]
@@ -61,11 +61,22 @@ impl Project for Line {
 
 impl Bounded for Line {
     fn local_bounds(&self) -> Bounds {
-        let thickness = self.style.stroke.as_ref().map(|s| s.thickness).unwrap_or(0.0);
+        let thickness = self
+            .style
+            .stroke
+            .as_ref()
+            .map(|s| s.thickness)
+            .unwrap_or(0.0);
         let half = thickness * 0.5;
         Bounds::new(
-            glam::vec2(self.start.x.min(self.end.x) - half, self.start.y.min(self.end.y) - half),
-            glam::vec2(self.start.x.max(self.end.x) + half, self.start.y.max(self.end.y) + half),
+            glam::vec2(
+                self.start.x.min(self.end.x) - half,
+                self.start.y.min(self.end.y) - half,
+            ),
+            glam::vec2(
+                self.start.x.max(self.end.x) + half,
+                self.start.y.max(self.end.y) + half,
+            ),
         )
     }
 }

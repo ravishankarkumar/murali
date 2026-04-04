@@ -9,8 +9,8 @@ pub mod primitives;
 pub mod text;
 
 pub mod prelude {
-    pub use super::composite::*;
     pub use super::ai::*;
+    pub use super::composite::*;
     pub use super::graph::*;
     pub use super::layout::*;
     pub use super::math::*;

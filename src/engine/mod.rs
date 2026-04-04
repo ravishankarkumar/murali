@@ -1,20 +1,20 @@
 // src/engine/mod.rs
 
 pub mod app;
-pub mod export;
+pub mod camera;
+pub mod config;
 pub mod doctor;
+pub mod export;
+pub mod render;
 pub mod scene;
 pub mod timeline;
-pub mod config;
-pub mod camera;
-pub mod render;
 
 use crate::backend::Backend;
 use crate::backend::sync::SyncBoundary;
 use crate::engine::scene::Scene;
 
-use winit::window::Window;
 use std::sync::Arc;
+use winit::window::Window;
 
 /// The Engine is the top-level owner of all systems.
 pub struct Engine {
@@ -60,10 +60,7 @@ impl Engine {
             .render_scene(&self.scene, &self.backend.world)
     }
 
-    pub async fn new_with_scene(
-        window: Arc<winit::window::Window>,
-        scene: Scene,
-    ) -> Self {
+    pub async fn new_with_scene(window: Arc<winit::window::Window>, scene: Scene) -> Self {
         let backend = Backend::new(window).await.expect("Backend creation failed");
 
         Self {

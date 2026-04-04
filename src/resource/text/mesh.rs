@@ -1,17 +1,13 @@
-use std::sync::Arc;
+use crate::backend::renderer::vertex::text::TextVertex;
+use crate::projection::{Mesh, MeshData};
 use crate::resource::text::atlas::GlyphAtlas;
 use crate::resource::text::layout::LabelLayout;
-use crate::projection::{Mesh, MeshData};
-use crate::backend::renderer::vertex::text::TextVertex;
 use glam::Vec4;
+use std::sync::Arc;
 
 /// Generates a GPU-ready Mesh from a high-level LabelLayout.
 /// This acts as the "Baker" for text geometry.
-pub fn build_label_mesh(
-    layout: &LabelLayout,
-    atlas: &GlyphAtlas,
-    color: Vec4,
-) -> Arc<Mesh> {
+pub fn build_label_mesh(layout: &LabelLayout, atlas: &GlyphAtlas, color: Vec4) -> Arc<Mesh> {
     let mut vertices: Vec<TextVertex> = Vec::new();
     let mut indices: Vec<u16> = Vec::new();
 

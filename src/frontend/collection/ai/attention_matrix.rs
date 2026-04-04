@@ -1,4 +1,4 @@
-use glam::{vec2, Vec2, Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4, vec2};
 
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Mesh, Project, ProjectionCtx, RenderPrimitive};
@@ -107,10 +107,17 @@ impl Bounded for AttentionMatrix {
     fn local_bounds(&self) -> Bounds {
         let rows = self.values.len();
         let cols = self.values.iter().map(|r| r.len()).max().unwrap_or(0);
-        let label_pad = if self.tokens.is_some() { self.cell_size * 1.4 } else { 0.0 };
+        let label_pad = if self.tokens.is_some() {
+            self.cell_size * 1.4
+        } else {
+            0.0
+        };
         Bounds::from_center_size(
             Vec2::ZERO,
-            vec2(cols as f32 * self.cell_size + label_pad * 1.5, rows as f32 * self.cell_size + label_pad * 1.2),
+            vec2(
+                cols as f32 * self.cell_size + label_pad * 1.5,
+                rows as f32 * self.cell_size + label_pad * 1.2,
+            ),
         )
     }
 }

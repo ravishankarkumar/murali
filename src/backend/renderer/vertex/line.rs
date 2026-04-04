@@ -1,6 +1,6 @@
 // src/renderer/vertex/line.rs
-use glam::Vec3;
 use bytemuck::{Pod, Zeroable};
+use glam::Vec3;
 
 #[derive(Copy, Clone, Debug)]
 pub struct LineComponent {

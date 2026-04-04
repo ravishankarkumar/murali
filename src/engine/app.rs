@@ -68,12 +68,11 @@ impl<'a> ApplicationHandler for App {
             .expect("Failed to create window");
 
         let arc_window = Arc::new(window);
-        
+
         let scene = self.pending_scene.take().unwrap_or_else(Scene::new);
 
-        let engine = pollster::block_on(async {
-            Engine::new_with_scene(arc_window.clone(), scene).await
-        });
+        let engine =
+            pollster::block_on(async { Engine::new_with_scene(arc_window.clone(), scene).await });
 
         self.window = Some(arc_window.clone());
         self.engine = Some(engine);

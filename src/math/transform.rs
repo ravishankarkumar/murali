@@ -1,6 +1,6 @@
 // src/transform.rs
 
-use glam::{Vec3, Quat};
+use glam::{Quat, Vec3};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Transform {
@@ -28,4 +28,3 @@ impl Default for Transform {
         }
     }
 }
-

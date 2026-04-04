@@ -1,18 +1,29 @@
-use glam::Vec3;
-use crate::frontend::animation::{Animation, Ease};
 use crate::engine::camera::Projection;
 use crate::engine::scene::Scene;
+use crate::frontend::animation::{Animation, Ease};
+use glam::Vec3;
 
 /// Camera animation kinds targeting the semantic state of the viewpoint.
 #[derive(Debug, Clone)]
 pub enum CameraAnimKind {
-    FrameTo { position: Vec3, target: Vec3 },
-    MoveTo { to: Vec3 },
-    LookAt { target: Vec3 },
+    FrameTo {
+        position: Vec3,
+        target: Vec3,
+    },
+    MoveTo {
+        to: Vec3,
+    },
+    LookAt {
+        target: Vec3,
+    },
     /// Orthographic zoom factor
-    ZoomTo { zoom: f32 },
+    ZoomTo {
+        zoom: f32,
+    },
     /// Perspective field-of-view (radians)
-    FovTo { fov_y_rad: f32 },
+    FovTo {
+        fov_y_rad: f32,
+    },
 }
 
 /// A concrete Animation implementation that mutates the Scene's camera.
@@ -128,7 +139,13 @@ impl Animation for CameraAnimate {
                 cam.target = from.lerp(target, k);
             }
             CameraAnimKind::ZoomTo { zoom } => {
-                if let Projection::Orthographic { width, height, near, far } = cam.projection {
+                if let Projection::Orthographic {
+                    width,
+                    height,
+                    near,
+                    far,
+                } = cam.projection
+                {
                     let fw = self.from_width.unwrap_or(width);
                     let fh = self.from_height.unwrap_or(height);
                     let zoom = zoom.max(0.001);
@@ -141,7 +158,10 @@ impl Animation for CameraAnimate {
                 }
             }
             CameraAnimKind::FovTo { fov_y_rad } => {
-                if let Projection::Perspective { aspect, near, far, .. } = cam.projection {
+                if let Projection::Perspective {
+                    aspect, near, far, ..
+                } = cam.projection
+                {
                     let from = self.from_fov.unwrap_or(fov_y_rad);
                     cam.projection = Projection::Perspective {
                         fov_y_rad: from + (fov_y_rad - from) * k,

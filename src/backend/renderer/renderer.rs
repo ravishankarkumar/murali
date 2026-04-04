@@ -386,20 +386,19 @@ impl Renderer {
             line_pipeline,
             camera_buffer,
             camera_bind_group,
-            line_bind_group_layout
-            // start_time: Instant::now(),
+            line_bind_group_layout, // start_time: Instant::now(),
         }
     }
 
     pub fn render_scene(&mut self, scene: &Scene, world: &hecs::World) -> Result<()> {
         let (frame, view) = self.device_mgr.acquire_frame()?;
         let view_proj = scene.camera.view_proj_matrix();
-        let mut encoder = self
-            .device_mgr
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Murali Render Encoder"),
-            });
+        let mut encoder =
+            self.device_mgr
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Murali Render Encoder"),
+                });
         self.encode_scene_pass(scene, world, &view, &mut encoder, view_proj);
         self.device_mgr.queue.submit(Some(encoder.finish()));
         frame.present();

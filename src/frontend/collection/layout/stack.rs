@@ -1,6 +1,6 @@
 use crate::engine::scene::Scene;
-use crate::frontend::layout::Anchor;
 use crate::frontend::TattvaId;
+use crate::frontend::layout::Anchor;
 
 #[derive(Debug, Clone)]
 pub struct HStack {
@@ -21,7 +21,12 @@ impl HStack {
         for pair in self.items.windows(2) {
             let prev = pair[0];
             let current = pair[1];
-            scene.next_to(current, prev, crate::frontend::layout::Direction::Right, self.gap);
+            scene.next_to(
+                current,
+                prev,
+                crate::frontend::layout::Direction::Right,
+                self.gap,
+            );
             scene.align_to(current, first_id, Anchor::Down);
         }
     }
@@ -46,7 +51,12 @@ impl VStack {
         for pair in self.items.windows(2) {
             let prev = pair[0];
             let current = pair[1];
-            scene.next_to(current, prev, crate::frontend::layout::Direction::Down, self.gap);
+            scene.next_to(
+                current,
+                prev,
+                crate::frontend::layout::Direction::Down,
+                self.gap,
+            );
             scene.align_to(current, first_id, Anchor::Left);
         }
     }

@@ -12,11 +12,11 @@
 use anyhow::Result;
 use std::path::Path;
 
-mod preview_config;
 mod export_config;
+mod preview_config;
 
-use preview_config::PreviewConfig;
 use export_config::ExportConfig;
+use preview_config::PreviewConfig;
 
 // -----------------------------------------------------------------------------
 // Public, resolved config

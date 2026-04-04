@@ -1,4 +1,4 @@
-use glam::{vec2, Vec2, Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4, vec2};
 
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Mesh, Project, ProjectionCtx, RenderPrimitive};
@@ -191,9 +191,17 @@ impl Project for NeuralNetworkDiagram {
 
 impl Bounded for NeuralNetworkDiagram {
     fn local_bounds(&self) -> Bounds {
-        let width = (self.layers.len().saturating_sub(1) as f32) * self.layer_spacing + self.node_radius * 2.0;
+        let width = (self.layers.len().saturating_sub(1) as f32) * self.layer_spacing
+            + self.node_radius * 2.0;
         let max_nodes = self.layers.iter().copied().max().unwrap_or(1);
-        let height = (max_nodes.saturating_sub(1) as f32) * self.node_spacing + self.node_radius * 2.0;
-        Bounds::from_center_size(Vec2::ZERO, vec2(width.max(self.node_radius * 2.0), height.max(self.node_radius * 2.0)))
+        let height =
+            (max_nodes.saturating_sub(1) as f32) * self.node_spacing + self.node_radius * 2.0;
+        Bounds::from_center_size(
+            Vec2::ZERO,
+            vec2(
+                width.max(self.node_radius * 2.0),
+                height.max(self.node_radius * 2.0),
+            ),
+        )
     }
 }

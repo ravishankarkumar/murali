@@ -1,13 +1,12 @@
-
-use glam::Vec4;
 use crate::frontend::layout::{Bounded, Bounds};
-use crate::resource::text::layout::measure_label;
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use crate::resource::text::layout::measure_label;
+use glam::Vec4;
 
-/// Frontend Label. 
+/// Frontend Label.
 /// Lightweight text intended for UI, ticks, or annotations.
 ///
-/// This represents the *intent* to show text. The actual glyph generation 
+/// This represents the *intent* to show text. The actual glyph generation
 /// happens in the Projection/Backend boundary using the Resource Layer.
 #[derive(Debug, Clone)]
 pub struct Label {
@@ -22,7 +21,7 @@ impl Label {
         Self {
             text: text.into(),
             world_height,
-            color: Vec4::new(1.0, 1.0, 1.0,1.0), // Default to white
+            color: Vec4::new(1.0, 1.0, 1.0, 1.0), // Default to white
         }
     }
 
@@ -36,7 +35,7 @@ impl Label {
 impl Project for Label {
     fn project(&self, ctx: &mut ProjectionCtx) {
         // We emit a primitive that describes the requirement.
-        // The Backend's Sync Boundary will use resource/text/layout.rs 
+        // The Backend's Sync Boundary will use resource/text/layout.rs
         // to convert this string into renderable glyph quads.
         ctx.emit(RenderPrimitive::Text {
             content: self.text.clone(),

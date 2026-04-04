@@ -39,11 +39,7 @@ pub struct LabelLayout {
 /// Compute glyph layout for a single-line label.
 ///
 /// This is CPU-only and renderer-agnostic.
-pub fn layout_label(
-    font: &LabelFont,
-    text: &str,
-    world_height: f32,
-) -> LabelLayout {
+pub fn layout_label(font: &LabelFont, text: &str, world_height: f32) -> LabelLayout {
     let metrics: FontMetrics = font.metrics();
 
     // Scale font units → world units

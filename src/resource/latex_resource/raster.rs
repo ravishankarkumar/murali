@@ -30,11 +30,8 @@ pub fn rasterize_svg(
 ) -> Result<LatexRaster, LatexError> {
     let svg_data = std::fs::read(path)?;
 
-    let tree = usvg::Tree::from_data(
-        &svg_data,
-        &usvg::Options::default(),
-    )
-    .map_err(|e| LatexError::DviSvgmFailed(e.to_string()))?;
+    let tree = usvg::Tree::from_data(&svg_data, &usvg::Options::default())
+        .map_err(|e| LatexError::DviSvgmFailed(e.to_string()))?;
 
     // ------------------------------------------------------------
     // SVG intrinsic size (logical units, floats)
@@ -56,9 +53,7 @@ pub fn rasterize_svg(
     let max_scale_x = max_tex / svg_w;
     let max_scale_y = max_tex / svg_h;
 
-    let scale = desired_scale
-        .min(max_scale_x)
-        .min(max_scale_y);
+    let scale = desired_scale.min(max_scale_x).min(max_scale_y);
 
     // ------------------------------------------------------------
     // Final raster dimensions
@@ -90,11 +85,7 @@ pub fn rasterize_svg(
     })
 }
 
-fn normalize_latex_raster(
-    rgba: Vec<u8>,
-    width: u32,
-    height: u32,
-) -> (Vec<u8>, u32, u32, f32) {
+fn normalize_latex_raster(rgba: Vec<u8>, width: u32, height: u32) -> (Vec<u8>, u32, u32, f32) {
     let (cropped, cropped_w, cropped_h) = crop_transparent_bounds(rgba, width, height);
     let masked = convert_to_alpha_mask(cropped);
     let dilated = dilate_alpha_mask(masked, cropped_w, cropped_h, LATEX_DILATION_RADIUS);
@@ -102,11 +93,7 @@ fn normalize_latex_raster(
     (dilated, cropped_w, cropped_h, normalized_height_px)
 }
 
-fn crop_transparent_bounds(
-    rgba: Vec<u8>,
-    width: u32,
-    height: u32,
-) -> (Vec<u8>, u32, u32) {
+fn crop_transparent_bounds(rgba: Vec<u8>, width: u32, height: u32) -> (Vec<u8>, u32, u32) {
     let mut min_x = width;
     let mut min_y = height;
     let mut max_x = 0u32;

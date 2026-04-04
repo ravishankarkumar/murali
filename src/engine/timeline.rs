@@ -1,6 +1,8 @@
 use crate::engine::scene::Scene;
 use crate::frontend::TattvaId;
-use crate::frontend::animation::{Animation, builder::AnimationBuilder, camera_animation_builder::CameraAnimationBuilder};
+use crate::frontend::animation::{
+    Animation, builder::AnimationBuilder, camera_animation_builder::CameraAnimationBuilder,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnimState {
@@ -117,8 +119,8 @@ impl Timeline {
         duration: f32,
         ease: crate::frontend::animation::Ease,
     ) {
-        use std::collections::HashMap;
         use crate::frontend::props::DrawableProps;
+        use std::collections::HashMap;
 
         let mut unmatched_sources = sources.clone();
         let mut unmatched_targets = targets.clone();
@@ -157,7 +159,8 @@ impl Timeline {
         // 2. Match by spatial proximity for the remainder
         let mut final_unmatched_targets = Vec::new();
         for &target_id in &unmatched_targets {
-            let target_pos = scene.get_tattva_any(target_id)
+            let target_pos = scene
+                .get_tattva_any(target_id)
                 .map(|t| DrawableProps::read(t.props()).position)
                 .unwrap_or_default();
 
@@ -165,10 +168,11 @@ impl Timeline {
             let mut min_dist = f32::MAX;
 
             for (idx, &source_id) in unmatched_sources.iter().enumerate() {
-                let source_pos = scene.get_tattva_any(source_id)
+                let source_pos = scene
+                    .get_tattva_any(source_id)
                     .map(|t| DrawableProps::read(t.props()).position)
                     .unwrap_or_default();
-                
+
                 let dist = (target_pos - source_pos).length_squared();
                 if dist < min_dist {
                     min_dist = dist;
@@ -193,11 +197,17 @@ impl Timeline {
                 .ease(ease)
                 .morph_from(src)
                 .spawn();
-            
+
             // Move position to target
-            let source_pos = scene.get_tattva_any(src).map(|t| DrawableProps::read(t.props()).position).unwrap_or_default();
-            let target_pos = scene.get_tattva_any(tgt).map(|t| DrawableProps::read(t.props()).position).unwrap_or_default();
-            
+            let source_pos = scene
+                .get_tattva_any(src)
+                .map(|t| DrawableProps::read(t.props()).position)
+                .unwrap_or_default();
+            let target_pos = scene
+                .get_tattva_any(tgt)
+                .map(|t| DrawableProps::read(t.props()).position)
+                .unwrap_or_default();
+
             self.animate(tgt)
                 .at(start_time)
                 .for_duration(duration)
@@ -205,7 +215,7 @@ impl Timeline {
                 .move_to(target_pos)
                 .from_vec3(source_pos)
                 .spawn();
-                
+
             // Also ensure it fades in if it was hidden
             self.animate(tgt)
                 .at(start_time)

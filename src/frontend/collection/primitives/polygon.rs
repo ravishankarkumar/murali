@@ -1,8 +1,8 @@
-use glam::{vec3, Vec2, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
-use crate::frontend::style::{Style, StrokeParams};
-use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use crate::frontend::style::{StrokeParams, Style};
 use crate::projection::Mesh;
+use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use glam::{Vec2, Vec4, vec3};
 
 #[derive(Debug, Clone)]
 pub struct Polygon {

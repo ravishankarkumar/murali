@@ -41,7 +41,11 @@ impl Mesh {
     }
 
     /// Axis-aligned rectangle in XY plane centered at origin.
-    pub fn rectangle(width: f32, height: f32, color: impl Into<crate::projection::style::ColorSource>) -> Arc<Self> {
+    pub fn rectangle(
+        width: f32,
+        height: f32,
+        color: impl Into<crate::projection::style::ColorSource>,
+    ) -> Arc<Self> {
         let hw = width * 0.5;
         let hh = height * 0.5;
         let color_source = color.into();
@@ -50,7 +54,8 @@ impl Mesh {
             match &color_source {
                 crate::projection::style::ColorSource::Solid(c) => [c[0], c[1], c[2], c[3]],
                 crate::projection::style::ColorSource::LinearGradient { start, end, stops } => {
-                    let c = Self::evaluate_gradient(glam::vec2(pos[0], pos[1]), *start, *end, stops);
+                    let c =
+                        Self::evaluate_gradient(glam::vec2(pos[0], pos[1]), *start, *end, stops);
                     [c[0], c[1], c[2], c[3]]
                 }
             }
@@ -123,8 +128,8 @@ impl Mesh {
         ];
 
         let indices = vec![
-            0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4, 0, 4, 7, 7, 3, 0, 1, 5, 6, 6, 2, 1, 0, 1, 5,
-            5, 4, 0, 3, 2, 6, 6, 7, 3,
+            0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4, 0, 4, 7, 7, 3, 0, 1, 5, 6, 6, 2, 1, 0, 1, 5, 5, 4,
+            0, 3, 2, 6, 6, 7, 3,
         ];
 
         Arc::new(Self {
@@ -134,7 +139,11 @@ impl Mesh {
     }
 
     /// Triangle fan circle in XY plane.
-    pub fn circle(radius: f32, segments: u32, color: impl Into<crate::projection::style::ColorSource>) -> Arc<Self> {
+    pub fn circle(
+        radius: f32,
+        segments: u32,
+        color: impl Into<crate::projection::style::ColorSource>,
+    ) -> Arc<Self> {
         let seg = segments.max(3);
         let mut vertices = Vec::with_capacity((seg + 1) as usize);
         let color_source = color.into();
@@ -143,7 +152,8 @@ impl Mesh {
             match &color_source {
                 crate::projection::style::ColorSource::Solid(c) => [c[0], c[1], c[2], c[3]],
                 crate::projection::style::ColorSource::LinearGradient { start, end, stops } => {
-                    let c = Self::evaluate_gradient(glam::vec2(pos[0], pos[1]), *start, *end, stops);
+                    let c =
+                        Self::evaluate_gradient(glam::vec2(pos[0], pos[1]), *start, *end, stops);
                     [c[0], c[1], c[2], c[3]]
                 }
             }
@@ -178,7 +188,12 @@ impl Mesh {
     }
 
     /// Triangle fan ellipse in XY plane.
-    pub fn ellipse(radius_x: f32, radius_y: f32, segments: u32, color: impl Into<crate::projection::style::ColorSource>) -> Arc<Self> {
+    pub fn ellipse(
+        radius_x: f32,
+        radius_y: f32,
+        segments: u32,
+        color: impl Into<crate::projection::style::ColorSource>,
+    ) -> Arc<Self> {
         let seg = segments.max(3);
         let mut vertices = Vec::with_capacity((seg + 1) as usize);
         let color_source = color.into();
@@ -187,7 +202,8 @@ impl Mesh {
             match &color_source {
                 crate::projection::style::ColorSource::Solid(c) => [c[0], c[1], c[2], c[3]],
                 crate::projection::style::ColorSource::LinearGradient { start, end, stops } => {
-                    let c = Self::evaluate_gradient(glam::vec2(pos[0], pos[1]), *start, *end, stops);
+                    let c =
+                        Self::evaluate_gradient(glam::vec2(pos[0], pos[1]), *start, *end, stops);
                     [c[0], c[1], c[2], c[3]]
                 }
             }
@@ -223,7 +239,10 @@ impl Mesh {
 
     /// Triangle fan polygon in XY plane.
     /// Assumes vertices are convex and provided in order.
-    pub fn polygon(vertices_2d: Vec<glam::Vec2>, color: impl Into<crate::projection::style::ColorSource>) -> Arc<Self> {
+    pub fn polygon(
+        vertices_2d: Vec<glam::Vec2>,
+        color: impl Into<crate::projection::style::ColorSource>,
+    ) -> Arc<Self> {
         let n = vertices_2d.len();
         if n < 3 {
             return Arc::new(Self::empty());
@@ -236,7 +255,8 @@ impl Mesh {
             match &color_source {
                 crate::projection::style::ColorSource::Solid(c) => [c[0], c[1], c[2], c[3]],
                 crate::projection::style::ColorSource::LinearGradient { start, end, stops } => {
-                    let c = Self::evaluate_gradient(glam::vec2(pos[0], pos[1]), *start, *end, stops);
+                    let c =
+                        Self::evaluate_gradient(glam::vec2(pos[0], pos[1]), *start, *end, stops);
                     [c[0], c[1], c[2], c[3]]
                 }
             }
@@ -357,7 +377,12 @@ impl Mesh {
     }
 
     /// Evaluates a linear gradient at a given 2D point.
-    pub fn evaluate_gradient(point: glam::Vec2, start: glam::Vec2, end: glam::Vec2, stops: &[(f32, Vec4)]) -> Vec4 {
+    pub fn evaluate_gradient(
+        point: glam::Vec2,
+        start: glam::Vec2,
+        end: glam::Vec2,
+        stops: &[(f32, Vec4)],
+    ) -> Vec4 {
         if stops.is_empty() {
             return Vec4::ONE;
         }
@@ -374,9 +399,9 @@ impl Mesh {
         let mut upper = &stops[stops.len() - 1];
 
         for i in 0..stops.len() - 1 {
-            if t >= stops[i].0 && t <= stops[i+1].0 {
+            if t >= stops[i].0 && t <= stops[i + 1].0 {
                 lower = &stops[i];
-                upper = &stops[i+1];
+                upper = &stops[i + 1];
                 break;
             }
         }

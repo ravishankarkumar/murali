@@ -15,7 +15,13 @@ impl ColorSource {
         match (self, other) {
             (ColorSource::Solid(v1), ColorSource::Solid(v2)) => ColorSource::Solid(v1.lerp(*v2, t)),
             // For now, if types mismatch, we snap to 'other' at t > 0.5
-            (_, _) => if t < 0.5 { self.clone() } else { other.clone() },
+            (_, _) => {
+                if t < 0.5 {
+                    self.clone()
+                } else {
+                    other.clone()
+                }
+            }
         }
     }
 }

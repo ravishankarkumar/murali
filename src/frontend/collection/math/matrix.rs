@@ -150,8 +150,9 @@ impl Matrix {
 
         let mut out = Vec::new();
         for (row_idx, row) in self.entries.iter().enumerate() {
-            let y =
-                top_edge - self.cell_height * 0.5 - row_idx as f32 * (self.cell_height + self.v_gap);
+            let y = top_edge
+                - self.cell_height * 0.5
+                - row_idx as f32 * (self.cell_height + self.v_gap);
             for (col_idx, cell) in row.iter().enumerate() {
                 out.push(MatrixCellLayout {
                     row: row_idx,
@@ -160,7 +161,11 @@ impl Matrix {
                     center: Vec3::new(x_positions[col_idx], y, 0.0),
                     width: col_widths[col_idx],
                     height: self.cell_height * cell.scale.max(0.05),
-                    color: if cell.color == Vec4::ONE { self.color } else { cell.color },
+                    color: if cell.color == Vec4::ONE {
+                        self.color
+                    } else {
+                        cell.color
+                    },
                     opacity: cell.opacity.clamp(0.0, 1.0),
                     scale: cell.scale.max(0.05),
                     highlight: cell.highlight,
@@ -261,7 +266,10 @@ impl Bounded for Matrix {
         let bracket_pad = self.cell_height * 0.45 + self.cell_height * 0.28;
         Bounds::from_center_size(
             Vec2::ZERO,
-            Vec2::new(total_width + bracket_pad * 2.0, total_height + self.cell_height * 0.7),
+            Vec2::new(
+                total_width + bracket_pad * 2.0,
+                total_height + self.cell_height * 0.7,
+            ),
         )
     }
 }

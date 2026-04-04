@@ -1,35 +1,20 @@
 use glam::{Vec3, Vec4};
+use murali::App;
 use murali::engine::export::{ExportSettings, export_scene};
 use murali::engine::scene::Scene;
-use murali::frontend::collection::ai::neural_network_diagram::{NeuralNetworkDiagram, ActivationFunc};
+use murali::frontend::collection::ai::neural_network_diagram::{
+    ActivationFunc, NeuralNetworkDiagram,
+};
 use murali::frontend::collection::text::code_block::CodeBlock;
 use murali::frontend::collection::text::label::Label;
 use murali::frontend::theme::Theme;
-use murali::frontend::Tattva;
-use murali::App;
-
-fn add_tattva<T>(scene: &mut Scene, state: T, position: Vec3) -> usize
-where
-    T: murali::projection::Project + murali::frontend::layout::Bounded + Send + Sync + 'static,
-{
-    let tattva = Tattva::new(0, state);
-    let id = scene.add(tattva);
-
-    if let Some(t) = scene.get_tattva_any_mut(id) {
-        let mut props = t.props().write();
-        props.position = position;
-    }
-
-    id
-}
 
 fn build_scene() -> Scene {
     let theme = Theme::ai_under_the_hood();
     let mut scene = Scene::new();
 
     // Title
-    add_tattva(
-        &mut scene,
+    scene.add_tattva(
         Label::new("AI Under The Hood: New Features!", 0.40).with_color(theme.text_primary),
         Vec3::new(0.0, 3.2, 0.0),
     );
@@ -38,14 +23,14 @@ fn build_scene() -> Scene {
     let nn = NeuralNetworkDiagram::new(vec![3, 4, 2])
         .with_labels(vec!["Input", "Hidden", "Output"])
         .with_activation(ActivationFunc::ReLU);
-    
-    add_tattva(&mut scene, nn, Vec3::new(-3.5, -0.5, 0.0));
+
+    scene.add_tattva(nn, Vec3::new(-3.5, -0.5, 0.0));
 
     // Code Block
     let code = "fn animate(t: f32) {\n  let pos = lerp(a, b, t);\n  draw(pos);\n}";
     let cb = CodeBlock::new(code, "rust", 0.9).with_color(Vec4::new(0.8, 0.9, 1.0, 1.0));
-    
-    add_tattva(&mut scene, cb, Vec3::new(2.5, -0.5, 0.0));
+
+    scene.add_tattva(cb, Vec3::new(2.5, -0.5, 0.0));
 
     scene.camera_mut().position = Vec3::new(0.0, 0.0, 10.0);
     scene
@@ -73,6 +58,6 @@ fn main() -> anyhow::Result<()> {
     } else {
         App::new()?.with_scene(scene).run_app()?;
     }
-    
+
     Ok(())
 }

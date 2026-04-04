@@ -1,7 +1,7 @@
 // src/camera/controller/pan_zoom.rs
 
-use glam::{Vec2, Vec3};
 use crate::engine::camera::{Camera, Projection};
+use glam::{Vec2, Vec3};
 
 pub struct PanZoomCameraController {
     pub pan_speed: f32,

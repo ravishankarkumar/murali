@@ -1,6 +1,6 @@
-use murali::prelude::*;
+use glam::{Vec4, vec2};
 use murali::engine::export::{ExportSettings, export_scene};
-use glam::{vec2, Vec4};
+use murali::prelude::*;
 
 fn main() -> anyhow::Result<()> {
     let mut scene = Scene::new();
@@ -8,7 +8,7 @@ fn main() -> anyhow::Result<()> {
     // 1. Basic Colors & Opacity (Circle needs segments now)
     let red_rect = Rectangle::new(1.5, 1.0, Vec4::new(1.0, 0.2, 0.2, 0.8))
         .with_stroke(0.04, Vec4::new(1.0, 1.0, 1.0, 1.0));
-    
+
     let green_circle = Circle::new(0.6, 32, Vec4::new(0.2, 0.8, 0.2, 0.6))
         .with_stroke(0.02, Vec4::new(0.8, 1.0, 0.8, 1.0));
 
@@ -20,20 +20,19 @@ fn main() -> anyhow::Result<()> {
         .with_color(Vec4::new(0.4, 0.7, 1.0, 1.0))
         .with_dash(0.2, 0.1);
 
-    let dashed_circle = Circle::new(0.8, 48, Vec4::new(1.0, 1.0, 1.0, 0.1))
-        .with_style(Style::new()
-            .with_stroke(StrokeParams {
-                thickness: 0.04,
-                color: Vec4::new(0.9, 0.6, 1.0, 1.0),
-                dash_length: 0.15,
-                gap_length: 0.1,
-                ..Default::default()
-            })
-        );
+    let dashed_circle = Circle::new(0.8, 48, Vec4::new(1.0, 1.0, 1.0, 0.1)).with_style(
+        Style::new().with_stroke(StrokeParams {
+            thickness: 0.04,
+            color: Vec4::new(0.9, 0.6, 1.0, 1.0),
+            dash_length: 0.15,
+            gap_length: 0.1,
+            ..Default::default()
+        }),
+    );
 
     // 3. Linear Gradient
-    let gradient_rect = Rectangle::new(2.0, 1.0, Vec4::ONE)
-        .with_style(Style::new().with_fill(ColorSource::LinearGradient {
+    let gradient_rect = Rectangle::new(2.0, 1.0, Vec4::ONE).with_style(Style::new().with_fill(
+        ColorSource::LinearGradient {
             start: vec2(-1.0, 0.0),
             end: vec2(1.0, 0.0),
             stops: vec![
@@ -41,7 +40,8 @@ fn main() -> anyhow::Result<()> {
                 (0.5, Vec4::new(0.8, 0.2, 0.8, 1.0)),
                 (1.0, Vec4::new(0.9, 0.6, 0.1, 1.0)),
             ],
-        }));
+        },
+    ));
 
     // Add to scene and get IDs
     let r1 = scene.add(red_rect.into_tattva());

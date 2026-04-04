@@ -1,4 +1,4 @@
-use glam::{vec2, Vec2, Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4, vec2};
 
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
@@ -58,7 +58,8 @@ impl TransformerBlockDiagram {
 impl Project for TransformerBlockDiagram {
     fn project(&self, ctx: &mut ProjectionCtx) {
         let names = self.block_names();
-        let total_height = names.len() as f32 * self.block_height + (names.len().saturating_sub(1) as f32) * self.gap;
+        let total_height = names.len() as f32 * self.block_height
+            + (names.len().saturating_sub(1) as f32) * self.gap;
         let top = total_height * 0.5 - self.block_height * 0.5;
         let inner_width = self.width * 0.86;
 
@@ -68,7 +69,11 @@ impl Project for TransformerBlockDiagram {
                 ctx,
                 vec2(0.0, y),
                 vec2(inner_width, self.block_height),
-                if idx % 2 == 0 { self.accent_color } else { self.frame_color },
+                if idx % 2 == 0 {
+                    self.accent_color
+                } else {
+                    self.frame_color
+                },
             );
             ctx.emit(RenderPrimitive::Text {
                 content: (*name).to_string(),

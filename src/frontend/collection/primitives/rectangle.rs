@@ -1,8 +1,8 @@
-use glam::{vec2, vec3, Vec2, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
-use crate::frontend::style::{Style, StrokeParams};
-use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use crate::frontend::style::{StrokeParams, Style};
 use crate::projection::Mesh;
+use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use glam::{Vec2, Vec4, vec2, vec3};
 
 #[derive(Debug, Clone)]
 pub struct Rectangle {
@@ -48,12 +48,7 @@ impl Project for Rectangle {
 
         // Stroke
         if let Some(stroke) = &self.style.stroke {
-            let pts = [
-                vec2(-hw, -hh),
-                vec2(hw, -hh),
-                vec2(hw, hh),
-                vec2(-hw, hh),
-            ];
+            let pts = [vec2(-hw, -hh), vec2(hw, -hh), vec2(hw, hh), vec2(-hw, hh)];
             for i in 0..4 {
                 let j = (i + 1) % 4;
                 ctx.emit(RenderPrimitive::Line {

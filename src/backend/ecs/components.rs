@@ -1,6 +1,6 @@
-use glam::{Vec2, Vec3, Vec4};
-use crate::engine::scene::SharedProps;
 use crate::backend::renderer::mesh::MeshInstance;
+use crate::engine::scene::SharedProps;
+use glam::{Vec2, Vec3, Vec4};
 use std::sync::Arc;
 
 /// Wraps a GPU-uploaded mesh for the renderer.

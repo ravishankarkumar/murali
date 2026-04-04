@@ -2,13 +2,13 @@
 
 pub use crate::frontend::props::{DrawableProps, SharedProps};
 
-use glam::{vec2, vec3, Mat4, Vec2};
+use glam::{Mat4, Vec2, Vec3, vec2, vec3};
 use std::collections::HashMap;
 
 use crate::engine::camera::Camera;
 use crate::engine::timeline::Timeline;
-use crate::frontend::layout::{anchor_for_direction, opposite_anchor, Anchor, Bounds, Direction};
-use crate::frontend::{DirtyFlags, TattvaId, tattva_trait::TattvaTrait};
+use crate::frontend::layout::{Anchor, Bounds, Direction, anchor_for_direction, opposite_anchor};
+use crate::frontend::{DirtyFlags, IntoTattva, TattvaId, tattva_trait::TattvaTrait};
 
 /// The Scene represents the authoritative Frontend state.
 pub struct Scene {
@@ -53,6 +53,19 @@ impl Scene {
         id
     }
 
+    /// Adds a concrete state object to the scene at a given position.
+    pub fn add_tattva<T>(&mut self, state: T, position: Vec3) -> TattvaId
+    where
+        T: crate::projection::Project + crate::frontend::layout::Bounded + Send + Sync + 'static,
+    {
+        let tattva = state.into_tattva();
+        {
+            let mut props = DrawableProps::write(&tattva.props);
+            props.position = position;
+        }
+        self.add(tattva)
+    }
+
     /// Retrieves a Tattva for inspection or mutation.
     pub fn get_tattva_any_mut(&mut self, id: TattvaId) -> Option<&mut (dyn TattvaTrait + '_)> {
         match self.tattvas.get_mut(&id) {
@@ -68,7 +81,10 @@ impl Scene {
         }
     }
 
-    pub fn get_tattva_typed<T: 'static>(&self, id: TattvaId) -> Option<&crate::frontend::Tattva<T>> {
+    pub fn get_tattva_typed<T: 'static>(
+        &self,
+        id: TattvaId,
+    ) -> Option<&crate::frontend::Tattva<T>> {
         self.get_tattva_any(id)?
             .as_any()
             .downcast_ref::<crate::frontend::Tattva<T>>()
@@ -190,13 +206,19 @@ impl Scene {
             Direction::Left => vec2(margin, 0.0),
             Direction::Right => vec2(-margin, 0.0),
         };
-        self.set_position(id, edge_point + margin_offset - local_bounds.anchor(moving_anchor));
+        self.set_position(
+            id,
+            edge_point + margin_offset - local_bounds.anchor(moving_anchor),
+        );
     }
 
     pub fn frame_bounds(&self) -> Bounds {
         let half_height = 4.0;
         let half_width = half_height * (16.0 / 9.0);
-        Bounds::new(vec2(-half_width, -half_height), vec2(half_width, half_height))
+        Bounds::new(
+            vec2(-half_width, -half_height),
+            vec2(half_width, half_height),
+        )
     }
 
     pub fn clear(&mut self) {

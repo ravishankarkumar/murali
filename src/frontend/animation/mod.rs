@@ -6,7 +6,9 @@ use std::collections::HashMap;
 
 use crate::engine::scene::Scene;
 use crate::frontend::collection::ai::signal_flow::SignalFlow;
-use crate::frontend::collection::math::equation::{EquationLayout, EquationPart, EquationPartLayout};
+use crate::frontend::collection::math::equation::{
+    EquationLayout, EquationPart, EquationPartLayout,
+};
 use crate::frontend::collection::math::matrix::{Matrix, MatrixCellLayout};
 use crate::frontend::collection::primitives::circle::Circle;
 use crate::frontend::collection::primitives::ellipse::Ellipse;
@@ -118,7 +120,10 @@ impl Animation for MoveTo {
     }
 
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
-        let new_pos = self.from.unwrap_or(self.to).lerp(self.to, self.ease.eval(t));
+        let new_pos = self
+            .from
+            .unwrap_or(self.to)
+            .lerp(self.to, self.ease.eval(t));
         with_props_mut(scene, self.target_id, DirtyFlags::TRANSFORM, |props| {
             props.position = new_pos;
         });
@@ -201,7 +206,10 @@ impl Animation for ScaleTo {
     }
 
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
-        let scale = self.from.unwrap_or(self.to).lerp(self.to, self.ease.eval(t));
+        let scale = self
+            .from
+            .unwrap_or(self.to)
+            .lerp(self.to, self.ease.eval(t));
         with_props_mut(scene, self.target_id, DirtyFlags::TRANSFORM, |props| {
             props.scale = scale;
         });
@@ -242,7 +250,8 @@ impl Animation for FadeTo {
     }
 
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
-        let opacity = self.from.unwrap_or(self.to) + (self.to - self.from.unwrap_or(self.to)) * self.ease.eval(t);
+        let opacity = self.from.unwrap_or(self.to)
+            + (self.to - self.from.unwrap_or(self.to)) * self.ease.eval(t);
         with_props_mut(
             scene,
             self.target_id,
@@ -417,7 +426,11 @@ struct MatchSnapshot {
     matched_scale: Vec3,
 }
 
-fn build_match_snapshot(scene: &Scene, source_id: TattvaId, target_id: TattvaId) -> Option<MatchSnapshot> {
+fn build_match_snapshot(
+    scene: &Scene,
+    source_id: TattvaId,
+    target_id: TattvaId,
+) -> Option<MatchSnapshot> {
     let source = scene.get_tattva_any(source_id)?;
     let target = scene.get_tattva_any(target_id)?;
     let source_props = DrawableProps::read(source.props()).clone();
@@ -485,9 +498,14 @@ impl Animation for MatchTransform {
         let eased = self.ease.eval(t);
         with_props_mut(scene, self.target_id, DirtyFlags::TRANSFORM, |props| {
             props.visible = true;
-            props.position = snapshot.matched_position.lerp(snapshot.target.position, eased);
+            props.position = snapshot
+                .matched_position
+                .lerp(snapshot.target.position, eased);
             props.scale = snapshot.matched_scale.lerp(snapshot.target.scale, eased);
-            props.rotation = snapshot.source.rotation.slerp(snapshot.target.rotation, eased);
+            props.rotation = snapshot
+                .source
+                .rotation
+                .slerp(snapshot.target.rotation, eased);
         });
     }
 
@@ -558,9 +576,14 @@ impl Animation for MorphObjects {
             DirtyFlags::TRANSFORM | DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
             |props| {
                 props.visible = true;
-                props.position = snapshot.matched_position.lerp(snapshot.target.position, eased);
+                props.position = snapshot
+                    .matched_position
+                    .lerp(snapshot.target.position, eased);
                 props.scale = snapshot.matched_scale.lerp(snapshot.target.scale, eased);
-                props.rotation = snapshot.source.rotation.slerp(snapshot.target.rotation, eased);
+                props.rotation = snapshot
+                    .source
+                    .rotation
+                    .slerp(snapshot.target.rotation, eased);
                 props.opacity = snapshot.target.opacity * eased;
             },
         );
@@ -701,8 +724,10 @@ impl Animation for EquationContinuity {
                         blended_center.y - target_layout.center.y,
                         0.0,
                     );
-                    part.scale = source_layout.scale + (target_layout.scale - source_layout.scale) * eased;
-                    part.opacity = source_layout.opacity + (target_layout.opacity - source_layout.opacity) * eased;
+                    part.scale =
+                        source_layout.scale + (target_layout.scale - source_layout.scale) * eased;
+                    part.opacity = source_layout.opacity
+                        + (target_layout.opacity - source_layout.opacity) * eased;
                 } else {
                     part.offset += Vec3::new(0.0, (1.0 - eased) * target_layout.height * 0.35, 0.0);
                     part.opacity = target_layout.opacity * eased;
@@ -897,10 +922,16 @@ impl Animation for MatrixStep {
                     cell.opacity = cell.opacity + (1.0 - cell.opacity) * (eased * 0.35);
                 } else {
                     cell.highlight = None;
-                    cell.opacity = cell.opacity + (self.dim_opacity.clamp(0.1, 1.0) - cell.opacity) * eased;
+                    cell.opacity =
+                        cell.opacity + (self.dim_opacity.clamp(0.1, 1.0) - cell.opacity) * eased;
                 }
             }
-            matrix.mark_dirty(DirtyFlags::TEXT_LAYOUT | DirtyFlags::BOUNDS | DirtyFlags::STYLE | DirtyFlags::GEOMETRY);
+            matrix.mark_dirty(
+                DirtyFlags::TEXT_LAYOUT
+                    | DirtyFlags::BOUNDS
+                    | DirtyFlags::STYLE
+                    | DirtyFlags::GEOMETRY,
+            );
         }
     }
 
@@ -912,7 +943,12 @@ impl Animation for MatrixStep {
         if let Some(snapshot) = &self.snapshot {
             if let Some(matrix) = scene.get_tattva_typed_mut::<Matrix>(self.target_id) {
                 matrix.state = snapshot.original.clone();
-                matrix.mark_dirty(DirtyFlags::TEXT_LAYOUT | DirtyFlags::BOUNDS | DirtyFlags::STYLE | DirtyFlags::GEOMETRY);
+                matrix.mark_dirty(
+                    DirtyFlags::TEXT_LAYOUT
+                        | DirtyFlags::BOUNDS
+                        | DirtyFlags::STYLE
+                        | DirtyFlags::GEOMETRY,
+                );
             }
         }
     }
@@ -949,12 +985,24 @@ impl MorphGeometry {
         }
 
         // Try common primitives
-        if let Some(p) = any.downcast_ref::<Tattva<Rectangle>>() { return Some(p.state.to_path()); }
-        if let Some(p) = any.downcast_ref::<Tattva<Circle>>() { return Some(p.state.to_path()); }
-        if let Some(p) = any.downcast_ref::<Tattva<Square>>() { return Some(p.state.to_path()); }
-        if let Some(p) = any.downcast_ref::<Tattva<Ellipse>>() { return Some(p.state.to_path()); }
-        if let Some(p) = any.downcast_ref::<Tattva<Polygon>>() { return Some(p.state.to_path()); }
-        if let Some(p) = any.downcast_ref::<Tattva<Line>>() { return Some(p.state.to_path()); }
+        if let Some(p) = any.downcast_ref::<Tattva<Rectangle>>() {
+            return Some(p.state.to_path());
+        }
+        if let Some(p) = any.downcast_ref::<Tattva<Circle>>() {
+            return Some(p.state.to_path());
+        }
+        if let Some(p) = any.downcast_ref::<Tattva<Square>>() {
+            return Some(p.state.to_path());
+        }
+        if let Some(p) = any.downcast_ref::<Tattva<Ellipse>>() {
+            return Some(p.state.to_path());
+        }
+        if let Some(p) = any.downcast_ref::<Tattva<Polygon>>() {
+            return Some(p.state.to_path());
+        }
+        if let Some(p) = any.downcast_ref::<Tattva<Line>>() {
+            return Some(p.state.to_path());
+        }
 
         None
     }
@@ -991,14 +1039,14 @@ impl Animation for MorphGeometry {
         // Displace the current target with a Path Tattva
         if let Some(tattva_box) = scene.tattvas.remove(&self.target_id) {
             let shared_props = tattva_box.props().clone();
-            
+
             // Ensure target is visible and opaque via the SHARED props
             {
                 let mut props = shared_props.write();
                 props.visible = true;
                 props.opacity = 1.0;
             }
-            
+
             // Create a new Tattva<Path> but REUSE the original SharedProps Arc
             let intermediate = Tattva {
                 id: self.target_id,
@@ -1006,7 +1054,7 @@ impl Animation for MorphGeometry {
                 props: shared_props,
                 dirty: DirtyFlags::ALL,
             };
-            
+
             // Hide the source shape
             if let Some(source) = scene.get_tattva_any_mut(self.source_id) {
                 let mut s_props = source.props().write();
@@ -1037,7 +1085,7 @@ impl Animation for MorphGeometry {
         // Swap back the original target Tattva
         if let Some(original) = self.original_target_tattva.take() {
             scene.replace_tattva(self.target_id, original);
-            
+
             // Marks geometry as dirty since it's back to original type
             if let Some(t) = scene.get_tattva_any_mut(self.target_id) {
                 {

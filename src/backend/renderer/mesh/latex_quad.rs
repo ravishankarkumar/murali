@@ -35,28 +35,25 @@ pub fn build_textured_quad(
         },
         // bottom-right
         TextVertex {
-            position: [ hw, -hh, 0.0],
+            position: [hw, -hh, 0.0],
             uv: [1.0, 1.0],
             color: color.into(),
         },
         // top-right
         TextVertex {
-            position: [ hw,  hh, 0.0],
+            position: [hw, hh, 0.0],
             uv: [1.0, 0.0],
             color: color.into(),
         },
         // top-left
         TextVertex {
-            position: [-hw,  hh, 0.0],
+            position: [-hw, hh, 0.0],
             uv: [0.0, 0.0],
             color: color.into(),
         },
     ];
 
-    let indices = vec![
-        0, 1, 2,
-        0, 2, 3,
-    ];
+    let indices = vec![0, 1, 2, 0, 2, 3];
 
     Arc::new(Mesh {
         data: MeshData::Text(vertices),

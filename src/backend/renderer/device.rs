@@ -163,9 +163,7 @@ impl DeviceManager {
     }
 
     /// Acquire next surface texture.
-    pub fn acquire_frame(
-        &self,
-    ) -> Result<(wgpu::SurfaceTexture, wgpu::TextureView), SurfaceError> {
+    pub fn acquire_frame(&self) -> Result<(wgpu::SurfaceTexture, wgpu::TextureView), SurfaceError> {
         let surface = self
             .surface
             .as_ref()
@@ -205,8 +203,7 @@ impl DepthTexture {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: Self::DEPTH_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                | wgpu::TextureUsages::TEXTURE_BINDING,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         };
 

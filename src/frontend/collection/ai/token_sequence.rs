@@ -1,8 +1,8 @@
-use glam::{vec2, Vec2, Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4, vec2};
 
 use crate::frontend::layout::{Bounded, Bounds};
-use crate::resource::text::layout::measure_label;
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use crate::resource::text::layout::measure_label;
 
 #[derive(Debug, Clone)]
 pub struct TokenSequence {
@@ -40,7 +40,8 @@ impl TokenSequence {
 impl Project for TokenSequence {
     fn project(&self, ctx: &mut ProjectionCtx) {
         let sizes: Vec<Vec2> = self.tokens.iter().map(|t| self.token_size(t)).collect();
-        let total_width = sizes.iter().map(|s| s.x).sum::<f32>() + self.gap * self.tokens.len().saturating_sub(1) as f32;
+        let total_width = sizes.iter().map(|s| s.x).sum::<f32>()
+            + self.gap * self.tokens.len().saturating_sub(1) as f32;
         let mut cursor = -total_width * 0.5;
 
         for (token, size) in self.tokens.iter().zip(sizes) {
@@ -82,7 +83,8 @@ impl Project for TokenSequence {
 impl Bounded for TokenSequence {
     fn local_bounds(&self) -> Bounds {
         let sizes: Vec<Vec2> = self.tokens.iter().map(|t| self.token_size(t)).collect();
-        let total_width = sizes.iter().map(|s| s.x).sum::<f32>() + self.gap * self.tokens.len().saturating_sub(1) as f32;
+        let total_width = sizes.iter().map(|s| s.x).sum::<f32>()
+            + self.gap * self.tokens.len().saturating_sub(1) as f32;
         let max_height = sizes.iter().map(|s| s.y).fold(0.0, f32::max);
         Bounds::from_center_size(Vec2::ZERO, vec2(total_width.max(0.1), max_height.max(0.1)))
     }

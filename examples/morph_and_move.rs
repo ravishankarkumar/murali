@@ -1,43 +1,25 @@
 use glam::{Vec3, Vec4};
+use murali::App;
 use murali::engine::scene::Scene;
 use murali::engine::timeline::Timeline;
 use murali::frontend::animation::Ease;
 use murali::frontend::collection::primitives::{circle::Circle, square::Square};
-use murali::frontend::Tattva;
-use murali::App;
-
-fn add_tattva<T>(scene: &mut Scene, state: T, position: Vec3) -> usize
-where
-    T: murali::projection::Project + murali::frontend::layout::Bounded + Send + Sync + 'static,
-{
-    let tattva = Tattva::new(0, state);
-    let id = scene.add(tattva);
-
-    if let Some(t) = scene.get_tattva_any_mut(id) {
-        let mut props = t.props().write();
-        props.position = position;
-    }
-
-    id
-}
 
 fn main() -> anyhow::Result<()> {
     let mut scene = Scene::new();
 
     // The Source (starts visible at left)
-    let square_id = add_tattva(
-        &mut scene,
+    let square_id = scene.add_tattva(
         Square::new(1.0, Vec4::new(0.96, 0.42, 0.28, 1.0)),
         Vec3::new(-4.0, 0.0, 0.0),
     );
 
     // The Target (hidden at right)
-    let circle_id = add_tattva(
-        &mut scene,
+    let circle_id = scene.add_tattva(
         Circle::new(0.5, 64, Vec4::new(0.26, 0.70, 0.44, 1.0)),
         Vec3::new(-4.0, 0.0, 0.0), // Start at the same position as square
     );
-    
+
     // Hide target initially
     if let Some(t) = scene.get_tattva_any_mut(circle_id) {
         let mut props = t.props().write();
@@ -50,7 +32,7 @@ fn main() -> anyhow::Result<()> {
     // 1. Morph AND Move together
     // Note: We animate the 'target' (circle), morphing it from the 'source' (square).
     // The source (square) will be automatically hidden at 1.0s.
-    
+
     // Morph
     timeline
         .animate(circle_id)

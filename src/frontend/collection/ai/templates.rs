@@ -15,10 +15,7 @@ impl AiUnderTheHoodTemplates {
         diagram
     }
 
-    pub fn token_sequence(
-        tokens: Vec<impl Into<String>>,
-        token_height: f32,
-    ) -> TokenSequence {
+    pub fn token_sequence(tokens: Vec<impl Into<String>>, token_height: f32) -> TokenSequence {
         let theme = Theme::ai_under_the_hood();
         let mut sequence = TokenSequence::new(tokens, token_height);
         sequence.text_color = theme.text_primary;
@@ -26,10 +23,7 @@ impl AiUnderTheHoodTemplates {
         sequence
     }
 
-    pub fn attention_matrix(
-        values: Vec<Vec<f32>>,
-        tokens: Option<Vec<String>>,
-    ) -> AttentionMatrix {
+    pub fn attention_matrix(values: Vec<Vec<f32>>, tokens: Option<Vec<String>>) -> AttentionMatrix {
         let theme = Theme::ai_under_the_hood();
         let mut matrix = AttentionMatrix::new(values, tokens);
         matrix.low_color = theme.surface;

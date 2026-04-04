@@ -1,10 +1,10 @@
 use glam::{Vec2, Vec3, Vec4};
 
+use crate::engine::scene::Scene;
 use crate::frontend::layout::{Bounded, Bounds};
+use crate::frontend::props::DrawableProps;
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 use crate::resource::text::layout::measure_label;
-use crate::engine::scene::Scene;
-use crate::frontend::props::DrawableProps;
 
 #[derive(Debug, Clone)]
 pub struct EquationPart {
@@ -190,14 +190,14 @@ impl VectorEquation {
     /// Compiles the equation into a set of individual Path Tattvas added to the scene.
     /// Returns the IDs of the spawned Tattvas.
     pub fn spawn(&self, scene: &mut Scene) -> Vec<usize> {
+        use crate::frontend::Tattva;
         use crate::resource::typst_resource::compiler::TypstBackend;
         use crate::resource::typst_resource::vector::parse_typst_svg_to_paths;
-        use crate::frontend::Tattva;
 
         let backend = TypstBackend::new().expect("Failed to init Typst backend");
-        
+
         // Use a base font size for the SVG generation, we'll scale it in world space later
-        let base_size = 32.0; 
+        let base_size = 32.0;
         let svg = match backend.render_to_svg(&self.content, base_size) {
             Ok(s) => s,
             Err(e) => {
@@ -214,26 +214,41 @@ impl VectorEquation {
             }
         };
 
-        // Typst SVGs are sized relative to the base_size. 
+        // Typst SVGs are sized relative to the base_size.
         // We need to scale them to our world_height.
         let world_scale = self.world_height / base_size;
-        
+
         let mut ids = Vec::new();
         for symbol in symbols {
             let mut path = symbol.path;
             // Scale the geometry to world space
             for seg in &mut path.segments {
                 match seg {
-                    crate::frontend::collection::primitives::path::PathSegment::MoveTo(p) => *p *= world_scale,
-                    crate::frontend::collection::primitives::path::PathSegment::LineTo(p) => *p *= world_scale,
-                    crate::frontend::collection::primitives::path::PathSegment::QuadTo(c, p) => { *c *= world_scale; *p *= world_scale; }
-                    crate::frontend::collection::primitives::path::PathSegment::CubicTo(c1, c2, p) => { *c1 *= world_scale; *c2 *= world_scale; *p *= world_scale; }
+                    crate::frontend::collection::primitives::path::PathSegment::MoveTo(p) => {
+                        *p *= world_scale
+                    }
+                    crate::frontend::collection::primitives::path::PathSegment::LineTo(p) => {
+                        *p *= world_scale
+                    }
+                    crate::frontend::collection::primitives::path::PathSegment::QuadTo(c, p) => {
+                        *c *= world_scale;
+                        *p *= world_scale;
+                    }
+                    crate::frontend::collection::primitives::path::PathSegment::CubicTo(
+                        c1,
+                        c2,
+                        p,
+                    ) => {
+                        *c1 *= world_scale;
+                        *c2 *= world_scale;
+                        *p *= world_scale;
+                    }
                 }
             }
 
             let tattva = Tattva::new(0, path);
             let id = scene.add(tattva);
-            
+
             // Set the ID/Key for animation matching
             if let Some(t) = scene.get_tattva_any_mut(id) {
                 let mut props = DrawableProps::write(t.props());

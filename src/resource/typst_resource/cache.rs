@@ -1,10 +1,10 @@
 // src/resources/typst/cache.rs
 //! LRU cache for compiled text rasters.
 
-use std::sync::Arc;
-use parking_lot::RwLock;
 use lru::LruCache;
+use parking_lot::RwLock;
 use std::num::NonZeroUsize;
+use std::sync::Arc;
 
 /// Raster + metadata stored in the cache.
 #[derive(Debug, Clone)]
@@ -24,7 +24,9 @@ pub struct TypstRasterCache {
 impl TypstRasterCache {
     pub fn new(capacity: usize) -> Self {
         Self {
-            inner: RwLock::new(LruCache::new(NonZeroUsize::new(capacity).expect("Cache capacity must be non-zero"))),
+            inner: RwLock::new(LruCache::new(
+                NonZeroUsize::new(capacity).expect("Cache capacity must be non-zero"),
+            )),
         }
     }
 

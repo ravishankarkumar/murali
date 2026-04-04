@@ -3,7 +3,7 @@ use glam::Vec4;
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 
-/// The Frontend LaTeX object. 
+/// The Frontend LaTeX object.
 /// Pure semantic intent. No file IO occurs here.
 pub struct Latex {
     pub source: String,
@@ -32,7 +32,7 @@ impl Project for Latex {
     fn project(&self, ctx: &mut ProjectionCtx) {
         // We emit the raw source and height.
         // The Sync Boundary will receive this and check the Resource Layer
-        // (resource/latex/) to see if a cached texture already exists 
+        // (resource/latex/) to see if a cached texture already exists
         // for this string. If not, IT will trigger the Tectonic compiler.
         ctx.emit(RenderPrimitive::Latex {
             source: self.source.clone(),
@@ -46,6 +46,9 @@ impl Project for Latex {
 impl Bounded for Latex {
     fn local_bounds(&self) -> Bounds {
         let width = self.source.chars().count() as f32 * self.world_height * 0.55;
-        Bounds::from_center_size(glam::Vec2::ZERO, glam::vec2(width.max(self.world_height), self.world_height))
+        Bounds::from_center_size(
+            glam::Vec2::ZERO,
+            glam::vec2(width.max(self.world_height), self.world_height),
+        )
     }
 }

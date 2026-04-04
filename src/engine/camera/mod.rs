@@ -51,11 +51,11 @@ impl Projection {
                 far,
             } => Mat4::orthographic_rh(
                 -width / 2.0,
-                 width / 2.0,
+                width / 2.0,
                 -height / 2.0,
-                 height / 2.0,
-                 near,
-                 far,
+                height / 2.0,
+                near,
+                far,
             ),
 
             Projection::Perspective {
@@ -63,12 +63,7 @@ impl Projection {
                 aspect,
                 near,
                 far,
-            } => Mat4::perspective_rh(
-                fov_y_rad,
-                aspect,
-                near,
-                far,
-            ),
+            } => Mat4::perspective_rh(fov_y_rad, aspect, near, far),
         }
     }
 }

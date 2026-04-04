@@ -1,20 +1,19 @@
 use glam::{Vec3, Vec4};
+use murali::App;
 use murali::engine::scene::Scene;
 use murali::engine::timeline::Timeline;
 use murali::frontend::animation::Ease;
 use murali::frontend::collection::math::equation::VectorEquation;
-use murali::App;
 
 fn main() -> anyhow::Result<()> {
     let mut scene = Scene::new();
 
     // 1. Create the two equations (mathematically equivalent but different layout)
     // We use Typst math syntax: $...$
-    let eq1 = VectorEquation::new("$(a + b)^2$", 1.2)
-        .with_color(Vec4::new(0.4, 0.7, 1.0, 1.0)); // Blueish
-    
-    let eq2 = VectorEquation::new("$a^2 + 2 a b + b^2$", 1.0)
-        .with_color(Vec4::new(1.0, 0.8, 0.4, 1.0)); // Orangeish
+    let eq1 = VectorEquation::new("$(a + b)^2$", 1.2).with_color(Vec4::new(0.4, 0.7, 1.0, 1.0)); // Blueish
+
+    let eq2 =
+        VectorEquation::new("$a^2 + 2 a b + b^2$", 1.0).with_color(Vec4::new(1.0, 0.8, 0.4, 1.0)); // Orangeish
 
     // 2. Spawn them into the scene
     // Note: They are spawned as individual character Tattvas.
@@ -39,8 +38,8 @@ fn main() -> anyhow::Result<()> {
         sources,
         targets,
         &scene,
-        1.5,           // Start at 1.5s
-        3.0,           // Duration 3s
+        1.5, // Start at 1.5s
+        3.0, // Duration 3s
         Ease::InOutCubic,
     );
 
