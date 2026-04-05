@@ -5,7 +5,7 @@ use crate::frontend::animation::{
     FollowAnchor, HorizonEvolve, HorizonPhaseBy, HorizonPhaseTo, MatchTransform, MatrixStep,
     MorphGeometry, MorphObjects, MoveTo, NoiseEvolve, NoisePhaseBy, NoisePhaseTo,
     PerlinFieldEvolve, PerlinFieldPhaseBy, PerlinFieldPhaseTo, PropagateSignal, RevealTo, RotateTo, ScaleTo,
-    TriggerCapture, WritePath, UnwritePath,
+    TriggerCapture, WritePath, UnwritePath, WriteText, UnwriteText, RevealText, UnrevealText,
 };
 use crate::frontend::layout::Anchor;
 use glam::{Quat, Vec3, Vec4};
@@ -104,6 +104,10 @@ pub enum AnimKind {
     },
     WritePath,
     UnwritePath,
+    WriteText,
+    UnwriteText,
+    RevealText,
+    UnrevealText,
 }
 
 #[derive(Debug, Clone)]
@@ -391,6 +395,26 @@ impl<'a> AnimationBuilder<'a> {
         self
     }
 
+    pub fn write_text(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::WriteText);
+        self
+    }
+
+    pub fn unwrite_text(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::UnwriteText);
+        self
+    }
+
+    pub fn reveal_text(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::RevealText);
+        self
+    }
+
+    pub fn unreveal_text(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::UnrevealText);
+        self
+    }
+
     pub fn spawn(self) {
         let spec = self.spec;
         let ease = spec.ease.unwrap_or_default();
@@ -533,6 +557,18 @@ impl<'a> AnimationBuilder<'a> {
             }
             Some(AnimKind::UnwritePath) => {
                 Box::new(UnwritePath::new(spec.target_id, ease))
+            }
+            Some(AnimKind::WriteText) => {
+                Box::new(WriteText::new(spec.target_id, ease))
+            }
+            Some(AnimKind::UnwriteText) => {
+                Box::new(UnwriteText::new(spec.target_id, ease))
+            }
+            Some(AnimKind::RevealText) => {
+                Box::new(RevealText::new(spec.target_id, ease))
+            }
+            Some(AnimKind::UnrevealText) => {
+                Box::new(UnrevealText::new(spec.target_id, ease))
             }
             None => panic!("Murali Error: AnimationBuilder requires a kind before .spawn()"),
         };

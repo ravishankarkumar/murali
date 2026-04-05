@@ -1985,3 +1985,341 @@ impl Animation for UnwritePath {
         }
     }
 }
+
+/// WriteText animation: reveals text character by character (typewriter effect)
+pub struct WriteText {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+}
+
+impl WriteText {
+    pub fn new(target_id: TattvaId, ease: Ease) -> Self {
+        Self { target_id, ease }
+    }
+}
+
+impl Animation for WriteText {
+    fn on_start(&mut self, scene: &mut Scene) {
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 0.0;
+            label.state.typewriter_mode = true;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 0.0;
+            latex.state.typewriter_mode = true;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let eased_t = self.ease.eval(t);
+        
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = eased_t;
+            label.state.typewriter_mode = true;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = eased_t;
+            latex.state.typewriter_mode = true;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 1.0;
+            label.state.typewriter_mode = true;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 1.0;
+            latex.state.typewriter_mode = true;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 0.0;
+            label.state.typewriter_mode = true;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 0.0;
+            latex.state.typewriter_mode = true;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+}
+
+/// UnwriteText animation: hides text character by character (reverse typewriter effect)
+pub struct UnwriteText {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+}
+
+impl UnwriteText {
+    pub fn new(target_id: TattvaId, ease: Ease) -> Self {
+        Self { target_id, ease }
+    }
+}
+
+impl Animation for UnwriteText {
+    fn on_start(&mut self, scene: &mut Scene) {
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 1.0;
+            label.state.typewriter_mode = true;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 1.0;
+            latex.state.typewriter_mode = true;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let eased_t = self.ease.eval(t);
+        
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 1.0 - eased_t;
+            label.state.typewriter_mode = true;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 1.0 - eased_t;
+            latex.state.typewriter_mode = true;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 0.0;
+            label.state.typewriter_mode = true;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 0.0;
+            latex.state.typewriter_mode = true;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 1.0;
+            label.state.typewriter_mode = true;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 1.0;
+            latex.state.typewriter_mode = true;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+}
+
+/// RevealText animation: reveals text character by character with shifting effect
+/// Text grows from center, shifting as characters are revealed
+pub struct RevealText {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+}
+
+impl RevealText {
+    pub fn new(target_id: TattvaId, ease: Ease) -> Self {
+        Self { target_id, ease }
+    }
+}
+
+impl Animation for RevealText {
+    fn on_start(&mut self, scene: &mut Scene) {
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 0.0;
+            label.state.typewriter_mode = false;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 0.0;
+            latex.state.typewriter_mode = false;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let eased_t = self.ease.eval(t);
+        
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = eased_t;
+            label.state.typewriter_mode = false;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = eased_t;
+            latex.state.typewriter_mode = false;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 1.0;
+            label.state.typewriter_mode = false;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 1.0;
+            latex.state.typewriter_mode = false;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 0.0;
+            label.state.typewriter_mode = false;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 0.0;
+            latex.state.typewriter_mode = false;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+}
+
+/// UnrevealText animation: hides text character by character with shifting effect
+/// Text shrinks to center, shifting as characters are hidden
+pub struct UnrevealText {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+}
+
+impl UnrevealText {
+    pub fn new(target_id: TattvaId, ease: Ease) -> Self {
+        Self { target_id, ease }
+    }
+}
+
+impl Animation for UnrevealText {
+    fn on_start(&mut self, scene: &mut Scene) {
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 1.0;
+            label.state.typewriter_mode = false;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 1.0;
+            latex.state.typewriter_mode = false;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let eased_t = self.ease.eval(t);
+        
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 1.0 - eased_t;
+            label.state.typewriter_mode = false;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 1.0 - eased_t;
+            latex.state.typewriter_mode = false;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 0.0;
+            label.state.typewriter_mode = false;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 0.0;
+            latex.state.typewriter_mode = false;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        // Try Label first
+        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+            label.state.char_reveal = 1.0;
+            label.state.typewriter_mode = false;
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+        
+        // Try LaTeX
+        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+            latex.state.char_reveal = 1.0;
+            latex.state.typewriter_mode = false;
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+}
