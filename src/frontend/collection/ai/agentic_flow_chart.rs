@@ -207,6 +207,16 @@ impl FlowEdge {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeAnimationStyle {
+    /// Nodes appear instantly when revealed
+    Instant,
+    /// Nodes draw themselves like a write effect
+    Write,
+    /// Nodes drop from above with bounce
+    Drop,
+}
+
 #[derive(Debug, Clone)]
 pub struct AgenticFlowChart {
     pub nodes: Vec<FlowNode>,
@@ -230,6 +240,10 @@ pub struct AgenticFlowChart {
     pub indicate_window: f32,
     pub reveal_progress: f32,
     pub active_content_nodes: HashSet<usize>,
+    /// Animation style for node appearance
+    pub node_animation_style: NodeAnimationStyle,
+    /// Whether to draw edges progressively as nodes appear
+    pub progressive_edges: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -269,6 +283,8 @@ impl AgenticFlowChart {
             indicate_window: 0.14,
             reveal_progress: 1.0,
             active_content_nodes: HashSet::new(),
+            node_animation_style: NodeAnimationStyle::Instant,
+            progressive_edges: false,
         }
     }
 
@@ -358,6 +374,16 @@ impl AgenticFlowChart {
 
     pub fn deactivate_content_node(&mut self, node_index: usize) {
         self.active_content_nodes.remove(&node_index);
+    }
+
+    pub fn with_node_animation_style(mut self, style: NodeAnimationStyle) -> Self {
+        self.node_animation_style = style;
+        self
+    }
+
+    pub fn with_progressive_edges(mut self, progressive: bool) -> Self {
+        self.progressive_edges = progressive;
+        self
     }
 
     fn connection_pairs(&self) -> Vec<FlowEdge> {
@@ -882,6 +908,36 @@ impl AgenticFlowChart {
         }
     }
 
+    /// Check if an edge should be drawn in progressive mode
+    /// Returns true if both start and end nodes are revealed
+    fn should_draw_edge_progressive(&self, edge: &FlowEdge, node_thresholds: &[f32]) -> bool {
+        if !self.progressive_edges {
+            return true; // Draw all edges if not in progressive mode
+        }
+        
+        let from_threshold = node_thresholds.get(edge.from).copied().unwrap_or(0.0);
+        let to_threshold = node_thresholds.get(edge.to).copied().unwrap_or(0.0);
+        
+        // Draw edge if both nodes are revealed
+        self.reveal_progress >= from_threshold && self.reveal_progress >= to_threshold
+    }
+
+    /// Get the write progress for a node (0.0 to 1.0)
+    /// Used for write animation style
+    fn node_write_progress(&self, node_index: usize, node_thresholds: &[f32]) -> f32 {
+        let threshold = node_thresholds.get(node_index).copied().unwrap_or(0.0);
+        if self.reveal_progress < threshold {
+            return 0.0;
+        }
+        
+        // Calculate progress within the reveal window
+        // Larger value = slower animation
+        // 0.1 = fast, 0.2 = 2x slower, 0.3 = 3x slower, etc.
+        let node_reveal_window = 0.2;
+        let progress_since_reveal = self.reveal_progress - threshold;
+        (progress_since_reveal / node_reveal_window).clamp(0.0, 1.0)
+    }
+
     fn draw_node(
         &self,
         ctx: &mut ProjectionCtx,
@@ -891,20 +947,113 @@ impl AgenticFlowChart {
         scale: f32,
         stroke_color: Vec4,
         stroke_thickness: f32,
+        node_thresholds: &[f32],
     ) {
         let size = layout.size * scale;
         let outline = shape_outline(node.shape, size);
-        let mesh = shape_mesh(node.shape, size, node.fill_color)
-            .as_ref()
-            .translated(layout.center);
-        ctx.emit(RenderPrimitive::Mesh(mesh));
-
-        emit_closed_polyline(
-            ctx,
-            &translate_points(&outline, layout.center),
-            stroke_thickness,
-            stroke_color,
-        );
+        
+        match self.node_animation_style {
+            NodeAnimationStyle::Write => {
+                // Write animation: outline draws progressively with sector fill
+                // Similar to WritePath - fill the sector that's been drawn
+                let write_progress = self.node_write_progress(node_index, node_thresholds);
+                
+                if write_progress > 0.0 {
+                    // Convert outline to Vec3 and translate
+                    let outline_3d = translate_points(&outline, layout.center);
+                    
+                    // Get the partial outline (the portion that's been drawn)
+                    let partial_outline = partial_polyline(&outline_3d, write_progress);
+                    
+                    // Draw the partial outline as a line
+                    emit_polyline(ctx, &partial_outline, stroke_thickness, stroke_color);
+                    
+                    // Fill the drawn sector as a closed polygon using Lyon tessellator
+                    if partial_outline.len() >= 3 {
+                        use lyon_tessellation as lyon;
+                        use lyon_tessellation::path::Path as LyonPath;
+                        use lyon_tessellation::{FillOptions, FillTessellator, VertexBuffers};
+                        use crate::backend::renderer::vertex::mesh::MeshVertex;
+                        
+                        // Build a closed path from the partial outline
+                        let mut builder = LyonPath::builder();
+                        
+                        if let Some(&first_pt) = partial_outline.first() {
+                            builder.begin(lyon::math::point(first_pt.x, first_pt.y));
+                            
+                            // Add all points
+                            for &pt in &partial_outline[1..] {
+                                builder.line_to(lyon::math::point(pt.x, pt.y));
+                            }
+                            
+                            // Close the path
+                            builder.end(true);
+                        }
+                        
+                        let lpath = builder.build();
+                        let mut tessellator = FillTessellator::new();
+                        let mut geometry: VertexBuffers<lyon::math::Point, u16> = VertexBuffers::new();
+                        
+                        let res = tessellator.tessellate_path(
+                            &lpath,
+                            &FillOptions::default(),
+                            &mut lyon::geometry_builder::simple_builder(&mut geometry),
+                        );
+                        
+                        if res.is_ok() {
+                            let vertices: Vec<MeshVertex> = geometry
+                                .vertices
+                                .iter()
+                                .map(|v| MeshVertex {
+                                    position: [v.x, v.y, 0.0],
+                                    color: node.fill_color.into(),
+                                })
+                                .collect();
+                            
+                            let mesh = crate::projection::Mesh::from_tessellation(vertices, geometry.indices);
+                            ctx.emit(RenderPrimitive::Mesh(mesh));
+                        }
+                    }
+                    
+                    // Draw the complete outline stroke (not just the partial one)
+                    // This ensures the outline is always visible
+                    emit_closed_polyline(
+                        ctx,
+                        &outline_3d,
+                        stroke_thickness,
+                        stroke_color,
+                    );
+                }
+            }
+            NodeAnimationStyle::Drop => {
+                // Drop animation: full node appears instantly (drop is handled by position animation)
+                let mesh = shape_mesh(node.shape, size, node.fill_color)
+                    .as_ref()
+                    .translated(layout.center);
+                ctx.emit(RenderPrimitive::Mesh(mesh));
+                
+                emit_closed_polyline(
+                    ctx,
+                    &translate_points(&outline, layout.center),
+                    stroke_thickness,
+                    stroke_color,
+                );
+            }
+            NodeAnimationStyle::Instant => {
+                // Instant animation: full node appears immediately
+                let mesh = shape_mesh(node.shape, size, node.fill_color)
+                    .as_ref()
+                    .translated(layout.center);
+                ctx.emit(RenderPrimitive::Mesh(mesh));
+                
+                emit_closed_polyline(
+                    ctx,
+                    &translate_points(&outline, layout.center),
+                    stroke_thickness,
+                    stroke_color,
+                );
+            }
+        }
 
         if let Some(content) = &node.embedded_content {
             if self.node_content_visible(node_index, node) {
@@ -936,9 +1085,15 @@ impl Project for AgenticFlowChart {
 
         let (node_thresholds, edge_thresholds) = self.resolved_reveal_thresholds();
 
+        // Draw static edges (non-flow edges)
         for (idx, edge) in self.connection_pairs().iter().enumerate() {
             let threshold = edge_thresholds.get(idx).copied().unwrap_or(0.0);
             if self.reveal_progress < threshold {
+                continue;
+            }
+
+            // Check if edge should be drawn in progressive mode
+            if !self.should_draw_edge_progressive(edge, &node_thresholds) {
                 continue;
             }
 
@@ -1048,6 +1203,7 @@ impl Project for AgenticFlowChart {
                     node_scale,
                     node.stroke_color,
                     self.edge_thickness * 0.9,
+                    &node_thresholds,
                 );
             }
         }
