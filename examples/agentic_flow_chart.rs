@@ -4,7 +4,8 @@ use murali::engine::scene::Scene;
 use murali::engine::timeline::Timeline;
 use murali::frontend::animation::Ease;
 use murali::frontend::collection::ai::agentic_flow_chart::{
-    AgenticFlowChart, FlowChartDirection, FlowEdge, FlowNode, FlowNodeShape,
+    AgenticFlowChart, EdgeStep, FlowChartDirection, FlowEdge, FlowNode, FlowNodePlacement,
+    FlowNodeShape,
 };
 use murali::frontend::collection::text::label::Label;
 use murali::frontend::layout::Direction;
@@ -31,7 +32,8 @@ fn main() -> anyhow::Result<()> {
             .with_shape(FlowNodeShape::Diamond)
             .with_size(vec2(2.2, 1.2))
             .with_fill_color(Vec4::new(0.33, 0.22, 0.15, 1.0))
-            .with_stroke_color(Vec4::new(0.98, 0.72, 0.34, 1.0)),
+            .with_stroke_color(Vec4::new(0.98, 0.72, 0.34, 1.0))
+            .with_placement(FlowNodePlacement::BelowPrevious),
         FlowNode::new("Answer")
             .with_shape(FlowNodeShape::Rounded)
             .with_fill_color(Vec4::new(0.20, 0.24, 0.30, 1.0))
@@ -49,7 +51,7 @@ fn main() -> anyhow::Result<()> {
             FlowEdge::new(1, 2),
             // FlowEdge::new(2, 1),
             FlowEdge::new(2, 3),
-            FlowEdge::new(3, 1),
+            FlowEdge::new(3, 1).with_route_steps(vec![EdgeStep::Up, EdgeStep::Left]),
             FlowEdge::new(3, 4),
         ])
         .with_flow_path(vec![0, 1, 2, 3, 1, 2, 3, 4])

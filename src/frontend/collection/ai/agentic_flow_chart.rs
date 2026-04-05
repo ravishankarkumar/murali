@@ -21,6 +21,22 @@ pub enum FlowNodeShape {
     Diamond,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowNodePlacement {
+    RightOfPrevious,
+    LeftOfPrevious,
+    AbovePrevious,
+    BelowPrevious,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EdgeStep {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
 pub trait FlowNodeContent: std::fmt::Debug + Send + Sync {
     fn local_bounds(&self) -> Bounds;
     fn project(&self, ctx: &mut ProjectionCtx);
@@ -61,6 +77,7 @@ pub struct FlowNode {
     pub label: String,
     pub shape: FlowNodeShape,
     pub size: Option<Vec2>,
+    pub placement: Option<FlowNodePlacement>,
     pub fill_color: Vec4,
     pub stroke_color: Vec4,
     pub text_color: Vec4,
@@ -75,6 +92,7 @@ impl FlowNode {
             label: label.into(),
             shape: FlowNodeShape::Rounded,
             size: None,
+            placement: None,
             fill_color: Vec4::new(0.16, 0.20, 0.28, 1.0),
             stroke_color: Vec4::new(0.56, 0.63, 0.74, 1.0),
             text_color: Vec4::new(0.96, 0.97, 0.99, 1.0),
@@ -91,6 +109,11 @@ impl FlowNode {
 
     pub fn with_size(mut self, size: Vec2) -> Self {
         self.size = Some(size);
+        self
+    }
+
+    pub fn with_placement(mut self, placement: FlowNodePlacement) -> Self {
+        self.placement = Some(placement);
         self
     }
 
@@ -144,15 +167,29 @@ impl From<&str> for FlowNode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FlowEdge {
     pub from: usize,
     pub to: usize,
+    pub route_steps: Vec<EdgeStep>,
 }
 
 impl FlowEdge {
     pub fn new(from: usize, to: usize) -> Self {
-        Self { from, to }
+        Self {
+            from,
+            to,
+            route_steps: Vec::new(),
+        }
+    }
+
+    pub fn with_route_steps(mut self, steps: Vec<EdgeStep>) -> Self {
+        self.route_steps = steps;
+        self
+    }
+
+    pub fn with_route_hint(self, steps: Vec<EdgeStep>) -> Self {
+        self.with_route_steps(steps)
     }
 }
 
@@ -353,6 +390,60 @@ impl AgenticFlowChart {
             .map(|node| self.resolved_node_size(node))
             .collect();
 
+        let has_custom_placements = self
+            .nodes
+            .iter()
+            .skip(1)
+            .any(|node| node.placement.is_some());
+
+        if has_custom_placements {
+            let mut layouts = Vec::with_capacity(self.nodes.len());
+            layouts.push(NodeLayout {
+                center: Vec3::ZERO,
+                size: sizes[0],
+            });
+
+            for idx in 1..self.nodes.len() {
+                let previous = layouts[idx - 1];
+                let size = sizes[idx];
+                let placement = self.nodes[idx].placement.unwrap_or(match self.direction {
+                    FlowChartDirection::Horizontal => FlowNodePlacement::RightOfPrevious,
+                    FlowChartDirection::Vertical => FlowNodePlacement::BelowPrevious,
+                });
+                let center = match placement {
+                    FlowNodePlacement::RightOfPrevious => Vec3::new(
+                        previous.center.x + previous.size.x * 0.5 + self.node_gap + size.x * 0.5,
+                        previous.center.y,
+                        0.0,
+                    ),
+                    FlowNodePlacement::LeftOfPrevious => Vec3::new(
+                        previous.center.x - previous.size.x * 0.5 - self.node_gap - size.x * 0.5,
+                        previous.center.y,
+                        0.0,
+                    ),
+                    FlowNodePlacement::AbovePrevious => Vec3::new(
+                        previous.center.x,
+                        previous.center.y + previous.size.y * 0.5 + self.node_gap + size.y * 0.5,
+                        0.0,
+                    ),
+                    FlowNodePlacement::BelowPrevious => Vec3::new(
+                        previous.center.x,
+                        previous.center.y - previous.size.y * 0.5 - self.node_gap - size.y * 0.5,
+                        0.0,
+                    ),
+                };
+                layouts.push(NodeLayout { center, size });
+            }
+
+            let (min, max) = layout_extents(&layouts);
+            let center = (min + max) * 0.5;
+            for layout in &mut layouts {
+                layout.center.x -= center.x;
+                layout.center.y -= center.y;
+            }
+            return layouts;
+        }
+
         let total_primary: f32 = sizes
             .iter()
             .map(|size| match self.direction {
@@ -430,19 +521,72 @@ impl AgenticFlowChart {
         }
     }
 
+    fn edge_definition(&self, from: usize, to: usize) -> Option<&FlowEdge> {
+        self.edges.iter().find(|edge| edge.from == from && edge.to == to)
+    }
+
     fn edge_route(&self, layouts: &[NodeLayout], from: usize, to: usize) -> Option<Vec<Vec3>> {
         let start = *layouts.get(from)?;
         let end = *layouts.get(to)?;
         let span = from.abs_diff(to).max(1) as f32;
         let lane_offset = self.lane_gap * span;
         let stub = 0.28;
+        let delta = end.center - start.center;
+        let prefer_horizontal = delta.x.abs() >= delta.y.abs();
+
+        if let Some(edge) = self.edge_definition(from, to) {
+            if !edge.route_steps.is_empty() {
+                return Some(dedup_points(self.manual_edge_route(
+                    layouts,
+                    from,
+                    to,
+                    &edge.route_steps,
+                )));
+            }
+        }
 
         let points = match self.direction {
             FlowChartDirection::Horizontal => {
                 if to == from + 1 {
-                    let start_anchor =
-                        Vec3::new(start.center.x + start.size.x * 0.5, start.center.y, 0.0);
-                    let end_anchor = Vec3::new(end.center.x - end.size.x * 0.5, end.center.y, 0.0);
+                    let (start_anchor, end_anchor) = if prefer_horizontal {
+                        if delta.x >= 0.0 {
+                            (
+                                Vec3::new(
+                                    start.center.x + start.size.x * 0.5,
+                                    start.center.y,
+                                    0.0,
+                                ),
+                                Vec3::new(
+                                    end.center.x - end.size.x * 0.5,
+                                    end.center.y,
+                                    0.0,
+                                ),
+                            )
+                        } else {
+                            (
+                                Vec3::new(
+                                    start.center.x - start.size.x * 0.5,
+                                    start.center.y,
+                                    0.0,
+                                ),
+                                Vec3::new(
+                                    end.center.x + end.size.x * 0.5,
+                                    end.center.y,
+                                    0.0,
+                                ),
+                            )
+                        }
+                    } else if delta.y >= 0.0 {
+                        (
+                            Vec3::new(start.center.x, start.center.y + start.size.y * 0.5, 0.0),
+                            Vec3::new(end.center.x, end.center.y - end.size.y * 0.5, 0.0),
+                        )
+                    } else {
+                        (
+                            Vec3::new(start.center.x, start.center.y - start.size.y * 0.5, 0.0),
+                            Vec3::new(end.center.x, end.center.y + end.size.y * 0.5, 0.0),
+                        )
+                    };
                     vec![start_anchor, end_anchor]
                 } else if to > from {
                     let start_anchor =
@@ -458,23 +602,53 @@ impl AgenticFlowChart {
                         end_anchor,
                     ]
                 } else {
-                    let start_anchor =
-                        Vec3::new(start.center.x, start.center.y - start.size.y * 0.5, 0.0);
-                    let end_anchor = Vec3::new(end.center.x, end.center.y - end.size.y * 0.5, 0.0);
-                    let lane_y = start_anchor.y.min(end_anchor.y) - lane_offset;
-                    vec![
-                        start_anchor,
-                        Vec3::new(start_anchor.x, lane_y, 0.0),
-                        Vec3::new(end_anchor.x, lane_y, 0.0),
-                        end_anchor,
-                    ]
+                    best_route(
+                        layouts,
+                        from,
+                        to,
+                        vec![
+                            horizontal_loop_route(start, end, start.size.y * 0.5, end.size.y * 0.5, lane_offset, true),
+                            horizontal_loop_route(start, end, -start.size.y * 0.5, -end.size.y * 0.5, lane_offset, false),
+                        ],
+                    )
                 }
             }
             FlowChartDirection::Vertical => {
                 if to == from + 1 {
-                    let start_anchor =
-                        Vec3::new(start.center.x, start.center.y - start.size.y * 0.5, 0.0);
-                    let end_anchor = Vec3::new(end.center.x, end.center.y + end.size.y * 0.5, 0.0);
+                    let (start_anchor, end_anchor) = if prefer_horizontal {
+                        if delta.x >= 0.0 {
+                            (
+                                Vec3::new(
+                                    start.center.x + start.size.x * 0.5,
+                                    start.center.y,
+                                    0.0,
+                                ),
+                                Vec3::new(
+                                    end.center.x - end.size.x * 0.5,
+                                    end.center.y,
+                                    0.0,
+                                ),
+                            )
+                        } else {
+                            (
+                                Vec3::new(
+                                    start.center.x - start.size.x * 0.5,
+                                    start.center.y,
+                                    0.0,
+                                ),
+                                Vec3::new(
+                                    end.center.x + end.size.x * 0.5,
+                                    end.center.y,
+                                    0.0,
+                                ),
+                            )
+                        }
+                    } else {
+                        (
+                            Vec3::new(start.center.x, start.center.y - start.size.y * 0.5, 0.0),
+                            Vec3::new(end.center.x, end.center.y + end.size.y * 0.5, 0.0),
+                        )
+                    };
                     vec![start_anchor, end_anchor]
                 } else if to > from {
                     let start_anchor =
@@ -490,23 +664,83 @@ impl AgenticFlowChart {
                         end_anchor,
                     ]
                 } else {
-                    let start_anchor =
-                        Vec3::new(start.center.x, start.center.y + start.size.y * 0.5, 0.0);
-                    let end_anchor = Vec3::new(end.center.x, end.center.y - end.size.y * 0.5, 0.0);
-                    let lane_x = -lane_offset;
-                    vec![
-                        start_anchor,
-                        Vec3::new(start_anchor.x, start_anchor.y + stub, 0.0),
-                        Vec3::new(lane_x, start_anchor.y + stub, 0.0),
-                        Vec3::new(lane_x, end_anchor.y - stub, 0.0),
-                        Vec3::new(end_anchor.x, end_anchor.y - stub, 0.0),
-                        end_anchor,
-                    ]
+                    best_route(
+                        layouts,
+                        from,
+                        to,
+                        vec![
+                            vertical_loop_route(start, end, start.size.x * 0.5, end.size.x * 0.5, lane_offset, true),
+                            vertical_loop_route(start, end, -start.size.x * 0.5, -end.size.x * 0.5, lane_offset, false),
+                        ],
+                    )
                 }
             }
         };
 
         Some(dedup_points(points))
+    }
+
+    fn manual_edge_route(
+        &self,
+        layouts: &[NodeLayout],
+        from: usize,
+        to: usize,
+        steps: &[EdgeStep],
+    ) -> Vec<Vec3> {
+        let Some(first_step) = steps.first().copied() else {
+            return Vec::new();
+        };
+        let last_step = steps.last().copied().unwrap_or(first_step);
+
+        let mut x_levels: Vec<f32> = layouts.iter().map(|l| l.center.x).collect();
+        let mut y_levels: Vec<f32> = layouts.iter().map(|l| l.center.y).collect();
+
+        let dedup = |v: &mut Vec<f32>| {
+            v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            v.dedup_by(|a, b| (*a - *b).abs() < 1e-4);
+        };
+        dedup(&mut x_levels);
+        dedup(&mut y_levels);
+
+        let start_node = layouts[from];
+        let end_node = layouts[to];
+
+        let start_anchor = anchor_for_step(start_node, first_step);
+        let end_anchor = anchor_for_step(end_node, opposite_step(last_step));
+
+        let mut cur_x = start_node.center.x;
+        let mut cur_y = start_node.center.y;
+
+        let mut points = vec![start_anchor];
+
+        for (idx, step) in steps.iter().copied().enumerate() {
+            let is_last = idx == steps.len() - 1;
+
+            match step {
+                EdgeStep::Up => {
+                    cur_y = next_level_val(&y_levels, cur_y, 1, self.lane_gap);
+                }
+                EdgeStep::Down => {
+                    cur_y = next_level_val(&y_levels, cur_y, -1, self.lane_gap);
+                }
+                EdgeStep::Left => {
+                    cur_x = next_level_val(&x_levels, cur_x, -1, self.lane_gap);
+                }
+                EdgeStep::Right => {
+                    cur_x = next_level_val(&x_levels, cur_x, 1, self.lane_gap);
+                }
+            }
+
+            let next = if is_last {
+                end_anchor
+            } else {
+                Vec3::new(cur_x, cur_y, 0.0)
+            };
+
+            points.push(next);
+        }
+
+        points
     }
 
     fn active_hop_state(&self) -> Option<(usize, f32)> {
@@ -1006,6 +1240,150 @@ fn translate_points(points: &[Vec2], offset: Vec3) -> Vec<Vec3> {
         .collect()
 }
 
+fn layout_extents(layouts: &[NodeLayout]) -> (Vec2, Vec2) {
+    let mut min = Vec2::splat(f32::INFINITY);
+    let mut max = Vec2::splat(f32::NEG_INFINITY);
+
+    for layout in layouts {
+        let half = layout.size * 0.5;
+        min = min.min(layout.center.truncate() - half);
+        max = max.max(layout.center.truncate() + half);
+    }
+
+    (min, max)
+}
+
+fn horizontal_loop_route(
+    start: NodeLayout,
+    end: NodeLayout,
+    start_y_offset: f32,
+    end_y_offset: f32,
+    lane_offset: f32,
+    above: bool,
+) -> Vec<Vec3> {
+    let start_anchor = Vec3::new(start.center.x, start.center.y + start_y_offset, 0.0);
+    let end_anchor = Vec3::new(end.center.x, end.center.y + end_y_offset, 0.0);
+    let lane_y = if above {
+        start_anchor.y.max(end_anchor.y) + lane_offset
+    } else {
+        start_anchor.y.min(end_anchor.y) - lane_offset
+    };
+
+    vec![
+        start_anchor,
+        Vec3::new(start_anchor.x, lane_y, 0.0),
+        Vec3::new(end_anchor.x, lane_y, 0.0),
+        end_anchor,
+    ]
+}
+
+fn vertical_loop_route(
+    start: NodeLayout,
+    end: NodeLayout,
+    start_x_offset: f32,
+    end_x_offset: f32,
+    lane_offset: f32,
+    right_side: bool,
+) -> Vec<Vec3> {
+    let start_anchor = Vec3::new(start.center.x + start_x_offset, start.center.y, 0.0);
+    let end_anchor = Vec3::new(end.center.x + end_x_offset, end.center.y, 0.0);
+    let lane_x = if right_side {
+        start_anchor.x.max(end_anchor.x) + lane_offset
+    } else {
+        start_anchor.x.min(end_anchor.x) - lane_offset
+    };
+
+    vec![
+        start_anchor,
+        Vec3::new(lane_x, start_anchor.y, 0.0),
+        Vec3::new(lane_x, end_anchor.y, 0.0),
+        end_anchor,
+    ]
+}
+
+fn anchor_for_step(layout: NodeLayout, step: EdgeStep) -> Vec3 {
+    match step {
+        EdgeStep::Up => Vec3::new(layout.center.x, layout.center.y + layout.size.y * 0.5, 0.0),
+        EdgeStep::Down => Vec3::new(layout.center.x, layout.center.y - layout.size.y * 0.5, 0.0),
+        EdgeStep::Left => Vec3::new(layout.center.x - layout.size.x * 0.5, layout.center.y, 0.0),
+        EdgeStep::Right => Vec3::new(layout.center.x + layout.size.x * 0.5, layout.center.y, 0.0),
+    }
+}
+
+fn opposite_step(step: EdgeStep) -> EdgeStep {
+    match step {
+        EdgeStep::Up => EdgeStep::Down,
+        EdgeStep::Down => EdgeStep::Up,
+        EdgeStep::Left => EdgeStep::Right,
+        EdgeStep::Right => EdgeStep::Left,
+    }
+}
+
+fn best_route(
+    layouts: &[NodeLayout],
+    from: usize,
+    to: usize,
+    candidates: Vec<Vec<Vec3>>,
+) -> Vec<Vec3> {
+    candidates
+        .into_iter()
+        .min_by(|a, b| {
+            route_score(layouts, from, to, a)
+                .partial_cmp(&route_score(layouts, from, to, b))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .unwrap_or_default()
+}
+
+fn route_score(layouts: &[NodeLayout], from: usize, to: usize, route: &[Vec3]) -> f32 {
+    let intersections = layouts
+        .iter()
+        .enumerate()
+        .filter(|(idx, _)| *idx != from && *idx != to)
+        .map(|(_, layout)| route_node_overlap_score(route, *layout))
+        .sum::<f32>();
+    intersections * 1000.0 + polyline_length(route)
+}
+
+fn route_node_overlap_score(route: &[Vec3], layout: NodeLayout) -> f32 {
+    route
+        .windows(2)
+        .map(|segment| segment_overlap_score(segment[0], segment[1], layout))
+        .sum()
+}
+
+fn segment_overlap_score(a: Vec3, b: Vec3, layout: NodeLayout) -> f32 {
+    let pad = 0.18;
+    let half = layout.size * 0.5 + Vec2::splat(pad);
+    let min = layout.center.truncate() - half;
+    let max = layout.center.truncate() + half;
+
+    let a2 = a.truncate();
+    let b2 = b.truncate();
+
+    if (a2.x - b2.x).abs() <= 1e-4 {
+        if a2.x < min.x || a2.x > max.x {
+            return 0.0;
+        }
+        let seg_min = a2.y.min(b2.y);
+        let seg_max = a2.y.max(b2.y);
+        let overlap = (seg_max.min(max.y) - seg_min.max(min.y)).max(0.0);
+        return overlap;
+    }
+
+    if (a2.y - b2.y).abs() <= 1e-4 {
+        if a2.y < min.y || a2.y > max.y {
+            return 0.0;
+        }
+        let seg_min = a2.x.min(b2.x);
+        let seg_max = a2.x.max(b2.x);
+        let overlap = (seg_max.min(max.x) - seg_min.max(min.x)).max(0.0);
+        return overlap;
+    }
+
+    0.0
+}
+
 fn shape_mesh(shape: FlowNodeShape, size: Vec2, color: Vec4) -> std::sync::Arc<Mesh> {
     match shape {
         FlowNodeShape::Rectangle => Mesh::rectangle(size.x, size.y, color),
@@ -1065,6 +1443,23 @@ fn rounded_rect_outline(size: Vec2, radius: f32, arc_steps: usize) -> Vec<Vec2> 
         }
     }
     points
+}
+
+fn next_level_val(levels: &[f32], current: f32, delta: i32, gap: f32) -> f32 {
+    let pos = levels.iter().position(|&v| (v - current).abs() < 1e-4);
+    match pos {
+        Some(idx) => {
+            let next_idx = idx as i32 + delta;
+            if next_idx >= 0 && next_idx < levels.len() as i32 {
+                levels[next_idx as usize]
+            } else if next_idx < 0 {
+                levels[0] + gap * next_idx as f32
+            } else {
+                levels.last().unwrap() + gap * (next_idx - (levels.len() as i32 - 1)) as f32
+            }
+        }
+        None => current + gap * delta as f32,
+    }
 }
 
 fn dedup_points(points: Vec<Vec3>) -> Vec<Vec3> {
