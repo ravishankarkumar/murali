@@ -2,7 +2,7 @@ use crate::frontend::layout::{Bounded, Bounds};
 use crate::frontend::style::{StrokeParams, Style};
 use crate::math::bezier::{cubic_bezier, quadratic_bezier};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
-use glam::{Vec2, Vec4, vec2, vec3};
+use glam::{Vec2, Vec4, vec2, vec3, FloatExt};
 
 #[derive(Debug, Clone, Copy)]
 pub enum PathSegment {
@@ -83,6 +83,12 @@ pub struct Path {
     pub segments: Vec<PathSegment>,
     pub style: Style,
     pub closed: bool,
+    /// Trim start: 0.0 = start of path, 1.0 = end of path
+    pub trim_start: f32,
+    /// Trim end: 0.0 = start of path, 1.0 = end of path
+    pub trim_end: f32,
+    /// Fill opacity: 0.0 = no fill, 1.0 = full fill (used for write effect)
+    pub fill_opacity: f32,
 }
 
 impl Path {
@@ -91,6 +97,9 @@ impl Path {
             segments: Vec::new(),
             style: Style::new().with_stroke(StrokeParams::default()),
             closed: false,
+            trim_start: 0.0,
+            trim_end: 1.0,
+            fill_opacity: 1.0,
         }
     }
 
@@ -260,7 +269,151 @@ impl Path {
             segments: new_segments,
             style: self.style.lerp(&target.style, t),
             closed: self.closed,
+            trim_start: self.trim_start.lerp(target.trim_start, t),
+            trim_end: self.trim_end.lerp(target.trim_end, t),
+            fill_opacity: self.fill_opacity.lerp(target.fill_opacity, t),
         }
+    }
+
+    /// Approximate length of a quadratic Bézier curve
+    fn quad_length(start: Vec2, ctrl: Vec2, end: Vec2) -> f32 {
+        let steps = 16;
+        let mut length = 0.0;
+        let mut prev = start;
+        for i in 1..=steps {
+            let t = i as f32 / steps as f32;
+            let curr = quadratic_bezier(start, ctrl, end, t);
+            length += (curr - prev).length();
+            prev = curr;
+        }
+        length
+    }
+
+    /// Approximate length of a cubic Bézier curve
+    fn cubic_length(start: Vec2, ctrl1: Vec2, ctrl2: Vec2, end: Vec2) -> f32 {
+        let steps = 24;
+        let mut length = 0.0;
+        let mut prev = start;
+        for i in 1..=steps {
+            let t = i as f32 / steps as f32;
+            let curr = cubic_bezier(start, ctrl1, ctrl2, end, t);
+            length += (curr - prev).length();
+            prev = curr;
+        }
+        length
+    }
+
+    /// Build a trimmed closed path for sector filling
+    /// Returns a path that includes the drawn portion and closes back to the start
+    fn build_trimmed_fill_path(&self, trim_start_dist: f32, trim_end_dist: f32) -> Vec<Vec2> {
+        let mut points = Vec::new();
+        let mut current_point = vec2(0.0, 0.0);
+        let mut first_point = None;
+        let mut cumulative_dist = 0.0;
+
+        for segment in &self.segments {
+            match *segment {
+                PathSegment::MoveTo(p) => {
+                    current_point = p;
+                    if first_point.is_none() {
+                        first_point = Some(p);
+                    }
+                }
+                PathSegment::LineTo(p) => {
+                    let len = (p - current_point).length();
+                    let seg_start = cumulative_dist;
+                    let seg_end = cumulative_dist + len;
+
+                    if seg_end > trim_start_dist && seg_start < trim_end_dist {
+                        let t_start = if seg_start < trim_start_dist {
+                            (trim_start_dist - seg_start) / len
+                        } else {
+                            0.0
+                        };
+                        let t_end = if seg_end > trim_end_dist {
+                            (trim_end_dist - seg_start) / len
+                        } else {
+                            1.0
+                        };
+
+                        let start_pt = current_point.lerp(p, t_start);
+                        let end_pt = current_point.lerp(p, t_end);
+
+                        if points.is_empty() {
+                            points.push(start_pt);
+                        }
+                        points.push(end_pt);
+                    }
+                    cumulative_dist += len;
+                    current_point = p;
+                }
+                PathSegment::QuadTo(ctrl, end) => {
+                    let len = Self::quad_length(current_point, ctrl, end);
+                    let seg_start = cumulative_dist;
+                    let seg_end = cumulative_dist + len;
+
+                    if seg_end > trim_start_dist && seg_start < trim_end_dist {
+                        let steps = 16;
+                        let mut prev_p = current_point;
+                        let mut prev_dist = seg_start;
+
+                        for i in 1..=steps {
+                            let t = i as f32 / steps as f32;
+                            let curr_p = quadratic_bezier(current_point, ctrl, end, t);
+                            let curr_dist = seg_start + (len * t);
+
+                            if curr_dist > trim_start_dist && prev_dist < trim_end_dist {
+                                if points.is_empty() {
+                                    points.push(prev_p);
+                                }
+                                points.push(curr_p);
+                            }
+                            prev_p = curr_p;
+                            prev_dist = curr_dist;
+                        }
+                    }
+                    cumulative_dist += len;
+                    current_point = end;
+                }
+                PathSegment::CubicTo(ctrl1, ctrl2, end) => {
+                    let len = Self::cubic_length(current_point, ctrl1, ctrl2, end);
+                    let seg_start = cumulative_dist;
+                    let seg_end = cumulative_dist + len;
+
+                    if seg_end > trim_start_dist && seg_start < trim_end_dist {
+                        let steps = 24;
+                        let mut prev_p = current_point;
+                        let mut prev_dist = seg_start;
+
+                        for i in 1..=steps {
+                            let t = i as f32 / steps as f32;
+                            let curr_p = cubic_bezier(current_point, ctrl1, ctrl2, end, t);
+                            let curr_dist = seg_start + (len * t);
+
+                            if curr_dist > trim_start_dist && prev_dist < trim_end_dist {
+                                if points.is_empty() {
+                                    points.push(prev_p);
+                                }
+                                points.push(curr_p);
+                            }
+                            prev_p = curr_p;
+                            prev_dist = curr_dist;
+                        }
+                    }
+                    cumulative_dist += len;
+                    current_point = end;
+                }
+            }
+        }
+
+        // Close the path back to the start point
+        if let Some(first) = first_point {
+            if !points.is_empty() && (*points.last().unwrap() - first).length() > 0.001 {
+                points.push(first);
+            }
+        }
+
+        points
     }
 }
 
@@ -270,12 +423,58 @@ impl Project for Path {
             return;
         }
 
+        // Calculate total path length for trimming
+        let mut segment_lengths = Vec::new();
+        let mut total_length = 0.0;
+        let mut current_point = vec2(0.0, 0.0);
+
+        for segment in &self.segments {
+            let seg_len = match *segment {
+                PathSegment::MoveTo(p) => {
+                    current_point = p;
+                    0.0
+                }
+                PathSegment::LineTo(p) => {
+                    let len = (p - current_point).length();
+                    current_point = p;
+                    len
+                }
+                PathSegment::QuadTo(ctrl, end) => {
+                    let len = Self::quad_length(current_point, ctrl, end);
+                    current_point = end;
+                    len
+                }
+                PathSegment::CubicTo(ctrl1, ctrl2, end) => {
+                    let len = Self::cubic_length(current_point, ctrl1, ctrl2, end);
+                    current_point = end;
+                    len
+                }
+            };
+            segment_lengths.push(seg_len);
+            total_length += seg_len;
+        }
+
+        // Add closing segment length if needed
+        if self.closed && !self.segments.is_empty() {
+            if let Some(PathSegment::MoveTo(first)) = self.segments.first() {
+                total_length += (current_point - *first).length();
+            }
+        }
+
+        let trim_start_dist = total_length * self.trim_start.clamp(0.0, 1.0);
+        let trim_end_dist = total_length * self.trim_end.clamp(0.0, 1.0);
+
+        // If trim_start >= trim_end, nothing should be rendered
+        if trim_start_dist >= trim_end_dist {
+            return;
+        }
+
         let mut current_point = vec2(0.0, 0.0);
         let mut first_point = None;
         let mut cumulative_dist = 0.0;
         let mut all_points = Vec::new();
 
-        for segment in &self.segments {
+        for (idx, segment) in self.segments.iter().enumerate() {
             match *segment {
                 PathSegment::MoveTo(p) => {
                     current_point = p;
@@ -287,15 +486,35 @@ impl Project for Path {
                 PathSegment::LineTo(p) => {
                     if let Some(stroke) = &self.style.stroke {
                         let len = (p - current_point).length();
-                        ctx.emit(RenderPrimitive::Line {
-                            start: vec3(current_point.x, current_point.y, 0.0),
-                            end: vec3(p.x, p.y, 0.0),
-                            thickness: stroke.thickness,
-                            color: stroke.color,
-                            dash_length: stroke.dash_length,
-                            gap_length: stroke.gap_length,
-                            dash_offset: stroke.dash_offset + cumulative_dist,
-                        });
+                        let seg_start = cumulative_dist;
+                        let seg_end = cumulative_dist + len;
+
+                        // Check if this segment is within trim range
+                        if seg_end > trim_start_dist && seg_start < trim_end_dist {
+                            let t_start = if seg_start < trim_start_dist {
+                                (trim_start_dist - seg_start) / len
+                            } else {
+                                0.0
+                            };
+                            let t_end = if seg_end > trim_end_dist {
+                                (trim_end_dist - seg_start) / len
+                            } else {
+                                1.0
+                            };
+
+                            let start_pt = current_point.lerp(p, t_start);
+                            let end_pt = current_point.lerp(p, t_end);
+
+                            ctx.emit(RenderPrimitive::Line {
+                                start: vec3(start_pt.x, start_pt.y, 0.0),
+                                end: vec3(end_pt.x, end_pt.y, 0.0),
+                                thickness: stroke.thickness,
+                                color: stroke.color,
+                                dash_length: stroke.dash_length,
+                                gap_length: stroke.gap_length,
+                                dash_offset: stroke.dash_offset + seg_start,
+                            });
+                        }
                         cumulative_dist += len;
                     }
                     current_point = p;
@@ -303,50 +522,72 @@ impl Project for Path {
                 }
                 PathSegment::QuadTo(ctrl, end) => {
                     let steps = 16;
-                    let mut prev_p = current_point;
-                    for i in 1..=steps {
-                        let t = i as f32 / steps as f32;
-                        let curr_p = quadratic_bezier(current_point, ctrl, end, t);
-                        if let Some(stroke) = &self.style.stroke {
-                            let len = (curr_p - prev_p).length();
-                            ctx.emit(RenderPrimitive::Line {
-                                start: vec3(prev_p.x, prev_p.y, 0.0),
-                                end: vec3(curr_p.x, curr_p.y, 0.0),
-                                thickness: stroke.thickness,
-                                color: stroke.color,
-                                dash_length: stroke.dash_length,
-                                gap_length: stroke.gap_length,
-                                dash_offset: stroke.dash_offset + cumulative_dist,
-                            });
-                            cumulative_dist += len;
+                    let len = Self::quad_length(current_point, ctrl, end);
+                    let seg_start = cumulative_dist;
+                    let seg_end = cumulative_dist + len;
+
+                    if seg_end > trim_start_dist && seg_start < trim_end_dist {
+                        let mut prev_p = current_point;
+                        let mut prev_dist = seg_start;
+
+                        for i in 1..=steps {
+                            let t = i as f32 / steps as f32;
+                            let curr_p = quadratic_bezier(current_point, ctrl, end, t);
+                            let curr_dist = seg_start + (len * t);
+
+                            if curr_dist > trim_start_dist && prev_dist < trim_end_dist {
+                                if let Some(stroke) = &self.style.stroke {
+                                    ctx.emit(RenderPrimitive::Line {
+                                        start: vec3(prev_p.x, prev_p.y, 0.0),
+                                        end: vec3(curr_p.x, curr_p.y, 0.0),
+                                        thickness: stroke.thickness,
+                                        color: stroke.color,
+                                        dash_length: stroke.dash_length,
+                                        gap_length: stroke.gap_length,
+                                        dash_offset: stroke.dash_offset + prev_dist,
+                                    });
+                                }
+                            }
+                            prev_p = curr_p;
+                            prev_dist = curr_dist;
                         }
-                        prev_p = curr_p;
-                        all_points.push(curr_p);
                     }
+                    cumulative_dist += len;
                     current_point = end;
                 }
                 PathSegment::CubicTo(ctrl1, ctrl2, end) => {
                     let steps = 24;
-                    let mut prev_p = current_point;
-                    for i in 1..=steps {
-                        let t = i as f32 / steps as f32;
-                        let curr_p = cubic_bezier(current_point, ctrl1, ctrl2, end, t);
-                        if let Some(stroke) = &self.style.stroke {
-                            let len = (curr_p - prev_p).length();
-                            ctx.emit(RenderPrimitive::Line {
-                                start: vec3(prev_p.x, prev_p.y, 0.0),
-                                end: vec3(curr_p.x, curr_p.y, 0.0),
-                                thickness: stroke.thickness,
-                                color: stroke.color,
-                                dash_length: stroke.dash_length,
-                                gap_length: stroke.gap_length,
-                                dash_offset: stroke.dash_offset + cumulative_dist,
-                            });
-                            cumulative_dist += len;
+                    let len = Self::cubic_length(current_point, ctrl1, ctrl2, end);
+                    let seg_start = cumulative_dist;
+                    let seg_end = cumulative_dist + len;
+
+                    if seg_end > trim_start_dist && seg_start < trim_end_dist {
+                        let mut prev_p = current_point;
+                        let mut prev_dist = seg_start;
+
+                        for i in 1..=steps {
+                            let t = i as f32 / steps as f32;
+                            let curr_p = cubic_bezier(current_point, ctrl1, ctrl2, end, t);
+                            let curr_dist = seg_start + (len * t);
+
+                            if curr_dist > trim_start_dist && prev_dist < trim_end_dist {
+                                if let Some(stroke) = &self.style.stroke {
+                                    ctx.emit(RenderPrimitive::Line {
+                                        start: vec3(prev_p.x, prev_p.y, 0.0),
+                                        end: vec3(curr_p.x, curr_p.y, 0.0),
+                                        thickness: stroke.thickness,
+                                        color: stroke.color,
+                                        dash_length: stroke.dash_length,
+                                        gap_length: stroke.gap_length,
+                                        dash_offset: stroke.dash_offset + prev_dist,
+                                    });
+                                }
+                            }
+                            prev_p = curr_p;
+                            prev_dist = curr_dist;
                         }
-                        prev_p = curr_p;
-                        all_points.push(curr_p);
                     }
+                    cumulative_dist += len;
                     current_point = end;
                 }
             }
@@ -373,105 +614,80 @@ impl Project for Path {
         }
 
         // Handle Fill using Lyon Tessellator for robust triangulation
-        if let Some(fill) = &self.style.fill {
-            use crate::backend::renderer::vertex::mesh::MeshVertex;
-            use lyon_tessellation as lyon;
-            use lyon_tessellation::path::Path as LyonPath;
-            use lyon_tessellation::{FillOptions, FillTessellator, VertexBuffers};
+        // Only render fill if fill_opacity > 0
+        if self.fill_opacity > 0.0 && trim_end_dist > trim_start_dist {
+            if let Some(fill) = &self.style.fill {
+                use crate::backend::renderer::vertex::mesh::MeshVertex;
+                use lyon_tessellation as lyon;
+                use lyon_tessellation::path::Path as LyonPath;
+                use lyon_tessellation::{FillOptions, FillTessellator, VertexBuffers};
 
-            let mut builder = LyonPath::builder();
-            let mut current_pos = vec2(0.0, 0.0);
-            let mut in_contour = false;
+                // Build a trimmed closed path for the sector fill
+                let fill_points = self.build_trimmed_fill_path(trim_start_dist, trim_end_dist);
 
-            for segment in &self.segments {
-                match *segment {
-                    PathSegment::MoveTo(p) => {
-                        if in_contour {
-                            builder.end(self.closed);
+                if fill_points.len() >= 3 {
+                    let mut builder = LyonPath::builder();
+                    
+                    // Start the path
+                    if let Some(&first_pt) = fill_points.first() {
+                        builder.begin(lyon::math::point(first_pt.x, first_pt.y));
+                        
+                        // Add all points
+                        for &pt in &fill_points[1..] {
+                            builder.line_to(lyon::math::point(pt.x, pt.y));
                         }
-                        builder.begin(lyon::math::point(p.x, p.y));
-                        current_pos = p;
-                        in_contour = true;
+                        
+                        // Close the path
+                        builder.end(true);
                     }
-                    PathSegment::LineTo(p) => {
-                        if !in_contour {
-                            builder.begin(lyon::math::point(current_pos.x, current_pos.y));
-                            in_contour = true;
-                        }
-                        builder.line_to(lyon::math::point(p.x, p.y));
-                        current_pos = p;
-                    }
-                    PathSegment::QuadTo(ctrl, end) => {
-                        if !in_contour {
-                            builder.begin(lyon::math::point(current_pos.x, current_pos.y));
-                            in_contour = true;
-                        }
-                        builder.quadratic_bezier_to(
-                            lyon::math::point(ctrl.x, ctrl.y),
-                            lyon::math::point(end.x, end.y),
-                        );
-                        current_pos = end;
-                    }
-                    PathSegment::CubicTo(ctrl1, ctrl2, end) => {
-                        if !in_contour {
-                            builder.begin(lyon::math::point(current_pos.x, current_pos.y));
-                            in_contour = true;
-                        }
-                        builder.cubic_bezier_to(
-                            lyon::math::point(ctrl1.x, ctrl1.y),
-                            lyon::math::point(ctrl2.x, ctrl2.y),
-                            lyon::math::point(end.x, end.y),
-                        );
-                        current_pos = end;
+
+                    let lpath = builder.build();
+                    let mut tessellator = FillTessellator::new();
+                    let mut geometry: VertexBuffers<lyon::math::Point, u16> = VertexBuffers::new();
+
+                    let res = tessellator.tessellate_path(
+                        &lpath,
+                        &FillOptions::default(),
+                        &mut lyon::geometry_builder::simple_builder(&mut geometry),
+                    );
+
+                    if res.is_ok() {
+                        let color_source = fill.clone();
+                        let fill_opacity = self.fill_opacity;
+                        let get_color = |pos: [f32; 2]| -> [f32; 4] {
+                            match &color_source {
+                                crate::projection::style::ColorSource::Solid(c) => {
+                                    [c[0], c[1], c[2], c[3] * fill_opacity]
+                                }
+                                crate::projection::style::ColorSource::LinearGradient {
+                                    start,
+                                    end,
+                                    stops,
+                                } => {
+                                    let c = crate::projection::Mesh::evaluate_gradient(
+                                        glam::vec2(pos[0], pos[1]),
+                                        *start,
+                                        *end,
+                                        stops,
+                                    );
+                                    [c[0], c[1], c[2], c[3] * fill_opacity]
+                                }
+                            }
+                        };
+
+                        let vertices: Vec<MeshVertex> = geometry
+                            .vertices
+                            .iter()
+                            .map(|v| MeshVertex {
+                                position: [v.x, v.y, 0.0],
+                                color: get_color([v.x, v.y]),
+                            })
+                            .collect();
+
+                        let mesh = crate::projection::Mesh::from_tessellation(vertices, geometry.indices);
+                        ctx.emit(RenderPrimitive::Mesh(mesh));
                     }
                 }
-            }
-            if in_contour {
-                builder.end(self.closed);
-            }
-
-            let lpath = builder.build();
-            let mut tessellator = FillTessellator::new();
-            let mut geometry: VertexBuffers<lyon::math::Point, u16> = VertexBuffers::new();
-
-            let res = tessellator.tessellate_path(
-                &lpath,
-                &FillOptions::default(),
-                &mut lyon::geometry_builder::simple_builder(&mut geometry),
-            );
-
-            if res.is_ok() {
-                let color_source = fill.clone();
-                let get_color = |pos: [f32; 2]| -> [f32; 4] {
-                    match &color_source {
-                        crate::projection::style::ColorSource::Solid(c) => [c[0], c[1], c[2], c[3]],
-                        crate::projection::style::ColorSource::LinearGradient {
-                            start,
-                            end,
-                            stops,
-                        } => {
-                            let c = crate::projection::Mesh::evaluate_gradient(
-                                glam::vec2(pos[0], pos[1]),
-                                *start,
-                                *end,
-                                stops,
-                            );
-                            [c[0], c[1], c[2], c[3]]
-                        }
-                    }
-                };
-
-                let vertices: Vec<MeshVertex> = geometry
-                    .vertices
-                    .iter()
-                    .map(|v| MeshVertex {
-                        position: [v.x, v.y, 0.0],
-                        color: get_color([v.x, v.y]),
-                    })
-                    .collect();
-
-                let mesh = crate::projection::Mesh::from_tessellation(vertices, geometry.indices);
-                ctx.emit(RenderPrimitive::Mesh(mesh));
             }
         }
     }

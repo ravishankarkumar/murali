@@ -1878,3 +1878,110 @@ impl Animation for MorphGeometry {
         }
     }
 }
+
+/// WritePath animation: traces the path outline and fills the completed sector
+/// The fill appears as a growing sector as the path is drawn (Manim-style)
+pub struct WritePath {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+}
+
+impl WritePath {
+    pub fn new(target_id: TattvaId, ease: Ease) -> Self {
+        Self { target_id, ease }
+    }
+}
+
+impl Animation for WritePath {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
+            path.state.trim_start = 0.0;
+            path.state.trim_end = 0.0;
+            path.state.fill_opacity = 1.0;
+            path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let eased_t = self.ease.eval(t);
+        
+        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
+            // Draw the outline and fill the completed sector simultaneously
+            path.state.trim_end = eased_t;
+            path.state.fill_opacity = 1.0; // Fill is clipped to the trimmed portion
+            path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
+            path.state.trim_end = 1.0;
+            path.state.fill_opacity = 1.0;
+            path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
+            path.state.trim_start = 0.0;
+            path.state.trim_end = 0.0;
+            path.state.fill_opacity = 1.0;
+            path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+}
+
+/// UnwritePath animation: reverses the write effect
+/// Erases the outline from the end while keeping the fill in the remaining portion
+pub struct UnwritePath {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+}
+
+impl UnwritePath {
+    pub fn new(target_id: TattvaId, ease: Ease) -> Self {
+        Self { target_id, ease }
+    }
+}
+
+impl Animation for UnwritePath {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
+            path.state.trim_start = 0.0;
+            path.state.trim_end = 1.0;
+            path.state.fill_opacity = 1.0;
+            path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let eased_t = self.ease.eval(t);
+        
+        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
+            // Erase from the end by increasing trim_start
+            // The fill remains in the portion that hasn't been erased yet
+            path.state.trim_start = eased_t;
+            path.state.trim_end = 1.0;
+            path.state.fill_opacity = 1.0;
+            path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
+            path.state.trim_start = 1.0;
+            path.state.trim_end = 1.0;
+            path.state.fill_opacity = 1.0;
+            path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
+            path.state.trim_start = 0.0;
+            path.state.trim_end = 1.0;
+            path.state.fill_opacity = 1.0;
+            path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+}

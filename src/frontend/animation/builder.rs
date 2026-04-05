@@ -5,7 +5,7 @@ use crate::frontend::animation::{
     FollowAnchor, HorizonEvolve, HorizonPhaseBy, HorizonPhaseTo, MatchTransform, MatrixStep,
     MorphGeometry, MorphObjects, MoveTo, NoiseEvolve, NoisePhaseBy, NoisePhaseTo,
     PerlinFieldEvolve, PerlinFieldPhaseBy, PerlinFieldPhaseTo, PropagateSignal, RevealTo, RotateTo, ScaleTo,
-    TriggerCapture,
+    TriggerCapture, WritePath, UnwritePath,
 };
 use crate::frontend::layout::Anchor;
 use glam::{Quat, Vec3, Vec4};
@@ -102,6 +102,8 @@ pub enum AnimKind {
     Reveal {
         to: f32,
     },
+    WritePath,
+    UnwritePath,
 }
 
 #[derive(Debug, Clone)]
@@ -379,6 +381,16 @@ impl<'a> AnimationBuilder<'a> {
         self
     }
 
+    pub fn write(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::WritePath);
+        self
+    }
+
+    pub fn unwrite(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::UnwritePath);
+        self
+    }
+
     pub fn spawn(self) {
         let spec = self.spec;
         let ease = spec.ease.unwrap_or_default();
@@ -515,6 +527,12 @@ impl<'a> AnimationBuilder<'a> {
             }
             Some(AnimKind::Reveal { to }) => {
                 Box::new(RevealTo::new(spec.target_id, to, ease))
+            }
+            Some(AnimKind::WritePath) => {
+                Box::new(WritePath::new(spec.target_id, ease))
+            }
+            Some(AnimKind::UnwritePath) => {
+                Box::new(UnwritePath::new(spec.target_id, ease))
             }
             None => panic!("Murali Error: AnimationBuilder requires a kind before .spawn()"),
         };
