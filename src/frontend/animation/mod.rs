@@ -474,6 +474,55 @@ impl Animation for PropagateSignal {
     }
 }
 
+pub struct RevealTo {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+    from: Option<f32>,
+    to: f32,
+}
+
+impl RevealTo {
+    pub fn new(target_id: TattvaId, to: f32, ease: Ease) -> Self {
+        Self {
+            target_id,
+            ease,
+            from: None,
+            to: to.clamp(0.0, 1.0),
+        }
+    }
+}
+
+impl Animation for RevealTo {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(flow) = scene.get_tattva_typed::<AgenticFlowChart>(self.target_id) {
+            self.from = Some(flow.state.reveal_progress);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(0.0);
+        let progress = from + (self.to - from) * self.ease.eval(t);
+        if let Some(flow) = scene.get_tattva_typed_mut::<AgenticFlowChart>(self.target_id) {
+            flow.state.reveal_progress = progress.clamp(0.0, 1.0);
+            flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(flow) = scene.get_tattva_typed_mut::<AgenticFlowChart>(self.target_id) {
+            flow.state.reveal_progress = self.to;
+            flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(flow) = scene.get_tattva_typed_mut::<AgenticFlowChart>(self.target_id) {
+            flow.state.reveal_progress = self.from.unwrap_or(0.0);
+            flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
 pub struct TriggerCapture {
     pub target_id: TattvaId,
 }

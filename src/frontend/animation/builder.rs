@@ -4,7 +4,7 @@ use crate::frontend::animation::{
     Animation, BeltEvolve, BeltPhaseBy, BeltPhaseTo, Create, Ease, EquationContinuity, FadeTo,
     FollowAnchor, HorizonEvolve, HorizonPhaseBy, HorizonPhaseTo, MatchTransform, MatrixStep,
     MorphGeometry, MorphObjects, MoveTo, NoiseEvolve, NoisePhaseBy, NoisePhaseTo,
-    PerlinFieldEvolve, PerlinFieldPhaseBy, PerlinFieldPhaseTo, PropagateSignal, RotateTo, ScaleTo,
+    PerlinFieldEvolve, PerlinFieldPhaseBy, PerlinFieldPhaseTo, PropagateSignal, RevealTo, RotateTo, ScaleTo,
     TriggerCapture,
 };
 use crate::frontend::layout::Anchor;
@@ -97,6 +97,9 @@ pub enum AnimKind {
     },
     CaptureFrame,
     Propagate {
+        to: f32,
+    },
+    Reveal {
         to: f32,
     },
 }
@@ -369,6 +372,13 @@ impl<'a> AnimationBuilder<'a> {
         self
     }
 
+    pub fn reveal_to(mut self, to: f32) -> Self {
+        self.spec.kind = Some(AnimKind::Reveal {
+            to: to.clamp(0.0, 1.0),
+        });
+        self
+    }
+
     pub fn spawn(self) {
         let spec = self.spec;
         let ease = spec.ease.unwrap_or_default();
@@ -502,6 +512,9 @@ impl<'a> AnimationBuilder<'a> {
             )),
             Some(AnimKind::Propagate { to }) => {
                 Box::new(PropagateSignal::new(spec.target_id, to, ease))
+            }
+            Some(AnimKind::Reveal { to }) => {
+                Box::new(RevealTo::new(spec.target_id, to, ease))
             }
             None => panic!("Murali Error: AnimationBuilder requires a kind before .spawn()"),
         };

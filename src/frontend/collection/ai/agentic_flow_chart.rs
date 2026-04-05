@@ -84,6 +84,7 @@ pub struct FlowNode {
     pub embedded_content: Option<Arc<dyn FlowNodeContent>>,
     pub content_visibility: FlowNodeContentVisibility,
     pub content_padding: Vec2,
+    pub reveal_at: Option<f32>,
 }
 
 impl FlowNode {
@@ -99,6 +100,7 @@ impl FlowNode {
             embedded_content: None,
             content_visibility: FlowNodeContentVisibility::Always,
             content_padding: vec2(0.22, 0.18),
+            reveal_at: None,
         }
     }
 
@@ -159,6 +161,11 @@ impl FlowNode {
         self.content_padding = padding;
         self
     }
+
+    pub fn with_reveal_at(mut self, reveal_at: f32) -> Self {
+        self.reveal_at = Some(reveal_at);
+        self
+    }
 }
 
 impl From<&str> for FlowNode {
@@ -167,11 +174,12 @@ impl From<&str> for FlowNode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FlowEdge {
     pub from: usize,
     pub to: usize,
     pub route_steps: Vec<EdgeStep>,
+    pub reveal_at: Option<f32>,
 }
 
 impl FlowEdge {
@@ -180,11 +188,17 @@ impl FlowEdge {
             from,
             to,
             route_steps: Vec::new(),
+            reveal_at: None,
         }
     }
 
     pub fn with_route_steps(mut self, steps: Vec<EdgeStep>) -> Self {
         self.route_steps = steps;
+        self
+    }
+
+    pub fn with_reveal_at(mut self, reveal_at: f32) -> Self {
+        self.reveal_at = Some(reveal_at);
         self
     }
 
@@ -214,6 +228,7 @@ pub struct AgenticFlowChart {
     pub indicate_color: Vec4,
     pub indicate_scale: f32,
     pub indicate_window: f32,
+    pub reveal_progress: f32,
     pub active_content_nodes: HashSet<usize>,
 }
 
@@ -252,6 +267,7 @@ impl AgenticFlowChart {
             indicate_color: Vec4::new(1.0, 0.90, 0.42, 1.0),
             indicate_scale: 0.12,
             indicate_window: 0.14,
+            reveal_progress: 1.0,
             active_content_nodes: HashSet::new(),
         }
     }
@@ -268,6 +284,11 @@ impl AgenticFlowChart {
 
     pub fn with_direction(mut self, direction: FlowChartDirection) -> Self {
         self.direction = direction;
+        self
+    }
+
+    pub fn with_reveal_progress(mut self, progress: f32) -> Self {
+        self.reveal_progress = progress.clamp(0.0, 1.0);
         self
     }
 
@@ -525,6 +546,59 @@ impl AgenticFlowChart {
         self.edges.iter().find(|edge| edge.from == from && edge.to == to)
     }
 
+    fn resolved_reveal_thresholds(&self) -> (Vec<f32>, Vec<f32>) {
+        let n_nodes = self.nodes.len();
+        let n_edges = self.edges.len();
+        let total = n_nodes + n_edges;
+        if total == 0 {
+            return (Vec::new(), Vec::new());
+        }
+
+        let mut explicit: Vec<(usize, f32)> = Vec::new();
+        for (i, node) in self.nodes.iter().enumerate() {
+            if let Some(at) = node.reveal_at {
+                explicit.push((i, at));
+            }
+        }
+        for (i, edge) in self.edges.iter().enumerate() {
+            if let Some(at) = edge.reveal_at {
+                explicit.push((i + n_nodes, at));
+            }
+        }
+        explicit.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        let mut thresholds = vec![0.0; total];
+        let mut last_idx = 0;
+        let mut last_at = 0.0;
+
+        for (idx, at) in explicit {
+            let gap_size = idx.saturating_sub(last_idx);
+            if gap_size > 0 {
+                let range = at - last_at;
+                let step = range / (gap_size + 1) as f32;
+                for i in 0..gap_size {
+                    thresholds[last_idx + i] = last_at + step * (i + 1) as f32;
+                }
+            }
+            thresholds[idx] = at;
+            last_idx = idx + 1;
+            last_at = at;
+        }
+
+        if last_idx < total {
+            let gap_size = total - last_idx;
+            let range = (1.0 - last_at).max(0.0);
+            let step = range / (gap_size + 1) as f32;
+            for i in 0..gap_size {
+                thresholds[last_idx + i] = last_at + step * (i + 1) as f32;
+            }
+        }
+
+        let node_thresholds = thresholds[0..n_nodes].to_vec();
+        let edge_thresholds = thresholds[n_nodes..].to_vec();
+        (node_thresholds, edge_thresholds)
+    }
+
     fn edge_route(&self, layouts: &[NodeLayout], from: usize, to: usize) -> Option<Vec<Vec3>> {
         let start = *layouts.get(from)?;
         let end = *layouts.get(to)?;
@@ -718,16 +792,16 @@ impl AgenticFlowChart {
 
             match step {
                 EdgeStep::Up => {
-                    cur_y = next_level_val(&y_levels, cur_y, 1, self.lane_gap);
+                    cur_y = next_level_val(&y_levels, cur_y, 1, self.lane_gap + self.default_node_size.y);
                 }
                 EdgeStep::Down => {
-                    cur_y = next_level_val(&y_levels, cur_y, -1, self.lane_gap);
+                    cur_y = next_level_val(&y_levels, cur_y, -1, self.lane_gap + self.default_node_size.y);
                 }
                 EdgeStep::Left => {
-                    cur_x = next_level_val(&x_levels, cur_x, -1, self.lane_gap);
+                    cur_x = next_level_val(&x_levels, cur_x, -1, self.node_gap + self.default_node_size.x);
                 }
                 EdgeStep::Right => {
-                    cur_x = next_level_val(&x_levels, cur_x, 1, self.lane_gap);
+                    cur_x = next_level_val(&x_levels, cur_x, 1, self.node_gap + self.default_node_size.x);
                 }
             }
 
@@ -860,7 +934,14 @@ impl Project for AgenticFlowChart {
             return;
         }
 
-        for edge in self.connection_pairs() {
+        let (node_thresholds, edge_thresholds) = self.resolved_reveal_thresholds();
+
+        for (idx, edge) in self.connection_pairs().iter().enumerate() {
+            let threshold = edge_thresholds.get(idx).copied().unwrap_or(0.0);
+            if self.reveal_progress < threshold {
+                continue;
+            }
+
             if let Some(route) = self.edge_route(&layouts, edge.from, edge.to) {
                 emit_polyline(ctx, &route, self.edge_thickness, self.edge_color);
                 emit_arrowhead(
@@ -885,9 +966,21 @@ impl Project for AgenticFlowChart {
             };
 
             for hop in 0..hop_count {
-                let Some(route) =
-                    self.edge_route(&layouts, self.flow_path[hop], self.flow_path[hop + 1])
-                else {
+                let from_idx = self.flow_path[hop];
+                let to_idx = self.flow_path[hop + 1];
+                let edge_idx = self
+                    .edges
+                    .iter()
+                    .position(|e| e.from == from_idx && e.to == to_idx);
+
+                if let Some(e_idx) = edge_idx {
+                    let threshold = edge_thresholds.get(e_idx).copied().unwrap_or(0.0);
+                    if self.reveal_progress < threshold {
+                        continue;
+                    }
+                }
+
+                let Some(route) = self.edge_route(&layouts, from_idx, to_idx) else {
                     continue;
                 };
 
@@ -939,6 +1032,11 @@ impl Project for AgenticFlowChart {
         }
 
         for (idx, node) in self.nodes.iter().enumerate() {
+            let threshold = node_thresholds.get(idx).copied().unwrap_or(0.0);
+            if self.reveal_progress < threshold {
+                continue;
+            }
+
             if let Some(layout) = layouts.get(idx).copied() {
                 let intensity = self.node_indicate_intensity(idx);
                 let node_scale = 1.0 + self.indicate_scale * intensity * 0.82;
@@ -1445,7 +1543,7 @@ fn rounded_rect_outline(size: Vec2, radius: f32, arc_steps: usize) -> Vec<Vec2> 
     points
 }
 
-fn next_level_val(levels: &[f32], current: f32, delta: i32, gap: f32) -> f32 {
+fn next_level_val(levels: &[f32], current: f32, delta: i32, jump_dist: f32) -> f32 {
     let pos = levels.iter().position(|&v| (v - current).abs() < 1e-4);
     match pos {
         Some(idx) => {
@@ -1453,12 +1551,12 @@ fn next_level_val(levels: &[f32], current: f32, delta: i32, gap: f32) -> f32 {
             if next_idx >= 0 && next_idx < levels.len() as i32 {
                 levels[next_idx as usize]
             } else if next_idx < 0 {
-                levels[0] + gap * next_idx as f32
+                levels[0] + jump_dist * next_idx as f32
             } else {
-                levels.last().unwrap() + gap * (next_idx - (levels.len() as i32 - 1)) as f32
+                levels.last().unwrap() + jump_dist * (next_idx - (levels.len() as i32 - 1)) as f32
             }
         }
-        None => current + gap * delta as f32,
+        None => current + jump_dist * delta as f32,
     }
 }
 
