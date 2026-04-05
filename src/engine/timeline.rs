@@ -1,7 +1,8 @@
 use crate::engine::scene::Scene;
 use crate::frontend::TattvaId;
 use crate::frontend::animation::{
-    Animation, Ease, builder::AnimationBuilder, camera_animation_builder::CameraAnimationBuilder,
+    Animation, Ease, RunSceneCallback, RunSceneCallbackOverTime, builder::AnimationBuilder,
+    camera_animation_builder::CameraAnimationBuilder,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -154,6 +155,24 @@ impl Timeline {
 
     pub fn animate_camera(&mut self) -> CameraAnimationBuilder<'_> {
         CameraAnimationBuilder::new(self)
+    }
+
+    pub fn call_at<F>(&mut self, time: f32, callback: F)
+    where
+        F: FnMut(&mut Scene) + Send + 'static,
+    {
+        self.add_animation(time, 0.0, Box::new(RunSceneCallback::new(callback)));
+    }
+
+    pub fn call_during<F>(&mut self, start_time: f32, duration: f32, callback: F)
+    where
+        F: FnMut(&mut Scene, f32) + Send + 'static,
+    {
+        self.add_animation(
+            start_time,
+            duration.max(0.0),
+            Box::new(RunSceneCallbackOverTime::new(callback)),
+        );
     }
 
     pub fn play_signal(&mut self, id: TattvaId, playback: SignalPlayback) {

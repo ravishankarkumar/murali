@@ -59,6 +59,11 @@ fn main() -> anyhow::Result<()> {
         .with_active_edge_color(Vec4::new(0.98, 0.80, 0.30, 1.0))
         .with_pulse_color(Vec4::new(1.0, 0.96, 0.84, 1.0));
 
+    let chart_start = 0.2;
+    let chart_duration = 5.6;
+    let arrivals = chart.node_arrivals(chart_start, chart_duration);
+    let completion_time = chart.completion_time(chart_start, chart_duration);
+
     let chart_id = scene.add_tattva(chart, Vec3::new(0.0, 0.25, 0.0));
 
     scene.add_tattva(
@@ -67,14 +72,38 @@ fn main() -> anyhow::Result<()> {
         Vec3::new(0.0, -3.1, 0.0),
     );
 
+    let mut task_checkmarks = Vec::new();
+    for idx in 0..3 {
+        let check_id = scene.add_tattva(
+            Label::new("✓", 0.34).with_color(Vec4::new(0.72, 0.95, 0.66, 1.0)),
+            Vec3::new(5.55, 1.0 - idx as f32 * 0.72, 0.0),
+        );
+        scene.hide(check_id);
+        task_checkmarks.push(check_id);
+    }
+
     let mut timeline = Timeline::new();
     timeline
         .animate(chart_id)
-        .at(0.2)
-        .for_duration(5.6)
+        .at(chart_start)
+        .for_duration(chart_duration)
         .ease(Ease::InOutQuad)
         .propagate()
         .spawn();
+
+    if let Some(reason_visit) = arrivals.iter().find(|arrival| arrival.node_index == 2) {
+        timeline.call_at(reason_visit.time, |_| {
+            // Placeholder hook for future "node finished processing" scenes.
+        });
+    }
+
+    if let Some(done_time) = completion_time {
+        for (idx, check_id) in task_checkmarks.into_iter().enumerate() {
+            timeline.call_at(done_time + idx as f32 * 0.45, move |scene| {
+                scene.show(check_id);
+            });
+        }
+    }
 
     scene.timelines.insert("main".to_string(), timeline);
     scene.camera_mut().position = Vec3::new(0.0, 0.0, 11.0);

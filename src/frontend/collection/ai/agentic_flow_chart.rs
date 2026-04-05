@@ -1,6 +1,10 @@
-use glam::{Vec2, Vec3, Vec4, vec2};
+use glam::{Vec2, Vec3, Vec4, vec2, vec3};
+use std::collections::HashSet;
+use std::sync::Arc;
 
+use crate::backend::renderer::vertex::{mesh::MeshVertex, text::TextVertex};
 use crate::frontend::layout::{Bounded, Bounds};
+use crate::projection::mesh::MeshData;
 use crate::projection::{Mesh, Project, ProjectionCtx, RenderPrimitive};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,6 +21,41 @@ pub enum FlowNodeShape {
     Diamond,
 }
 
+pub trait FlowNodeContent: std::fmt::Debug + Send + Sync {
+    fn local_bounds(&self) -> Bounds;
+    fn project(&self, ctx: &mut ProjectionCtx);
+}
+
+#[derive(Debug)]
+pub struct ProjectedFlowNodeContent<T> {
+    pub state: T,
+}
+
+impl<T> ProjectedFlowNodeContent<T> {
+    pub fn new(state: T) -> Self {
+        Self { state }
+    }
+}
+
+impl<T> FlowNodeContent for ProjectedFlowNodeContent<T>
+where
+    T: Project + Bounded + std::fmt::Debug + Send + Sync + 'static,
+{
+    fn local_bounds(&self) -> Bounds {
+        self.state.local_bounds()
+    }
+
+    fn project(&self, ctx: &mut ProjectionCtx) {
+        self.state.project(ctx);
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowNodeContentVisibility {
+    Always,
+    ActiveOnly,
+}
+
 #[derive(Debug, Clone)]
 pub struct FlowNode {
     pub label: String,
@@ -25,6 +64,9 @@ pub struct FlowNode {
     pub fill_color: Vec4,
     pub stroke_color: Vec4,
     pub text_color: Vec4,
+    pub embedded_content: Option<Arc<dyn FlowNodeContent>>,
+    pub content_visibility: FlowNodeContentVisibility,
+    pub content_padding: Vec2,
 }
 
 impl FlowNode {
@@ -36,6 +78,9 @@ impl FlowNode {
             fill_color: Vec4::new(0.16, 0.20, 0.28, 1.0),
             stroke_color: Vec4::new(0.56, 0.63, 0.74, 1.0),
             text_color: Vec4::new(0.96, 0.97, 0.99, 1.0),
+            embedded_content: None,
+            content_visibility: FlowNodeContentVisibility::Always,
+            content_padding: vec2(0.22, 0.18),
         }
     }
 
@@ -61,6 +106,34 @@ impl FlowNode {
 
     pub fn with_text_color(mut self, color: Vec4) -> Self {
         self.text_color = color;
+        self
+    }
+
+    pub fn with_content<T>(mut self, content: T) -> Self
+    where
+        T: Project + Bounded + std::fmt::Debug + Send + Sync + 'static,
+    {
+        self.embedded_content = Some(Arc::new(ProjectedFlowNodeContent::new(content)));
+        self
+    }
+
+    pub fn with_content_renderer(mut self, content: Arc<dyn FlowNodeContent>) -> Self {
+        self.embedded_content = Some(content);
+        self
+    }
+
+    pub fn with_content_visibility(mut self, visibility: FlowNodeContentVisibility) -> Self {
+        self.content_visibility = visibility;
+        self
+    }
+
+    pub fn with_active_only_content(mut self) -> Self {
+        self.content_visibility = FlowNodeContentVisibility::ActiveOnly;
+        self
+    }
+
+    pub fn with_content_padding(mut self, padding: Vec2) -> Self {
+        self.content_padding = padding;
         self
     }
 }
@@ -104,6 +177,14 @@ pub struct AgenticFlowChart {
     pub indicate_color: Vec4,
     pub indicate_scale: f32,
     pub indicate_window: f32,
+    pub active_content_nodes: HashSet<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FlowNodeArrival {
+    pub node_index: usize,
+    pub visit_index: usize,
+    pub time: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -134,6 +215,7 @@ impl AgenticFlowChart {
             indicate_color: Vec4::new(1.0, 0.90, 0.42, 1.0),
             indicate_scale: 0.12,
             indicate_window: 0.14,
+            active_content_nodes: HashSet::new(),
         }
     }
 
@@ -207,6 +289,19 @@ impl AgenticFlowChart {
         self
     }
 
+    pub fn with_active_content_nodes(mut self, nodes: impl IntoIterator<Item = usize>) -> Self {
+        self.active_content_nodes = nodes.into_iter().collect();
+        self
+    }
+
+    pub fn activate_content_node(&mut self, node_index: usize) {
+        self.active_content_nodes.insert(node_index);
+    }
+
+    pub fn deactivate_content_node(&mut self, node_index: usize) {
+        self.active_content_nodes.remove(&node_index);
+    }
+
     fn connection_pairs(&self) -> Vec<FlowEdge> {
         if !self.edges.is_empty() {
             return self.edges.clone();
@@ -229,14 +324,22 @@ impl AgenticFlowChart {
 
         let text_layout =
             crate::resource::text::layout::measure_label(&node.label, self.text_height);
-        vec2(
+        let mut size = vec2(
             self.default_node_size
                 .x
                 .max(text_layout.width + self.text_padding.x * 2.0),
             self.default_node_size
                 .y
                 .max(text_layout.height + self.text_padding.y * 2.0),
-        )
+        );
+
+        if let Some(content) = &node.embedded_content {
+            let content_size = content.local_bounds().size();
+            size.x = size.x.max(content_size.x + node.content_padding.x * 2.0);
+            size.y = size.y.max(content_size.y + node.content_padding.y * 2.0);
+        }
+
+        size
     }
 
     fn node_layouts(&self) -> Vec<NodeLayout> {
@@ -292,6 +395,39 @@ impl AgenticFlowChart {
         self.node_layouts()
             .get(node_index)
             .map(|layout| layout.center)
+    }
+
+    pub fn node_arrivals(&self, start_time: f32, duration: f32) -> Vec<FlowNodeArrival> {
+        if self.flow_path.is_empty() {
+            return Vec::new();
+        }
+
+        let hop_count = self.flow_path.len().saturating_sub(1);
+        self.flow_path
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(visit_index, node_index)| {
+                let progress = if hop_count == 0 {
+                    0.0
+                } else {
+                    visit_index as f32 / hop_count as f32
+                };
+                FlowNodeArrival {
+                    node_index,
+                    visit_index,
+                    time: start_time + duration.max(0.0) * progress,
+                }
+            })
+            .collect()
+    }
+
+    pub fn completion_time(&self, start_time: f32, duration: f32) -> Option<f32> {
+        if self.flow_path.is_empty() {
+            None
+        } else {
+            Some(start_time + duration.max(0.0))
+        }
     }
 
     fn edge_route(&self, layouts: &[NodeLayout], from: usize, to: usize) -> Option<Vec<Vec3>> {
@@ -429,9 +565,19 @@ impl AgenticFlowChart {
         best
     }
 
+    fn node_content_visible(&self, node_index: usize, node: &FlowNode) -> bool {
+        match node.content_visibility {
+            FlowNodeContentVisibility::Always => true,
+            FlowNodeContentVisibility::ActiveOnly => {
+                self.active_content_nodes.contains(&node_index)
+            }
+        }
+    }
+
     fn draw_node(
         &self,
         ctx: &mut ProjectionCtx,
+        node_index: usize,
         node: &FlowNode,
         layout: NodeLayout,
         scale: f32,
@@ -452,12 +598,24 @@ impl AgenticFlowChart {
             stroke_color,
         );
 
-        ctx.emit(RenderPrimitive::Text {
-            content: node.label.clone(),
-            height: self.text_height * scale.min(1.08),
-            color: node.text_color,
-            offset: layout.center,
-        });
+        if let Some(content) = &node.embedded_content {
+            if self.node_content_visible(node_index, node) {
+                let inner_size = vec2(
+                    (size.x - node.content_padding.x * 2.0).max(0.05),
+                    (size.y - node.content_padding.y * 2.0).max(0.05),
+                );
+                project_content_in_node(ctx, content.as_ref(), layout.center, inner_size);
+            }
+        }
+
+        if !node.label.is_empty() {
+            ctx.emit(RenderPrimitive::Text {
+                content: node.label.clone(),
+                height: self.text_height * scale.min(1.08),
+                color: node.text_color,
+                offset: layout.center,
+            });
+        }
     }
 }
 
@@ -549,9 +707,10 @@ impl Project for AgenticFlowChart {
         for (idx, node) in self.nodes.iter().enumerate() {
             if let Some(layout) = layouts.get(idx).copied() {
                 let intensity = self.node_indicate_intensity(idx);
-                let node_scale = 1.0 + self.indicate_scale * intensity * 0.4;
+                let node_scale = 1.0 + self.indicate_scale * intensity * 0.82;
                 self.draw_node(
                     ctx,
+                    idx,
                     node,
                     layout,
                     node_scale,
@@ -619,6 +778,161 @@ impl Bounded for AgenticFlowChart {
 
         Bounds::new(min, max)
     }
+}
+
+fn project_content_in_node(
+    ctx: &mut ProjectionCtx,
+    content: &dyn FlowNodeContent,
+    node_center: Vec3,
+    target_size: Vec2,
+) {
+    let source_bounds = content.local_bounds();
+    let source_size = vec2(
+        source_bounds.width().max(0.01),
+        source_bounds.height().max(0.01),
+    );
+    let scale = (target_size.x / source_size.x)
+        .min(target_size.y / source_size.y)
+        .max(0.001);
+    let source_center = source_bounds.center();
+    let target_center = node_center.truncate();
+
+    let mut subctx = ProjectionCtx::new(ctx.props.clone());
+    content.project(&mut subctx);
+    for primitive in subctx.primitives {
+        emit_transformed_primitive(ctx, primitive, source_center, target_center, scale);
+    }
+}
+
+fn emit_transformed_primitive(
+    ctx: &mut ProjectionCtx,
+    primitive: RenderPrimitive,
+    source_center: Vec2,
+    target_center: Vec2,
+    scale: f32,
+) {
+    match primitive {
+        RenderPrimitive::Mesh(mesh) => {
+            let transformed = match &mesh.data {
+                MeshData::Empty => std::sync::Arc::new(mesh.as_ref().clone()),
+                MeshData::Mesh(vertices) => std::sync::Arc::new(Mesh {
+                    data: MeshData::Mesh(
+                        vertices
+                            .iter()
+                            .map(|vertex| MeshVertex {
+                                position: transform_position(
+                                    vertex.position,
+                                    source_center,
+                                    target_center,
+                                    scale,
+                                ),
+                                color: vertex.color,
+                            })
+                            .collect(),
+                    ),
+                    indices: mesh.indices.clone(),
+                }),
+                MeshData::Text(vertices) => std::sync::Arc::new(Mesh {
+                    data: MeshData::Text(
+                        vertices
+                            .iter()
+                            .map(|vertex| TextVertex {
+                                position: transform_position(
+                                    vertex.position,
+                                    source_center,
+                                    target_center,
+                                    scale,
+                                ),
+                                uv: vertex.uv,
+                                color: vertex.color,
+                            })
+                            .collect(),
+                    ),
+                    indices: mesh.indices.clone(),
+                }),
+            };
+            ctx.emit(RenderPrimitive::Mesh(transformed));
+        }
+        RenderPrimitive::Line {
+            start,
+            end,
+            thickness,
+            color,
+            dash_length,
+            gap_length,
+            dash_offset,
+        } => {
+            ctx.emit(RenderPrimitive::Line {
+                start: transform_vec3(start, source_center, target_center, scale),
+                end: transform_vec3(end, source_center, target_center, scale),
+                thickness: thickness * scale,
+                color,
+                dash_length: dash_length * scale,
+                gap_length: gap_length * scale,
+                dash_offset: dash_offset * scale,
+            });
+        }
+        RenderPrimitive::Text {
+            content,
+            height,
+            color,
+            offset,
+        } => {
+            ctx.emit(RenderPrimitive::Text {
+                content,
+                height: height * scale,
+                color,
+                offset: transform_vec3(offset, source_center, target_center, scale),
+            });
+        }
+        RenderPrimitive::Latex {
+            source,
+            height,
+            color,
+            offset,
+        } => {
+            ctx.emit(RenderPrimitive::Latex {
+                source,
+                height: height * scale,
+                color,
+                offset: transform_vec3(offset, source_center, target_center, scale),
+            });
+        }
+        RenderPrimitive::Typst {
+            source,
+            height,
+            color,
+            offset,
+        } => {
+            ctx.emit(RenderPrimitive::Typst {
+                source,
+                height: height * scale,
+                color,
+                offset: transform_vec3(offset, source_center, target_center, scale),
+            });
+        }
+    }
+}
+
+fn transform_vec3(point: Vec3, source_center: Vec2, target_center: Vec2, scale: f32) -> Vec3 {
+    vec3(
+        (point.x - source_center.x) * scale + target_center.x,
+        (point.y - source_center.y) * scale + target_center.y,
+        point.z * scale,
+    )
+}
+
+fn transform_position(
+    position: [f32; 3],
+    source_center: Vec2,
+    target_center: Vec2,
+    scale: f32,
+) -> [f32; 3] {
+    [
+        (position[0] - source_center.x) * scale + target_center.x,
+        (position[1] - source_center.y) * scale + target_center.y,
+        position[2] * scale,
+    ]
 }
 
 fn emit_polyline(ctx: &mut ProjectionCtx, points: &[Vec3], thickness: f32, color: Vec4) {

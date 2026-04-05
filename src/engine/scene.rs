@@ -144,6 +144,24 @@ impl Scene {
         }
     }
 
+    pub fn set_opacity(&mut self, id: TattvaId, opacity: f32) {
+        if let Some(tattva) = self.get_tattva_any_mut(id) {
+            let mut props = DrawableProps::write(tattva.props());
+            props.opacity = opacity.clamp(0.0, 1.0);
+            props.visible = props.opacity > 0.001;
+            drop(props);
+            tattva.mark_dirty(DirtyFlags::STYLE | DirtyFlags::VISIBILITY);
+        }
+    }
+
+    pub fn show(&mut self, id: TattvaId) {
+        self.set_opacity(id, 1.0);
+    }
+
+    pub fn hide(&mut self, id: TattvaId) {
+        self.set_opacity(id, 0.0);
+    }
+
     pub fn align_to(&mut self, moving: TattvaId, target: TattvaId, anchor: Anchor) {
         let Some(moving_anchor) = self.anchor_position(moving, anchor) else {
             return;

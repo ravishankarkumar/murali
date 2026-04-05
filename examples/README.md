@@ -24,6 +24,9 @@ Signal propagation through a neural-network path.
 `cargo run --example neural_network_v2`
 Deactivated-node behavior, multi-path propagation, and signal playback modes.
 
+`cargo run --example agentic_flow_with_neural_node`
+Flow chart pauses at a neural-network node, waits for three neural signal loops, then resumes and marks the task complete.
+
 `cargo run --example screenshot_markers`
 Scene markers that save screenshots when timeline control reaches them.
 

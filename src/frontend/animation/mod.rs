@@ -2,6 +2,7 @@ pub mod builder;
 pub mod camera_animation;
 pub mod camera_animation_builder;
 
+use parking_lot::Mutex;
 use std::collections::HashMap;
 
 use crate::engine::scene::Scene;
@@ -77,6 +78,60 @@ pub trait Animation: Send + Sync {
     fn apply_at(&mut self, scene: &mut Scene, t: f32);
     fn on_finish(&mut self, _scene: &mut Scene) {}
     fn reset(&mut self, _scene: &mut Scene) {}
+}
+
+pub struct RunSceneCallback {
+    callback: Mutex<Box<dyn FnMut(&mut Scene) + Send>>,
+}
+
+impl RunSceneCallback {
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: FnMut(&mut Scene) + Send + 'static,
+    {
+        Self {
+            callback: Mutex::new(Box::new(callback)),
+        }
+    }
+}
+
+impl Animation for RunSceneCallback {
+    fn on_start(&mut self, _scene: &mut Scene) {}
+
+    fn apply_at(&mut self, _scene: &mut Scene, _t: f32) {}
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        (self.callback.lock())(scene);
+    }
+}
+
+pub struct RunSceneCallbackOverTime {
+    callback: Mutex<Box<dyn FnMut(&mut Scene, f32) + Send>>,
+}
+
+impl RunSceneCallbackOverTime {
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: FnMut(&mut Scene, f32) + Send + 'static,
+    {
+        Self {
+            callback: Mutex::new(Box::new(callback)),
+        }
+    }
+}
+
+impl Animation for RunSceneCallbackOverTime {
+    fn on_start(&mut self, scene: &mut Scene) {
+        (self.callback.lock())(scene, 0.0);
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        (self.callback.lock())(scene, t.clamp(0.0, 1.0));
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        (self.callback.lock())(scene, 1.0);
+    }
 }
 
 fn with_props_mut<F>(scene: &mut Scene, target_id: TattvaId, dirty: DirtyFlags, f: F)
