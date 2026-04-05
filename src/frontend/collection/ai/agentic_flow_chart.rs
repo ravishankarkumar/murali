@@ -506,6 +506,13 @@ impl Project for AgenticFlowChart {
                         self.edge_thickness * 1.15,
                         self.active_edge_color,
                     );
+                    emit_arrowhead(
+                        ctx,
+                        &route,
+                        self.arrow_size,
+                        self.edge_thickness * 1.15,
+                        self.active_edge_color,
+                    );
                 } else if hop == current_hop && progress < 1.0 {
                     let partial = partial_polyline(&route, current_t);
                     emit_polyline(
@@ -514,10 +521,24 @@ impl Project for AgenticFlowChart {
                         self.edge_thickness * 1.15,
                         self.active_edge_color,
                     );
+                    emit_arrowhead(
+                        ctx,
+                        &partial,
+                        self.arrow_size,
+                        self.edge_thickness * 1.15,
+                        self.active_edge_color,
+                    );
                 } else if hop == current_hop && progress >= 1.0 {
                     emit_polyline(
                         ctx,
                         &route,
+                        self.edge_thickness * 1.15,
+                        self.active_edge_color,
+                    );
+                    emit_arrowhead(
+                        ctx,
+                        &route,
+                        self.arrow_size,
                         self.edge_thickness * 1.15,
                         self.active_edge_color,
                     );
