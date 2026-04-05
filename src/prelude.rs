@@ -8,6 +8,11 @@ pub use crate::frontend::collection::primitives::noisy_circle::{
     NoisyCircle, NoisyCircleColorMode, NoisyCircleGradient, PerlinNoiseCircle,
     PerlinNoiseCircleColorMode, PerlinNoiseCircleGradient,
 };
+pub use crate::frontend::collection::primitives::noisy_horizon::{
+    AINoiseField, GenerativeHorizon, LayeredPerlinField, MultiLayeredPerlinField, NoisyHorizon,
+    NoisyHorizonGradient, PerlinFieldLayer, PerlinNoiseHorizon, PerlinNoiseHorizonGradient,
+    PerlinNoiseTerrain,
+};
 pub use crate::frontend::collection::primitives::particle_belt::{AsteroidBelt, ParticleBelt};
 pub use crate::frontend::collection::primitives::path::Path;
 pub use crate::frontend::collection::primitives::polygon::Polygon;

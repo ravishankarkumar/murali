@@ -30,6 +30,9 @@ Scene markers that save screenshots when timeline control reaches them.
 `cargo run --example noisy_circle`
 Circular outline driven by polar Perlin noise and animated over time.
 
+`cargo run --example perlin_noise_horizon`
+Generative horizon with a Perlin-noise top edge and a shifting multicolor fill below it.
+
 `cargo run --example particle_belt`
 Colored particles orbit in a living circular band, like a stylized asteroid belt.
 

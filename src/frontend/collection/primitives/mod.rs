@@ -3,6 +3,7 @@ pub mod cube;
 pub mod ellipse;
 pub mod line;
 pub mod noisy_circle;
+pub mod noisy_horizon;
 pub mod particle_belt;
 pub mod path;
 pub mod polygon;

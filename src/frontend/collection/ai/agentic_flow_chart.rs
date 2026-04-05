@@ -304,66 +304,54 @@ impl AgenticFlowChart {
         let points = match self.direction {
             FlowChartDirection::Horizontal => {
                 if to == from + 1 {
-                    vec![
-                        start.center,
-                        Vec3::new(start.center.x + start.size.x * 0.5, start.center.y, 0.0),
-                        Vec3::new(end.center.x - end.size.x * 0.5, end.center.y, 0.0),
-                        end.center,
-                    ]
+                    let start_anchor =
+                        Vec3::new(start.center.x + start.size.x * 0.5, start.center.y, 0.0);
+                    let end_anchor = Vec3::new(end.center.x - end.size.x * 0.5, end.center.y, 0.0);
+                    vec![start_anchor, end_anchor]
                 } else if to > from {
                     let start_anchor =
                         Vec3::new(start.center.x + start.size.x * 0.5, start.center.y, 0.0);
                     let end_anchor = Vec3::new(end.center.x - end.size.x * 0.5, end.center.y, 0.0);
                     let lane_y = lane_offset;
                     vec![
-                        start.center,
                         start_anchor,
                         Vec3::new(start_anchor.x + stub, start_anchor.y, 0.0),
                         Vec3::new(start_anchor.x + stub, lane_y, 0.0),
                         Vec3::new(end_anchor.x - stub, lane_y, 0.0),
                         Vec3::new(end_anchor.x - stub, end_anchor.y, 0.0),
                         end_anchor,
-                        end.center,
                     ]
                 } else {
                     let start_anchor =
-                        Vec3::new(start.center.x - start.size.x * 0.5, start.center.y, 0.0);
-                    let end_anchor = Vec3::new(end.center.x + end.size.x * 0.5, end.center.y, 0.0);
-                    let lane_y = -lane_offset;
+                        Vec3::new(start.center.x, start.center.y - start.size.y * 0.5, 0.0);
+                    let end_anchor = Vec3::new(end.center.x, end.center.y - end.size.y * 0.5, 0.0);
+                    let lane_y = start_anchor.y.min(end_anchor.y) - lane_offset;
                     vec![
-                        start.center,
                         start_anchor,
-                        Vec3::new(start_anchor.x - stub, start_anchor.y, 0.0),
-                        Vec3::new(start_anchor.x - stub, lane_y, 0.0),
-                        Vec3::new(end_anchor.x + stub, lane_y, 0.0),
-                        Vec3::new(end_anchor.x + stub, end_anchor.y, 0.0),
+                        Vec3::new(start_anchor.x, lane_y, 0.0),
+                        Vec3::new(end_anchor.x, lane_y, 0.0),
                         end_anchor,
-                        end.center,
                     ]
                 }
             }
             FlowChartDirection::Vertical => {
                 if to == from + 1 {
-                    vec![
-                        start.center,
-                        Vec3::new(start.center.x, start.center.y - start.size.y * 0.5, 0.0),
-                        Vec3::new(end.center.x, end.center.y + end.size.y * 0.5, 0.0),
-                        end.center,
-                    ]
+                    let start_anchor =
+                        Vec3::new(start.center.x, start.center.y - start.size.y * 0.5, 0.0);
+                    let end_anchor = Vec3::new(end.center.x, end.center.y + end.size.y * 0.5, 0.0);
+                    vec![start_anchor, end_anchor]
                 } else if to > from {
                     let start_anchor =
                         Vec3::new(start.center.x, start.center.y - start.size.y * 0.5, 0.0);
                     let end_anchor = Vec3::new(end.center.x, end.center.y + end.size.y * 0.5, 0.0);
                     let lane_x = lane_offset;
                     vec![
-                        start.center,
                         start_anchor,
                         Vec3::new(start_anchor.x, start_anchor.y - stub, 0.0),
                         Vec3::new(lane_x, start_anchor.y - stub, 0.0),
                         Vec3::new(lane_x, end_anchor.y + stub, 0.0),
                         Vec3::new(end_anchor.x, end_anchor.y + stub, 0.0),
                         end_anchor,
-                        end.center,
                     ]
                 } else {
                     let start_anchor =
@@ -371,14 +359,12 @@ impl AgenticFlowChart {
                     let end_anchor = Vec3::new(end.center.x, end.center.y - end.size.y * 0.5, 0.0);
                     let lane_x = -lane_offset;
                     vec![
-                        start.center,
                         start_anchor,
                         Vec3::new(start_anchor.x, start_anchor.y + stub, 0.0),
                         Vec3::new(lane_x, start_anchor.y + stub, 0.0),
                         Vec3::new(lane_x, end_anchor.y - stub, 0.0),
                         Vec3::new(end_anchor.x, end_anchor.y - stub, 0.0),
                         end_anchor,
-                        end.center,
                     ]
                 }
             }
@@ -459,7 +445,7 @@ impl AgenticFlowChart {
             .translated(layout.center);
         ctx.emit(RenderPrimitive::Mesh(mesh));
 
-        emit_polyline(
+        emit_closed_polyline(
             ctx,
             &translate_points(&outline, layout.center),
             stroke_thickness,
@@ -541,11 +527,13 @@ impl Project for AgenticFlowChart {
 
         for (idx, node) in self.nodes.iter().enumerate() {
             if let Some(layout) = layouts.get(idx).copied() {
+                let intensity = self.node_indicate_intensity(idx);
+                let node_scale = 1.0 + self.indicate_scale * intensity * 0.4;
                 self.draw_node(
                     ctx,
                     node,
                     layout,
-                    1.0,
+                    node_scale,
                     node.stroke_color,
                     self.edge_thickness * 0.9,
                 );
@@ -562,7 +550,7 @@ impl Project for AgenticFlowChart {
                 indicate_color.w *= 0.35 + intensity * 0.55;
                 let scale = 1.0 + self.indicate_scale * intensity;
                 let outline = shape_outline(node.shape, layout.size * scale);
-                emit_polyline(
+                emit_closed_polyline(
                     ctx,
                     &translate_points(&outline, layout.center),
                     self.edge_thickness * (1.5 + intensity),
@@ -628,6 +616,19 @@ fn emit_polyline(ctx: &mut ProjectionCtx, points: &[Vec3], thickness: f32, color
             gap_length: 0.0,
             dash_offset: 0.0,
         });
+    }
+}
+
+fn emit_closed_polyline(ctx: &mut ProjectionCtx, points: &[Vec3], thickness: f32, color: Vec4) {
+    if points.len() < 2 {
+        return;
+    }
+
+    emit_polyline(ctx, points, thickness, color);
+    if let (Some(&start), Some(&end)) = (points.first(), points.last()) {
+        if start.distance_squared(end) > 1e-6 {
+            emit_polyline(ctx, &[end, start], thickness, color);
+        }
     }
 }
 

@@ -15,6 +15,7 @@ use crate::frontend::collection::primitives::circle::Circle;
 use crate::frontend::collection::primitives::ellipse::Ellipse;
 use crate::frontend::collection::primitives::line::Line;
 use crate::frontend::collection::primitives::noisy_circle::NoisyCircle;
+use crate::frontend::collection::primitives::noisy_horizon::{LayeredPerlinField, NoisyHorizon};
 use crate::frontend::collection::primitives::particle_belt::ParticleBelt;
 use crate::frontend::collection::primitives::path::Path;
 use crate::frontend::collection::primitives::polygon::Polygon;
@@ -758,6 +759,322 @@ impl Animation for BeltEvolve {
         if let Some(belt) = scene.get_tattva_typed_mut::<ParticleBelt>(self.target_id) {
             belt.state.phase = self.from.unwrap_or(0.0);
             belt.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+pub struct HorizonPhaseTo {
+    pub target_id: TattvaId,
+    pub to: f32,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl HorizonPhaseTo {
+    pub fn new(target_id: TattvaId, to: f32, ease: Ease) -> Self {
+        Self {
+            target_id,
+            to,
+            ease,
+            from: None,
+        }
+    }
+}
+
+impl Animation for HorizonPhaseTo {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(horizon) = scene.get_tattva_typed::<NoisyHorizon>(self.target_id) {
+            self.from = Some(horizon.state.phase);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(self.to);
+        let phase = from + (self.to - from) * self.ease.eval(t);
+        if let Some(horizon) = scene.get_tattva_typed_mut::<NoisyHorizon>(self.target_id) {
+            horizon.state.phase = phase;
+            horizon.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(horizon) = scene.get_tattva_typed_mut::<NoisyHorizon>(self.target_id) {
+            horizon.state.phase = self.to;
+            horizon.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(horizon) = scene.get_tattva_typed_mut::<NoisyHorizon>(self.target_id) {
+            horizon.state.phase = self.from.unwrap_or(0.0);
+            horizon.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+pub struct HorizonPhaseBy {
+    pub target_id: TattvaId,
+    pub delta: f32,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl HorizonPhaseBy {
+    pub fn new(target_id: TattvaId, delta: f32, ease: Ease) -> Self {
+        Self {
+            target_id,
+            delta,
+            ease,
+            from: None,
+        }
+    }
+}
+
+impl Animation for HorizonPhaseBy {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(horizon) = scene.get_tattva_typed::<NoisyHorizon>(self.target_id) {
+            self.from = Some(horizon.state.phase);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(0.0);
+        let phase = from + self.delta * self.ease.eval(t);
+        if let Some(horizon) = scene.get_tattva_typed_mut::<NoisyHorizon>(self.target_id) {
+            horizon.state.phase = phase;
+            horizon.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        let from = self.from.unwrap_or(0.0);
+        if let Some(horizon) = scene.get_tattva_typed_mut::<NoisyHorizon>(self.target_id) {
+            horizon.state.phase = from + self.delta;
+            horizon.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(horizon) = scene.get_tattva_typed_mut::<NoisyHorizon>(self.target_id) {
+            horizon.state.phase = self.from.unwrap_or(0.0);
+            horizon.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+pub struct HorizonEvolve {
+    pub target_id: TattvaId,
+    pub duration: f32,
+    pub speed_override: Option<f32>,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl HorizonEvolve {
+    pub fn new(
+        target_id: TattvaId,
+        duration: f32,
+        speed_override: Option<f32>,
+        ease: Ease,
+    ) -> Self {
+        Self {
+            target_id,
+            duration,
+            speed_override,
+            ease,
+            from: None,
+        }
+    }
+}
+
+impl Animation for HorizonEvolve {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(horizon) = scene.get_tattva_typed::<NoisyHorizon>(self.target_id) {
+            self.from = Some(horizon.state.phase);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(0.0);
+        if let Some(horizon) = scene.get_tattva_typed_mut::<NoisyHorizon>(self.target_id) {
+            let speed = self.speed_override.unwrap_or(horizon.state.morph_speed);
+            let phase = from + speed * self.duration * self.ease.eval(t);
+            horizon.state.phase = phase;
+            horizon.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        let from = self.from.unwrap_or(0.0);
+        if let Some(horizon) = scene.get_tattva_typed_mut::<NoisyHorizon>(self.target_id) {
+            let speed = self.speed_override.unwrap_or(horizon.state.morph_speed);
+            horizon.state.phase = from + speed * self.duration;
+            horizon.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(horizon) = scene.get_tattva_typed_mut::<NoisyHorizon>(self.target_id) {
+            horizon.state.phase = self.from.unwrap_or(0.0);
+            horizon.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+pub struct PerlinFieldPhaseTo {
+    pub target_id: TattvaId,
+    pub to: f32,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl PerlinFieldPhaseTo {
+    pub fn new(target_id: TattvaId, to: f32, ease: Ease) -> Self {
+        Self {
+            target_id,
+            to,
+            ease,
+            from: None,
+        }
+    }
+}
+
+impl Animation for PerlinFieldPhaseTo {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(field) = scene.get_tattva_typed::<LayeredPerlinField>(self.target_id) {
+            self.from = Some(field.state.phase);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(self.to);
+        let phase = from + (self.to - from) * self.ease.eval(t);
+        if let Some(field) = scene.get_tattva_typed_mut::<LayeredPerlinField>(self.target_id) {
+            field.state.phase = phase;
+            field.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(field) = scene.get_tattva_typed_mut::<LayeredPerlinField>(self.target_id) {
+            field.state.phase = self.to;
+            field.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(field) = scene.get_tattva_typed_mut::<LayeredPerlinField>(self.target_id) {
+            field.state.phase = self.from.unwrap_or(0.0);
+            field.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+pub struct PerlinFieldPhaseBy {
+    pub target_id: TattvaId,
+    pub delta: f32,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl PerlinFieldPhaseBy {
+    pub fn new(target_id: TattvaId, delta: f32, ease: Ease) -> Self {
+        Self {
+            target_id,
+            delta,
+            ease,
+            from: None,
+        }
+    }
+}
+
+impl Animation for PerlinFieldPhaseBy {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(field) = scene.get_tattva_typed::<LayeredPerlinField>(self.target_id) {
+            self.from = Some(field.state.phase);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(0.0);
+        let phase = from + self.delta * self.ease.eval(t);
+        if let Some(field) = scene.get_tattva_typed_mut::<LayeredPerlinField>(self.target_id) {
+            field.state.phase = phase;
+            field.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        let from = self.from.unwrap_or(0.0);
+        if let Some(field) = scene.get_tattva_typed_mut::<LayeredPerlinField>(self.target_id) {
+            field.state.phase = from + self.delta;
+            field.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(field) = scene.get_tattva_typed_mut::<LayeredPerlinField>(self.target_id) {
+            field.state.phase = self.from.unwrap_or(0.0);
+            field.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+pub struct PerlinFieldEvolve {
+    pub target_id: TattvaId,
+    pub duration: f32,
+    pub speed_override: Option<f32>,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl PerlinFieldEvolve {
+    pub fn new(
+        target_id: TattvaId,
+        duration: f32,
+        speed_override: Option<f32>,
+        ease: Ease,
+    ) -> Self {
+        Self {
+            target_id,
+            duration,
+            speed_override,
+            ease,
+            from: None,
+        }
+    }
+}
+
+impl Animation for PerlinFieldEvolve {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(field) = scene.get_tattva_typed::<LayeredPerlinField>(self.target_id) {
+            self.from = Some(field.state.phase);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(0.0);
+        if let Some(field) = scene.get_tattva_typed_mut::<LayeredPerlinField>(self.target_id) {
+            let speed = self.speed_override.unwrap_or(field.state.morph_speed);
+            let phase = from + speed * self.duration * self.ease.eval(t);
+            field.state.phase = phase;
+            field.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        let from = self.from.unwrap_or(0.0);
+        if let Some(field) = scene.get_tattva_typed_mut::<LayeredPerlinField>(self.target_id) {
+            let speed = self.speed_override.unwrap_or(field.state.morph_speed);
+            field.state.phase = from + speed * self.duration;
+            field.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(field) = scene.get_tattva_typed_mut::<LayeredPerlinField>(self.target_id) {
+            field.state.phase = self.from.unwrap_or(0.0);
+            field.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 }

@@ -47,8 +47,9 @@ fn main() -> anyhow::Result<()> {
         .with_edges(vec![
             FlowEdge::new(0, 1),
             FlowEdge::new(1, 2),
-            FlowEdge::new(2, 1),
+            // FlowEdge::new(2, 1),
             FlowEdge::new(2, 3),
+            FlowEdge::new(3, 1),
             FlowEdge::new(3, 4),
         ])
         .with_flow_path(vec![0, 1, 2, 3, 1, 2, 3, 4])

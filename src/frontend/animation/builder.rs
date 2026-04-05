@@ -2,8 +2,10 @@ use crate::engine::timeline::Timeline;
 use crate::frontend::TattvaId;
 use crate::frontend::animation::{
     Animation, BeltEvolve, BeltPhaseBy, BeltPhaseTo, Create, Ease, EquationContinuity, FadeTo,
-    FollowAnchor, MatchTransform, MatrixStep, MorphGeometry, MorphObjects, MoveTo, NoiseEvolve,
-    NoisePhaseBy, NoisePhaseTo, PropagateSignal, RotateTo, ScaleTo, TriggerCapture,
+    FollowAnchor, HorizonEvolve, HorizonPhaseBy, HorizonPhaseTo, MatchTransform, MatrixStep,
+    MorphGeometry, MorphObjects, MoveTo, NoiseEvolve, NoisePhaseBy, NoisePhaseTo,
+    PerlinFieldEvolve, PerlinFieldPhaseBy, PerlinFieldPhaseTo, PropagateSignal, RotateTo, ScaleTo,
+    TriggerCapture,
 };
 use crate::frontend::layout::Anchor;
 use glam::{Quat, Vec3, Vec4};
@@ -73,6 +75,24 @@ pub enum AnimKind {
         delta: f32,
     },
     BeltEvolve {
+        speed: Option<f32>,
+    },
+    HorizonPhaseTo {
+        to: f32,
+    },
+    HorizonPhaseBy {
+        delta: f32,
+    },
+    HorizonEvolve {
+        speed: Option<f32>,
+    },
+    PerlinFieldPhaseTo {
+        to: f32,
+    },
+    PerlinFieldPhaseBy {
+        delta: f32,
+    },
+    PerlinFieldEvolve {
         speed: Option<f32>,
     },
     CaptureFrame,
@@ -302,6 +322,46 @@ impl<'a> AnimationBuilder<'a> {
         self
     }
 
+    pub fn horizon_phase_to(mut self, to: f32) -> Self {
+        self.spec.kind = Some(AnimKind::HorizonPhaseTo { to });
+        self
+    }
+
+    pub fn horizon_phase_by(mut self, delta: f32) -> Self {
+        self.spec.kind = Some(AnimKind::HorizonPhaseBy { delta });
+        self
+    }
+
+    pub fn horizon_evolve(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::HorizonEvolve { speed: None });
+        self
+    }
+
+    pub fn horizon_evolve_with_speed(mut self, speed: f32) -> Self {
+        self.spec.kind = Some(AnimKind::HorizonEvolve { speed: Some(speed) });
+        self
+    }
+
+    pub fn perlin_field_phase_to(mut self, to: f32) -> Self {
+        self.spec.kind = Some(AnimKind::PerlinFieldPhaseTo { to });
+        self
+    }
+
+    pub fn perlin_field_phase_by(mut self, delta: f32) -> Self {
+        self.spec.kind = Some(AnimKind::PerlinFieldPhaseBy { delta });
+        self
+    }
+
+    pub fn perlin_field_evolve(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::PerlinFieldEvolve { speed: None });
+        self
+    }
+
+    pub fn perlin_field_evolve_with_speed(mut self, speed: f32) -> Self {
+        self.spec.kind = Some(AnimKind::PerlinFieldEvolve { speed: Some(speed) });
+        self
+    }
+
     pub fn propagate_to(mut self, to: f32) -> Self {
         self.spec.kind = Some(AnimKind::Propagate {
             to: to.clamp(0.0, 1.0),
@@ -416,6 +476,30 @@ impl<'a> AnimationBuilder<'a> {
             Some(AnimKind::BeltEvolve { speed }) => {
                 Box::new(BeltEvolve::new(spec.target_id, spec.duration, speed, ease))
             }
+            Some(AnimKind::HorizonPhaseTo { to }) => {
+                Box::new(HorizonPhaseTo::new(spec.target_id, to, ease))
+            }
+            Some(AnimKind::HorizonPhaseBy { delta }) => {
+                Box::new(HorizonPhaseBy::new(spec.target_id, delta, ease))
+            }
+            Some(AnimKind::HorizonEvolve { speed }) => Box::new(HorizonEvolve::new(
+                spec.target_id,
+                spec.duration,
+                speed,
+                ease,
+            )),
+            Some(AnimKind::PerlinFieldPhaseTo { to }) => {
+                Box::new(PerlinFieldPhaseTo::new(spec.target_id, to, ease))
+            }
+            Some(AnimKind::PerlinFieldPhaseBy { delta }) => {
+                Box::new(PerlinFieldPhaseBy::new(spec.target_id, delta, ease))
+            }
+            Some(AnimKind::PerlinFieldEvolve { speed }) => Box::new(PerlinFieldEvolve::new(
+                spec.target_id,
+                spec.duration,
+                speed,
+                ease,
+            )),
             Some(AnimKind::Propagate { to }) => {
                 Box::new(PropagateSignal::new(spec.target_id, to, ease))
             }
