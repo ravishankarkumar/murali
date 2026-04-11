@@ -6,6 +6,7 @@ use crate::frontend::animation::{
     MorphGeometry, MorphObjects, MoveTo, NoiseEvolve, NoisePhaseBy, NoisePhaseTo,
     PerlinFieldEvolve, PerlinFieldPhaseBy, PerlinFieldPhaseTo, PropagateSignal, RevealTo, RotateTo, ScaleTo,
     TriggerCapture, WritePath, UnwritePath, WriteText, UnwriteText, RevealText, UnrevealText,
+    WriteTable, UnwriteTable, WriteSurface, UnwriteSurface, StepwiseSignal,
 };
 use crate::frontend::layout::Anchor;
 use glam::{Quat, Vec3, Vec4};
@@ -102,12 +103,19 @@ pub enum AnimKind {
     Reveal {
         to: f32,
     },
+    Signal {
+        to: f32,
+    },
     WritePath,
     UnwritePath,
     WriteText,
     UnwriteText,
     RevealText,
     UnrevealText,
+    WriteTable,
+    UnwriteTable,
+    WriteSurface,
+    UnwriteSurface,
 }
 
 #[derive(Debug, Clone)]
@@ -378,6 +386,13 @@ impl<'a> AnimationBuilder<'a> {
         self
     }
 
+    pub fn signal_to(mut self, to: f32) -> Self {
+        self.spec.kind = Some(AnimKind::Signal {
+            to: to.clamp(0.0, 1.0),
+        });
+        self
+    }
+
     pub fn reveal_to(mut self, to: f32) -> Self {
         self.spec.kind = Some(AnimKind::Reveal {
             to: to.clamp(0.0, 1.0),
@@ -412,6 +427,26 @@ impl<'a> AnimationBuilder<'a> {
 
     pub fn unreveal_text(mut self) -> Self {
         self.spec.kind = Some(AnimKind::UnrevealText);
+        self
+    }
+
+    pub fn write_table(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::WriteTable);
+        self
+    }
+
+    pub fn unwrite_table(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::UnwriteTable);
+        self
+    }
+
+    pub fn write_surface(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::WriteSurface);
+        self
+    }
+
+    pub fn unwrite_surface(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::UnwriteSurface);
         self
     }
 
@@ -549,6 +584,9 @@ impl<'a> AnimationBuilder<'a> {
             Some(AnimKind::Propagate { to }) => {
                 Box::new(PropagateSignal::new(spec.target_id, to, ease))
             }
+            Some(AnimKind::Signal { to }) => {
+                Box::new(StepwiseSignal::new(spec.target_id, to, ease))
+            }
             Some(AnimKind::Reveal { to }) => {
                 Box::new(RevealTo::new(spec.target_id, to, ease))
             }
@@ -569,6 +607,18 @@ impl<'a> AnimationBuilder<'a> {
             }
             Some(AnimKind::UnrevealText) => {
                 Box::new(UnrevealText::new(spec.target_id, ease))
+            }
+            Some(AnimKind::WriteTable) => {
+                Box::new(WriteTable::new(spec.target_id, ease))
+            }
+            Some(AnimKind::UnwriteTable) => {
+                Box::new(UnwriteTable::new(spec.target_id, ease))
+            }
+            Some(AnimKind::WriteSurface) => {
+                Box::new(WriteSurface::new(spec.target_id, ease))
+            }
+            Some(AnimKind::UnwriteSurface) => {
+                Box::new(UnwriteSurface::new(spec.target_id, ease))
             }
             None => panic!("Murali Error: AnimationBuilder requires a kind before .spawn()"),
         };

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use crate::engine::scene::Scene;
 use crate::frontend::collection::ai::agentic_flow_chart::AgenticFlowChart;
 use crate::frontend::collection::ai::signal_flow::SignalFlow;
-use crate::frontend::collection::math::equation::{
+use crate::frontend::collection::storytelling::stepwise::Stepwise;use crate::frontend::collection::math::equation::{
     EquationLayout, EquationPart, EquationPartLayout,
 };
 use crate::frontend::collection::math::matrix::{Matrix, MatrixCellLayout};
@@ -43,10 +43,13 @@ pub enum Ease {
     InCubic,
     OutCubic,
     InOutCubic,
+    /// Smoothstep: 3t² - 2t³. Continuous first derivative at 0 and 1.
+    InOutSmooth,
 }
 
 impl Ease {
     pub fn eval(&self, t: f32) -> f32 {
+        let t = t.clamp(0.0, 1.0);
         match self {
             Ease::Linear => t,
             Ease::InQuad => t * t,
@@ -67,6 +70,7 @@ impl Ease {
                     1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
                 }
             }
+            Ease::InOutSmooth => t * t * (3.0 - 2.0 * t),
         }
     }
 }
@@ -438,6 +442,8 @@ impl Animation for PropagateSignal {
             self.from = Some(flow.state.progress);
         } else if let Some(flow) = scene.get_tattva_typed::<AgenticFlowChart>(self.target_id) {
             self.from = Some(flow.state.progress);
+        } else if let Some(sw) = scene.get_tattva_typed::<Stepwise>(self.target_id) {
+            self.from = Some(sw.state.progress);
         }
     }
 
@@ -450,6 +456,9 @@ impl Animation for PropagateSignal {
         } else if let Some(flow) = scene.get_tattva_typed_mut::<AgenticFlowChart>(self.target_id) {
             flow.state.progress = progress.clamp(0.0, 1.0);
             flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        } else if let Some(sw) = scene.get_tattva_typed_mut::<Stepwise>(self.target_id) {
+            sw.state.progress = progress.clamp(0.0, 1.0);
+            sw.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 
@@ -460,6 +469,9 @@ impl Animation for PropagateSignal {
         } else if let Some(flow) = scene.get_tattva_typed_mut::<AgenticFlowChart>(self.target_id) {
             flow.state.progress = self.to;
             flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        } else if let Some(sw) = scene.get_tattva_typed_mut::<Stepwise>(self.target_id) {
+            sw.state.progress = self.to;
+            sw.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 
@@ -470,12 +482,60 @@ impl Animation for PropagateSignal {
         } else if let Some(flow) = scene.get_tattva_typed_mut::<AgenticFlowChart>(self.target_id) {
             flow.state.progress = self.from.unwrap_or(0.0);
             flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        } else if let Some(sw) = scene.get_tattva_typed_mut::<Stepwise>(self.target_id) {
+            sw.state.progress = self.from.unwrap_or(0.0);
+            sw.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 }
 
-pub struct RevealTo {
+/// Animates `Stepwise::signal_progress` — drives the signal dot along the
+/// sequence path independently of the build animation.
+pub struct StepwiseSignal {
     pub target_id: TattvaId,
+    pub ease: Ease,
+    from: Option<f32>,
+    to: f32,
+}
+
+impl StepwiseSignal {
+    pub fn new(target_id: TattvaId, to: f32, ease: Ease) -> Self {
+        Self { target_id, ease, from: None, to: to.clamp(0.0, 1.0) }
+    }
+}
+
+impl Animation for StepwiseSignal {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(sw) = scene.get_tattva_typed::<Stepwise>(self.target_id) {
+            self.from = Some(sw.state.signal_progress);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        let from = self.from.unwrap_or(0.0);
+        let p = from + (self.to - from) * self.ease.eval(t);
+        if let Some(sw) = scene.get_tattva_typed_mut::<Stepwise>(self.target_id) {
+            sw.state.signal_progress = p.clamp(0.0, 1.0);
+            sw.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(sw) = scene.get_tattva_typed_mut::<Stepwise>(self.target_id) {
+            sw.state.signal_progress = self.to;
+            sw.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(sw) = scene.get_tattva_typed_mut::<Stepwise>(self.target_id) {
+            sw.state.signal_progress = self.from.unwrap_or(0.0);
+            sw.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+}
+
+pub struct RevealTo {    pub target_id: TattvaId,
     pub ease: Ease,
     from: Option<f32>,
     to: f32,
@@ -2320,6 +2380,176 @@ impl Animation for UnrevealText {
             latex.state.char_reveal = 1.0;
             latex.state.typewriter_mode = false;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+}
+
+/// WriteTable animation: draws grid lines then writes text content
+/// Grid lines are drawn first (horizontal then vertical), then text appears cell by cell
+pub struct WriteTable {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl WriteTable {
+    pub fn new(target_id: TattvaId, ease: Ease) -> Self {
+        Self { target_id, ease, from: None }
+    }
+}
+
+impl Animation for WriteTable {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
+            self.from = Some(tattva.state.write_progress);
+            tattva.state.write_progress = 0.0;
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
+            let from = self.from.unwrap_or(0.0);
+            let eased_t = self.ease.eval(t);
+            tattva.state.write_progress = from + (1.0 - from) * eased_t;
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
+            tattva.state.write_progress = 1.0;
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
+            tattva.state.write_progress = self.from.unwrap_or(0.0);
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+/// UnwriteTable animation: reverses the write animation
+pub struct UnwriteTable {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl UnwriteTable {
+    pub fn new(target_id: TattvaId, ease: Ease) -> Self {
+        Self { target_id, ease, from: None }
+    }
+}
+
+impl Animation for UnwriteTable {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
+            self.from = Some(tattva.state.write_progress);
+            tattva.state.write_progress = 1.0;
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
+            let from = self.from.unwrap_or(1.0);
+            let eased_t = self.ease.eval(t);
+            tattva.state.write_progress = from - from * eased_t;
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
+            tattva.state.write_progress = self.from.unwrap_or(1.0);
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+/// WriteSurface animation: progressively reveals a parametric surface
+pub struct WriteSurface {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl WriteSurface {
+    pub fn new(target_id: TattvaId, ease: Ease) -> Self {
+        Self { target_id, ease, from: None }
+    }
+}
+
+impl Animation for WriteSurface {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::graph::parametric_surface::ParametricSurface>(self.target_id) {
+            self.from = Some(tattva.state.write_progress);
+            tattva.state.write_progress = 0.0;
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::graph::parametric_surface::ParametricSurface>(self.target_id) {
+            let from = self.from.unwrap_or(0.0);
+            let eased_t = self.ease.eval(t);
+            tattva.state.write_progress = from + (1.0 - from) * eased_t;
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::graph::parametric_surface::ParametricSurface>(self.target_id) {
+            tattva.state.write_progress = 1.0;
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::graph::parametric_surface::ParametricSurface>(self.target_id) {
+            tattva.state.write_progress = self.from.unwrap_or(0.0);
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+}
+
+/// UnwriteSurface animation: reverses the write animation
+pub struct UnwriteSurface {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+    from: Option<f32>,
+}
+
+impl UnwriteSurface {
+    pub fn new(target_id: TattvaId, ease: Ease) -> Self {
+        Self { target_id, ease, from: None }
+    }
+}
+
+impl Animation for UnwriteSurface {
+    fn on_start(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::graph::parametric_surface::ParametricSurface>(self.target_id) {
+            self.from = Some(tattva.state.write_progress);
+            tattva.state.write_progress = 1.0;
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::graph::parametric_surface::ParametricSurface>(self.target_id) {
+            let from = self.from.unwrap_or(1.0);
+            let eased_t = self.ease.eval(t);
+            tattva.state.write_progress = from - from * eased_t;
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+        }
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::graph::parametric_surface::ParametricSurface>(self.target_id) {
+            tattva.state.write_progress = self.from.unwrap_or(1.0);
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 }

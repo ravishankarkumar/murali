@@ -9,6 +9,7 @@ use crate::engine::camera::Camera;
 use crate::engine::timeline::Timeline;
 use crate::frontend::layout::{Anchor, Bounds, Direction, anchor_for_direction, opposite_anchor};
 use crate::frontend::{DirtyFlags, IntoTattva, TattvaId, tattva_trait::TattvaTrait};
+use crate::frontend::updater::UpdaterManager;
 
 /// The Scene represents the authoritative Frontend state.
 pub struct Scene {
@@ -19,6 +20,9 @@ pub struct Scene {
     /// Time & Animation
     pub scene_time: f32,
     pub timelines: HashMap<String, Timeline>,
+
+    /// Updaters - callbacks that run every frame
+    pub updaters: UpdaterManager,
 
     /// Global State
     pub camera: Camera,
@@ -34,6 +38,7 @@ impl Scene {
             tattvas: HashMap::new(),
             scene_time: 0.0,
             timelines: HashMap::new(),
+            updaters: UpdaterManager::new(),
             camera: Camera::default(),
             global_model: Mat4::IDENTITY,
             next_tattva_id: 1,
@@ -110,6 +115,57 @@ impl Scene {
             tl.update(self.scene_time, self);
         }
         self.timelines = timelines;
+
+        // 2. Update traced paths
+        self.update_traced_paths();
+
+        // 3. Run all updaters
+        let updaters = std::mem::take(&mut self.updaters);
+        updaters.update_all(self, dt);
+        self.updaters = updaters;
+    }
+
+    /// Update all traced paths in the scene
+    fn update_traced_paths(&mut self) {
+        use crate::frontend::collection::utility::TracedPath;
+        use crate::frontend::Tattva;
+
+        // Collect IDs of traced paths and their tracked objects
+        let mut traced_paths: Vec<(TattvaId, TattvaId)> = Vec::new();
+        
+        for (id, tattva) in self.tattvas.iter() {
+            // TracedPath is wrapped in Tattva<TracedPath>
+            if let Some(wrapped) = tattva.as_any().downcast_ref::<Tattva<TracedPath>>() {
+                traced_paths.push((*id, wrapped.state.tracked_object_id));
+            }
+        }
+
+        // Update each traced path
+        for (traced_path_id, tracked_object_id) in traced_paths {
+            // Get the tracked object's position and rotation
+            if let Some(tracked_obj) = self.get_tattva_any(tracked_object_id) {
+                let props = DrawableProps::read(tracked_obj.props());
+                let obj_pos = props.position;
+                let obj_rot = props.rotation;
+                drop(props);
+
+                // Get the traced path and record the point
+                if let Some(tattva) = self.tattvas.get_mut(&traced_path_id) {
+                    if let Some(wrapped) = tattva.as_any_mut().downcast_mut::<Tattva<TracedPath>>() {
+                        // Compute the traced point position using the point function
+                        let traced_point = (wrapped.state.point_fn)(obj_pos, obj_rot);
+                        let old_count = wrapped.state.path_points.len();
+                        wrapped.state.record_point(traced_point);
+                        let new_count = wrapped.state.path_points.len();
+                        
+                        // If a new point was added, mark the tattva as dirty
+                        if new_count > old_count {
+                            wrapped.mark_dirty(DirtyFlags::GEOMETRY);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Returns an iterator over all Tattvas for the Sync Boundary to process.
@@ -242,6 +298,7 @@ impl Scene {
     pub fn clear(&mut self) {
         self.tattvas.clear();
         self.timelines.clear();
+        self.updaters.clear();
         self.scene_time = 0.0;
         self.next_tattva_id = 1;
         self.camera = Camera::default();
@@ -260,6 +317,26 @@ impl Scene {
     /// This is used for shape morphing where we swap types (e.g., Circle -> Path).
     pub fn replace_tattva(&mut self, id: TattvaId, tattva: Box<dyn TattvaTrait>) {
         self.tattvas.insert(id, tattva);
+    }
+
+    /// Add an updater callback for a tattva
+    /// The callback will be called every frame with (scene, tattva_id, dt)
+    /// Returns an index that can be used to remove the updater later
+    pub fn add_updater<F>(&mut self, tattva_id: TattvaId, callback: F) -> usize
+    where
+        F: Fn(&mut Scene, TattvaId, f32) + Send + Sync + 'static,
+    {
+        self.updaters.add_updater(tattva_id, callback)
+    }
+
+    /// Remove an updater by its index
+    pub fn remove_updater(&mut self, index: usize) {
+        self.updaters.remove_updater(index);
+    }
+
+    /// Remove all updaters for a specific tattva
+    pub fn remove_updaters_for(&mut self, tattva_id: TattvaId) {
+        self.updaters.remove_updaters_for_tattva(tattva_id);
     }
 }
 

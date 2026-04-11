@@ -37,6 +37,12 @@ impl Label {
         self
     }
 
+    /// Builder-style method to set character reveal progress.
+    pub fn with_char_reveal(mut self, char_reveal: f32) -> Self {
+        self.char_reveal = char_reveal.clamp(0.0, 1.0);
+        self
+    }
+
     /// Get the revealed text based on char_reveal progress
     fn get_revealed_text(&self) -> String {
         let char_count = self.text.chars().count();

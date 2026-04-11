@@ -3,6 +3,9 @@
 `cargo run --example primitives_showcase`
 Basic primitive/render smoke test.
 
+`cargo run --example arrow_showcase`
+Arrow primitive with various tip configurations and vector field patterns.
+
 `cargo run --example layout_playground`
 Scene composition, anchors, stacks, and number-plane layout.
 
@@ -77,3 +80,30 @@ Dedicated example showing a plotted function and sampled points on 2D axes.
 
 `cargo run --example graph_draw_3d_camera`
 Graph is progressively drawn while the camera moves in perspective to reveal spatial depth.
+
+## Updater System Examples
+
+`cargo run --example projectile_with_updaters`
+Projectile motion with dynamic velocity vectors and traced path. Demonstrates the updater system with physics simulation.
+
+`cargo run --example force_field_with_updaters`
+Single charged particle moving through an electric field. Force vectors update based on inverse square law.
+
+`cargo run --example force_field_multiple_charges`
+Multiple charges (positive and negative) creating a combined electric field. Shows vector superposition.
+
+## Traced Path Examples
+
+`cargo run --example traced_path_rolling_circle`
+Circle rolling along a surface while tracing a cycloid curve from a point on its circumference.
+
+## Vector Field Examples
+
+`cargo run --example vector_field_showcase`
+Various vector field visualizations: radial, rotational, gradient, saddle point, sine wave, and magnitude-colored fields.
+
+`cargo run --example stream_lines_showcase`
+Streamline visualizations showing flow paths: radial source, vortex, saddle point, flow around obstacle, dipole field, and magnitude-colored streams.
+
+`cargo run --example vector_field_and_streamlines`
+Side-by-side comparison of vector field and streamline representations of the same field, plus a combined view.

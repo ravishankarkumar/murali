@@ -9,6 +9,7 @@ pub mod primitives;
 pub mod table;
 pub mod text;
 pub mod utility;
+pub mod storytelling;
 
 pub mod prelude {
     pub use super::ai::*;
@@ -20,4 +21,5 @@ pub mod prelude {
     pub use super::table::*;
     pub use super::text::*;
     pub use super::utility::*;
+    pub use super::storytelling::*;
 }

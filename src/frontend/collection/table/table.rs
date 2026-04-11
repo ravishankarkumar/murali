@@ -64,7 +64,7 @@ pub struct Table {
     pub row_labels: Option<Vec<String>>,
     pub col_labels: Option<Vec<String>>,
     pub config: TableConfig,
-    pub position: Vec3,
+    pub write_progress: f32,  // 0.0 to 1.0 for animation
 }
 
 impl Table {
@@ -84,7 +84,7 @@ impl Table {
             row_labels: None,
             col_labels: None,
             config: TableConfig::default(),
-            position: Vec3::ZERO,
+            write_progress: 1.0,  // Fully visible by default
         }
     }
 
@@ -160,6 +160,12 @@ impl Table {
         self
     }
 
+    /// Set write progress for animation (0.0 to 1.0)
+    pub fn with_write_progress(mut self, progress: f32) -> Self {
+        self.write_progress = progress.clamp(0.0, 1.0);
+        self
+    }
+
     /// Get the number of rows
     pub fn num_rows(&self) -> usize {
         self.rows.len()
@@ -209,35 +215,14 @@ impl Table {
         (total_width, total_height)
     }
 
-    /// Get cell position in world space
-    fn get_cell_position(&self, row: usize, col: usize) -> Vec3 {
-        let cell_width = 1.2;
-        let cell_height = 0.6;
-        let (total_width, total_height) = self.calculate_dimensions();
-
-        let mut x = self.position.x - total_width / 2.0;
-        let mut y = self.position.y + total_height / 2.0;
-
-        // Account for row labels
-        if self.row_labels.is_some() {
-            x += 1.5 + self.config.h_buff;
-        }
-
-        // Account for column labels
-        if self.col_labels.is_some() {
-            y -= cell_height + self.config.v_buff;
-        }
-
-        // Move to the target cell
-        x += (col as f32) * (cell_width + self.config.h_buff) + cell_width / 2.0;
-        y -= (row as f32) * (cell_height + self.config.v_buff) + cell_height / 2.0;
-
-        Vec3::new(x, y, self.position.z)
-    }
 }
 
 impl Project for Table {
     fn project(&self, ctx: &mut ProjectionCtx) {
+        if self.write_progress <= 0.0 {
+            return; // Nothing to draw
+        }
+
         let cell_width = 1.2;
         let cell_height = 0.6;
         let num_rows = self.num_rows();
@@ -245,7 +230,6 @@ impl Project for Table {
 
         // Calculate grid dimensions based on labels_inside setting
         let (grid_cols, grid_rows) = if self.config.labels_inside {
-            // When labels are inside, they occupy the first row/column
             let cols = num_cols + if self.row_labels.is_some() { 1 } else { 0 };
             let rows = num_rows + if self.col_labels.is_some() { 1 } else { 0 };
             (cols, rows)
@@ -257,16 +241,31 @@ impl Project for Table {
         let grid_width = (grid_cols as f32) * (cell_width + self.config.h_buff);
         let grid_height = (grid_rows as f32) * (cell_height + self.config.v_buff);
 
-        // Calculate starting position (top-left corner of the grid)
-        let start_x = self.position.x - grid_width / 2.0;
-        let start_y = self.position.y + grid_height / 2.0;
+        // Calculate starting position (centered at origin)
+        let start_x = -grid_width / 2.0;
+        let start_y = grid_height / 2.0;
 
-        // Draw ALL horizontal lines (0 to grid_rows inclusive)
-        for row in 0..=grid_rows {
+        // Calculate how many elements to show based on write_progress
+        // Animation phases: 
+        // 0.0 - 0.5: Draw grid lines (horizontal then vertical)
+        // 0.5 - 1.0: Write text content
+        
+        let total_h_lines = grid_rows + 1;
+        let total_v_lines = grid_cols + 1;
+        let total_lines = total_h_lines + total_v_lines;
+        
+        let line_progress = (self.write_progress * 2.0).min(1.0); // 0.0 to 0.5 maps to 0.0 to 1.0
+        let text_progress = ((self.write_progress - 0.5) * 2.0).max(0.0); // 0.5 to 1.0 maps to 0.0 to 1.0
+        
+        let lines_to_draw = (line_progress * total_lines as f32) as usize;
+
+        // Draw horizontal lines
+        let h_lines_to_draw = lines_to_draw.min(total_h_lines);
+        for row in 0..h_lines_to_draw {
             let y = start_y - (row as f32) * (cell_height + self.config.v_buff);
             ctx.emit(RenderPrimitive::Line {
-                start: Vec3::new(start_x, y, self.position.z),
-                end: Vec3::new(start_x + grid_width, y, self.position.z),
+                start: Vec3::new(start_x, y, 0.0),
+                end: Vec3::new(start_x + grid_width, y, 0.0),
                 thickness: self.config.line_thickness,
                 color: self.config.line_color,
                 dash_length: 0.0,
@@ -275,108 +274,136 @@ impl Project for Table {
             });
         }
 
-        // Draw ALL vertical lines (0 to grid_cols inclusive)
-        for col in 0..=grid_cols {
-            let x = start_x + (col as f32) * (cell_width + self.config.h_buff);
-            ctx.emit(RenderPrimitive::Line {
-                start: Vec3::new(x, start_y, self.position.z),
-                end: Vec3::new(x, start_y - grid_height, self.position.z),
-                thickness: self.config.line_thickness,
-                color: self.config.line_color,
-                dash_length: 0.0,
-                gap_length: 0.0,
-                dash_offset: 0.0,
-            });
+        // Draw vertical lines
+        if lines_to_draw > total_h_lines {
+            let v_lines_to_draw = (lines_to_draw - total_h_lines).min(total_v_lines);
+            for col in 0..v_lines_to_draw {
+                let x = start_x + (col as f32) * (cell_width + self.config.h_buff);
+                ctx.emit(RenderPrimitive::Line {
+                    start: Vec3::new(x, start_y, 0.0),
+                    end: Vec3::new(x, start_y - grid_height, 0.0),
+                    thickness: self.config.line_thickness,
+                    color: self.config.line_color,
+                    dash_length: 0.0,
+                    gap_length: 0.0,
+                    dash_offset: 0.0,
+                });
+            }
         }
 
-        if self.config.labels_inside {
-            // Labels are inside the grid
-            let row_offset = if self.col_labels.is_some() { 1 } else { 0 };
-            let col_offset = if self.row_labels.is_some() { 1 } else { 0 };
+        // Only draw text if we're past the line drawing phase
+        if text_progress > 0.0 {
+            let total_cells = if self.config.labels_inside {
+                let label_cells = (if self.col_labels.is_some() { grid_cols } else { 0 })
+                    + (if self.row_labels.is_some() { grid_rows - if self.col_labels.is_some() { 1 } else { 0 } } else { 0 });
+                label_cells + (num_rows * num_cols)
+            } else {
+                let label_cells = (if self.col_labels.is_some() { num_cols } else { 0 })
+                    + (if self.row_labels.is_some() { num_rows } else { 0 });
+                label_cells + (num_rows * num_cols)
+            };
 
-            // Draw column labels (first row)
-            if let Some(labels) = &self.col_labels {
-                for (idx, label) in labels.iter().enumerate() {
-                    let x = start_x + ((idx + col_offset) as f32) * (cell_width + self.config.h_buff) + (cell_width + self.config.h_buff) / 2.0;
-                    let y = start_y - (cell_height + self.config.v_buff) / 2.0;
-                    ctx.emit(RenderPrimitive::Text {
-                        content: label.clone(),
-                        height: self.config.text_height * 0.8, // Smaller text to fit
-                        color: self.config.text_color,
-                        offset: Vec3::new(x, y, self.position.z),
-                    });
-                }
-            }
+            let cells_to_show = (text_progress * total_cells as f32) as usize;
+            let mut cell_count = 0;
 
-            // Draw row labels (first column)
-            if let Some(labels) = &self.row_labels {
-                for (idx, label) in labels.iter().enumerate() {
-                    let x = start_x + (cell_width + self.config.h_buff) / 2.0;
-                    let y = start_y - ((idx + row_offset) as f32) * (cell_height + self.config.v_buff) - (cell_height + self.config.v_buff) / 2.0;
-                    ctx.emit(RenderPrimitive::Text {
-                        content: label.clone(),
-                        height: self.config.text_height * 0.8, // Smaller text to fit
-                        color: self.config.text_color,
-                        offset: Vec3::new(x, y, self.position.z),
-                    });
-                }
-            }
+            if self.config.labels_inside {
+                let row_offset = if self.col_labels.is_some() { 1 } else { 0 };
+                let col_offset = if self.row_labels.is_some() { 1 } else { 0 };
 
-            // Draw cell content
-            for (row_idx, row) in self.rows.iter().enumerate() {
-                for (col_idx, cell) in row.iter().enumerate() {
-                    let x = start_x + ((col_idx + col_offset) as f32) * (cell_width + self.config.h_buff) + (cell_width + self.config.h_buff) / 2.0;
-                    let y = start_y - ((row_idx + row_offset) as f32) * (cell_height + self.config.v_buff) - (cell_height + self.config.v_buff) / 2.0;
-                    ctx.emit(RenderPrimitive::Text {
-                        content: cell.content.clone(),
-                        height: self.config.text_height * 0.8, // Smaller text to fit
-                        color: self.config.text_color,
-                        offset: Vec3::new(x, y, self.position.z),
-                    });
+                // Draw column labels
+                if let Some(labels) = &self.col_labels {
+                    for (idx, label) in labels.iter().enumerate() {
+                        if cell_count >= cells_to_show { break; }
+                        let x = start_x + ((idx + col_offset) as f32) * (cell_width + self.config.h_buff) + (cell_width + self.config.h_buff) / 2.0;
+                        let y = start_y - (cell_height + self.config.v_buff) / 2.0;
+                        ctx.emit(RenderPrimitive::Text {
+                            content: label.clone(),
+                            height: self.config.text_height * 0.8,
+                            color: self.config.text_color,
+                            offset: Vec3::new(x, y, 0.0),
+                        });
+                        cell_count += 1;
+                    }
                 }
-            }
-        } else {
-            // Labels are outside the grid
-            
-            // Draw column labels (above the grid)
-            if let Some(labels) = &self.col_labels {
-                let label_y = start_y + (cell_height + self.config.v_buff) / 2.0;
-                for (idx, label) in labels.iter().enumerate() {
-                    let x = start_x + (idx as f32) * (cell_width + self.config.h_buff) + (cell_width + self.config.h_buff) / 2.0;
-                    ctx.emit(RenderPrimitive::Text {
-                        content: label.clone(),
-                        height: self.config.text_height * 0.8,
-                        color: self.config.text_color,
-                        offset: Vec3::new(x, label_y, self.position.z),
-                    });
-                }
-            }
 
-            // Draw row labels (left of the grid)
-            if let Some(labels) = &self.row_labels {
-                let label_x = start_x - (cell_width + self.config.h_buff) / 2.0;
-                for (idx, label) in labels.iter().enumerate() {
-                    let y = start_y - (idx as f32) * (cell_height + self.config.v_buff) - (cell_height + self.config.v_buff) / 2.0;
-                    ctx.emit(RenderPrimitive::Text {
-                        content: label.clone(),
-                        height: self.config.text_height * 0.8,
-                        color: self.config.text_color,
-                        offset: Vec3::new(label_x, y, self.position.z),
-                    });
+                // Draw row labels
+                if let Some(labels) = &self.row_labels {
+                    for (idx, label) in labels.iter().enumerate() {
+                        if cell_count >= cells_to_show { break; }
+                        let x = start_x + (cell_width + self.config.h_buff) / 2.0;
+                        let y = start_y - ((idx + row_offset) as f32) * (cell_height + self.config.v_buff) - (cell_height + self.config.v_buff) / 2.0;
+                        ctx.emit(RenderPrimitive::Text {
+                            content: label.clone(),
+                            height: self.config.text_height * 0.8,
+                            color: self.config.text_color,
+                            offset: Vec3::new(x, y, 0.0),
+                        });
+                        cell_count += 1;
+                    }
                 }
-            }
 
-            // Draw cell content
-            for (row_idx, row) in self.rows.iter().enumerate() {
-                for (col_idx, cell) in row.iter().enumerate() {
-                    let x = start_x + (col_idx as f32) * (cell_width + self.config.h_buff) + (cell_width + self.config.h_buff) / 2.0;
-                    let y = start_y - (row_idx as f32) * (cell_height + self.config.v_buff) - (cell_height + self.config.v_buff) / 2.0;
-                    ctx.emit(RenderPrimitive::Text {
-                        content: cell.content.clone(),
-                        height: self.config.text_height * 0.8, // Smaller text to fit
-                        color: self.config.text_color,
-                        offset: Vec3::new(x, y, self.position.z),
-                    });
+                // Draw cell content
+                for (row_idx, row) in self.rows.iter().enumerate() {
+                    for (col_idx, cell) in row.iter().enumerate() {
+                        if cell_count >= cells_to_show { break; }
+                        let x = start_x + ((col_idx + col_offset) as f32) * (cell_width + self.config.h_buff) + (cell_width + self.config.h_buff) / 2.0;
+                        let y = start_y - ((row_idx + row_offset) as f32) * (cell_height + self.config.v_buff) - (cell_height + self.config.v_buff) / 2.0;
+                        ctx.emit(RenderPrimitive::Text {
+                            content: cell.content.clone(),
+                            height: self.config.text_height * 0.8,
+                            color: self.config.text_color,
+                            offset: Vec3::new(x, y, 0.0),
+                        });
+                        cell_count += 1;
+                    }
+                }
+            } else {
+                // Draw column labels (outside grid, above)
+                if let Some(labels) = &self.col_labels {
+                    for (idx, label) in labels.iter().enumerate() {
+                        if cell_count >= cells_to_show { break; }
+                        let x = start_x + (idx as f32) * (cell_width + self.config.h_buff) + (cell_width + self.config.h_buff) / 2.0;
+                        let y = start_y + (cell_height + self.config.v_buff) / 2.0;
+                        ctx.emit(RenderPrimitive::Text {
+                            content: label.clone(),
+                            height: self.config.text_height * 0.8,
+                            color: self.config.text_color,
+                            offset: Vec3::new(x, y, 0.0),
+                        });
+                        cell_count += 1;
+                    }
+                }
+
+                // Draw row labels (outside grid, left)
+                if let Some(labels) = &self.row_labels {
+                    for (idx, label) in labels.iter().enumerate() {
+                        if cell_count >= cells_to_show { break; }
+                        let x = start_x - (cell_width + self.config.h_buff) / 2.0;
+                        let y = start_y - (idx as f32) * (cell_height + self.config.v_buff) - (cell_height + self.config.v_buff) / 2.0;
+                        ctx.emit(RenderPrimitive::Text {
+                            content: label.clone(),
+                            height: self.config.text_height * 0.8,
+                            color: self.config.text_color,
+                            offset: Vec3::new(x, y, 0.0),
+                        });
+                        cell_count += 1;
+                    }
+                }
+
+                // Draw cell content
+                for (row_idx, row) in self.rows.iter().enumerate() {
+                    for (col_idx, cell) in row.iter().enumerate() {
+                        if cell_count >= cells_to_show { break; }
+                        let x = start_x + (col_idx as f32) * (cell_width + self.config.h_buff) + (cell_width + self.config.h_buff) / 2.0;
+                        let y = start_y - (row_idx as f32) * (cell_height + self.config.v_buff) - (cell_height + self.config.v_buff) / 2.0;
+                        ctx.emit(RenderPrimitive::Text {
+                            content: cell.content.clone(),
+                            height: self.config.text_height * 0.8,
+                            color: self.config.text_color,
+                            offset: Vec3::new(x, y, 0.0),
+                        });
+                        cell_count += 1;
+                    }
                 }
             }
         }

@@ -42,3 +42,6 @@ thiserror = "1.0"
 # font rendering
 fontdue = "0.8"
 hecs = "0.9"
+
+[dev-dependencies]
+proptest = "1"

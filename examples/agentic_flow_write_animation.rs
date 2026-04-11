@@ -68,10 +68,39 @@ fn main() -> anyhow::Result<()> {
         // Enable progressive edge drawing
         .with_progressive_edges(true);
 
+    // Add chart FIRST so it renders behind the labels
     let chart_id = scene.add_tattva(chart, Vec3::new(0.0, 0.25, 0.0));
 
+    // Create Label tattvas for each node and position them at node centers
+    // Labels are added AFTER the chart so they render on top
+    let mut label_ids = Vec::new();
+    
+    // First, collect node data (labels, colors, positions)
+    let node_data: Vec<(String, Vec4, Vec3)> = {
+        let chart_ref = scene.get_tattva_typed::<AgenticFlowChart>(chart_id).unwrap();
+        chart_ref.state.nodes.iter().enumerate().map(|(i, node)| {
+            let node_center = chart_ref.state.node_center(i).unwrap_or(Vec3::ZERO);
+            // Position labels at the same position as node centers
+            let label_position = Vec3::new(0.0, 0.25, 0.0) + node_center;
+            (node.label.clone(), node.text_color, label_position)
+        }).collect()
+    };
+    
+    // Now create the labels (after dropping the immutable borrow)
+    for (label_text, text_color, label_position) in node_data {
+        let label = Label::new(&label_text, 0.22)
+            .with_color(text_color);
+        let label_id = scene.add_tattva(label, label_position);
+        label_ids.push(Some(label_id));
+    }
+    
+    // Update chart with label IDs
+    if let Some(chart_mut) = scene.get_tattva_typed_mut::<AgenticFlowChart>(chart_id) {
+        chart_mut.state.label_ids = label_ids.clone();
+    }
+
     scene.add_tattva(
-        Label::new("Nodes draw with write effect, edges appear progressively", 0.22)
+        Label::new("Nodes draw with write effect, text types character by character", 0.22)
             .with_color(Vec4::new(0.79, 0.83, 0.88, 1.0)),
         Vec3::new(0.0, -3.1, 0.0),
     );
@@ -90,6 +119,28 @@ fn main() -> anyhow::Result<()> {
         .ease(Ease::Linear)
         .reveal_to(1.0)
         .spawn();
+
+    // Add WriteText animations for each label, synchronized with node reveal
+    // We need to calculate when each node starts revealing
+    let node_count = label_ids.len();
+    let node_reveal_window = 0.2; // Same as in node_write_progress
+    
+    for (i, label_id_opt) in label_ids.iter().enumerate() {
+        if let Some(label_id) = label_id_opt {
+            // Calculate when this node starts revealing
+            let node_threshold = i as f32 / node_count as f32;
+            let node_start_time = reveal_start + (reveal_duration * node_threshold);
+            let write_duration = reveal_duration * node_reveal_window;
+            
+            timeline
+                .animate(*label_id)
+                .at(node_start_time)
+                .for_duration(write_duration)
+                .ease(Ease::Linear)
+                .write_text()
+                .spawn();
+        }
+    }
 
     // Phase 2: Flow propagation through the path
     // Starts after reveal is complete

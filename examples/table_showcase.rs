@@ -1,4 +1,4 @@
-/// Table showcase demonstrating Manim-style table implementation
+/// Table showcase demonstrating Manim-style table implementation with write animation
 use glam::{Vec3, Vec4};
 use murali::App;
 use murali::engine::scene::Scene;
@@ -13,13 +13,13 @@ fn main() -> anyhow::Result<()> {
 
     // Title
     let title_id = scene.add_tattva(
-        Label::new("Table Showcase", 0.4)
+        Label::new("Table Showcase - Animated", 0.4)
             .with_color(Vec4::new(0.96, 0.98, 0.99, 1.0)),
         Vec3::ZERO,
     );
     scene.to_edge(title_id, Direction::Up, 0.35);
 
-    // Left table - Person data
+    // Left table - Person data (starts invisible for animation)
     let left_table = Table::new(vec![
         vec!["Alice", "28", "NYC"],
         vec!["Bob", "34", "LA"],
@@ -32,7 +32,8 @@ fn main() -> anyhow::Result<()> {
     .with_text_height(0.25)
     .with_h_buff(0.3)
     .with_v_buff(0.2)
-    .with_outer_lines(true);
+    .with_outer_lines(true)
+    .with_write_progress(0.0);  // Start invisible for animation
 
     let left_table_id = scene.add_tattva(left_table, Vec3::new(-3.5, 0.8, 0.0));
 
@@ -42,7 +43,7 @@ fn main() -> anyhow::Result<()> {
         Vec3::new(-3.5, -0.8, 0.0),
     );
 
-    // Right table - Quarterly data
+    // Right table - Quarterly data (starts invisible for animation)
     let right_table = Table::new(vec![
         vec!["100", "150", "120", "180"],
         vec!["200", "180", "220", "210"],
@@ -55,7 +56,8 @@ fn main() -> anyhow::Result<()> {
     .with_h_buff(0.25)
     .with_v_buff(0.15)
     .with_outer_lines(true)
-    .with_labels_inside(true);
+    .with_labels_inside(false)
+    .with_write_progress(0.0);  // Start invisible for animation
 
     let right_table_id = scene.add_tattva(right_table, Vec3::new(3.5, 0.8, 0.0));
 
@@ -67,22 +69,24 @@ fn main() -> anyhow::Result<()> {
 
     let mut timeline = Timeline::new();
 
-    // Animate left table
+    // Animate left table with write animation
+    // Phase 1 (0.0-0.5): Draw grid lines
+    // Phase 2 (0.5-1.0): Write text content
     timeline
         .animate(left_table_id)
         .at(0.5)
-        .for_duration(1.0)
+        .for_duration(3.0)
         .ease(Ease::InOutQuad)
-        .move_to(Vec3::new(-3.5, 0.8, 0.0))
+        .write_table()
         .spawn();
 
-    // Animate right table
+    // Animate right table with write animation (starts after left table)
     timeline
         .animate(right_table_id)
-        .at(1.2)
-        .for_duration(1.0)
+        .at(4.0)
+        .for_duration(3.0)
         .ease(Ease::InOutQuad)
-        .move_to(Vec3::new(3.5, 0.8, 0.0))
+        .write_table()
         .spawn();
 
     scene.timelines.insert("main".to_string(), timeline);

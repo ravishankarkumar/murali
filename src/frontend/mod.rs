@@ -7,6 +7,7 @@ pub mod props;
 pub mod style;
 pub mod tattva_trait;
 pub mod theme;
+pub mod updater;
 
 use crate::frontend::props::SharedProps;
 use std::ops::{BitOr, BitOrAssign};
