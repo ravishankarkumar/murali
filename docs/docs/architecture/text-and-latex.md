@@ -1,10 +1,12 @@
 ---
-sidebar_position: 6
+sidebar_position: 8
 ---
 
 # Text & LaTeX pipeline
 
 Murali has two text backends that share the same final step (texture quad), but differ significantly in how they produce the texture.
+
+This page is about the specialized text pipelines after the broader projection and backend architecture is already understood.
 
 ## Label (glyph atlas)
 
@@ -65,3 +67,14 @@ fn build_textured_quad(
 ```
 
 This produces a rectangle with the correct aspect ratio in world space. The `color` is multiplied in the fragment shader, so you can tint expressions.
+
+## What This Page Owns
+
+This page is the home for:
+
+- label text via glyph atlas
+- LaTeX raster pipeline
+- Typst raster pipeline
+- the shared textured-quad final step
+
+For the more general rendering pipeline, see [Projection](/docs/architecture/projection) and [Renderer](/docs/architecture/renderer).

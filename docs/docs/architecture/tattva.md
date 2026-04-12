@@ -1,10 +1,12 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 ---
 
 # Tattva
 
 The word *tattva* comes from Sanskrit and means "element", "essence", or "that which is real". In Murali, a tattva is the fundamental unit of a scene — anything that can be placed, animated, and rendered.
+
+This page is about the tattva abstraction itself: the wrapper, the concrete state object, the shared props, and the traits that make a type scene-compatible.
 
 ## Philosophy
 
@@ -143,3 +145,15 @@ It's never baked into vertex data, which is why transform animations (`move_to`,
 - There is no parent/child hierarchy — tattvas are a flat list. Grouping and transform propagation are not yet implemented
 - `project()` is called on the CPU every time a tattva is dirty with `REBUILD`. For very complex shapes with expensive tessellation, this can be a bottleneck
 - `SharedProps` uses a `RwLock` — contention is unlikely in practice but worth knowing if you're writing high-frequency updaters
+
+## What This Page Owns
+
+This page is the home for:
+
+- what a tattva is
+- `Tattva<T>` vs the concrete state type
+- `TattvaTrait`
+- `Project` and `Bounded`
+- `SharedProps` and `DrawableProps`
+
+For time progression and animation lifecycle, see [Scene & Timeline](/docs/architecture/scene-timeline).

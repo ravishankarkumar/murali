@@ -1,10 +1,12 @@
 ---
-sidebar_position: 2
+sidebar_position: 9
 ---
 
 # End-to-end flow
 
 This document traces exactly what happens when you write a simple scene and run it — from the first line of user code to pixels on screen. We'll use a circle as the example throughout.
+
+Unlike the other pages in this section, this page is intentionally example-driven. Its job is to walk one concrete object through the whole system rather than define each subsystem in isolation.
 
 ```rust
 let mut scene = Scene::new();

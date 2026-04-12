@@ -1,10 +1,12 @@
 ---
-sidebar_position: 4
+sidebar_position: 7
 ---
 
 # Renderer & pipelines
 
 The `Renderer` owns all wgpu render pipelines and is responsible for encoding a single render pass per frame.
+
+This page is specifically about draw-time rendering concerns after backend entities already exist.
 
 ## Pipelines
 
@@ -75,3 +77,16 @@ For video export, `render_to_image` renders into an offscreen texture instead of
 - Headless (`DeviceManager::new_headless`) — no surface, uses `Rgba8UnormSrgb` format, falls back to low-power adapter if needed
 
 The config is stored in a `RefCell` to allow interior mutability during resize without requiring `&mut self` everywhere.
+
+## What This Page Owns
+
+This page is the home for:
+
+- render pipelines
+- uniform handling
+- draw list construction
+- frame encoding
+- headless render-to-image behavior
+- device and surface management
+
+For how data reaches the renderer, see [ECS](/docs/architecture/ecs) and [End-to-end flow](/docs/architecture/end-to-end-flow).

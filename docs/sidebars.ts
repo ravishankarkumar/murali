@@ -28,15 +28,16 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Architecture',
       items: [
+        'architecture/overview',
         'architecture/architecture',
         'architecture/scene-timeline',
-        'architecture/end-to-end-flow',
         'architecture/tattva',
         'architecture/dirty-flags',
+        'architecture/projection',
         'architecture/ecs',
         'architecture/renderer',
-        'architecture/projection',
         'architecture/text-and-latex',
+        'architecture/end-to-end-flow',
       ],
     },
 

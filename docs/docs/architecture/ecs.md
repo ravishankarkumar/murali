@@ -1,10 +1,12 @@
 ---
-sidebar_position: 3
+sidebar_position: 6
 ---
 
 # ECS & components
 
 Murali uses [hecs](https://github.com/Ralith/hecs) as a lightweight ECS (Entity Component System) for the GPU-side world. The ECS is entirely internal — user code never interacts with it directly.
+
+This page is specifically about how backend entities are represented once projection has already happened.
 
 ## Why ECS?
 
@@ -66,3 +68,14 @@ Entities are created and destroyed by `SyncBoundary`, not by user code:
 5. Entity IDs are stored in `entity_cache` keyed by `TattvaId`
 
 When a tattva is removed from the scene, its cached entities are despawned.
+
+## What This Page Owns
+
+This page is the home for:
+
+- why the backend uses ECS
+- what backend entities represent
+- the major backend components
+- how entities are created and destroyed
+
+For what gets stored before ECS materialization, see [Projection](/docs/architecture/projection). For how the renderer draws those entities, see [Renderer](/docs/architecture/renderer).
