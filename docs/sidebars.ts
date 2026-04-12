@@ -40,6 +40,15 @@ const sidebars: SidebarsConfig = {
         'architecture/end-to-end-flow',
       ],
     },
+    {
+      type: 'category',
+      label: 'Feature Internals',
+      items: [
+        'feature-internals/overview',
+        'feature-internals/stepwise',
+        'feature-internals/neural-network',
+      ],
+    },
 
   ],
 };
