@@ -29,6 +29,7 @@ const sidebars: SidebarsConfig = {
       label: 'Contributing Guide',
       items: [
         'internals/architecture',
+        'internals/scene-timeline',
         'internals/end-to-end-flow',
         'internals/tattva',
         'internals/dirty-flags',

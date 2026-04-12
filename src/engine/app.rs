@@ -16,6 +16,7 @@ use crate::engine::Engine;
 use crate::engine::camera::controller::{
     ActiveCameraController, orbit::OrbitCameraController, pan_zoom::PanZoomCameraController,
 };
+use crate::engine::config::RenderConfig;
 use crate::engine::export::{ExportSettings, export_scene};
 use crate::engine::render::RenderOptions;
 use crate::engine::scene::Scene;
@@ -26,6 +27,7 @@ pub struct App {
     pending_scene: Option<Scene>,
     explicit_export_settings: Option<ExportSettings>,
     render_options: RenderOptions,
+    preview_dt: f32,
     camera_controller: ActiveCameraController,
     is_left_mouse_down: bool,
     last_cursor_position: Option<(f64, f64)>,
@@ -34,6 +36,7 @@ pub struct App {
 impl App {
     pub fn new() -> Result<Self> {
         Ok(Self {
+            preview_dt: 1.0 / RenderConfig::preview()?.fps.max(1) as f32,
             window: None,
             engine: None,
             pending_scene: None,
@@ -138,7 +141,7 @@ impl<'a> ApplicationHandler for App {
 
             WindowEvent::RedrawRequested => {
                 // Drive the engine
-                engine.update(0.016);
+                engine.update(self.preview_dt);
 
                 if let Err(e) = engine.render() {
                     eprintln!("Render error: {:?}", e);

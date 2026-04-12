@@ -25,6 +25,7 @@ use preview_config::PreviewConfig;
 #[derive(Debug, Clone)]
 pub struct RenderConfig {
     pub text_px_per_world_unit: f32,
+    pub fps: u32,
 }
 
 // -----------------------------------------------------------------------------
@@ -39,6 +40,7 @@ impl ResolveRenderConfig for PreviewConfig {
     fn resolve(self) -> RenderConfig {
         RenderConfig {
             text_px_per_world_unit: self.text_px_per_world_unit,
+            fps: self.fps,
         }
     }
 }
@@ -47,6 +49,7 @@ impl ResolveRenderConfig for ExportConfig {
     fn resolve(self) -> RenderConfig {
         RenderConfig {
             text_px_per_world_unit: self.text_px_per_world_unit,
+            fps: self.fps.unwrap_or(60),
         }
     }
 }
@@ -56,9 +59,11 @@ impl ResolveRenderConfig for ExportConfig {
 // -----------------------------------------------------------------------------
 
 impl RenderConfig {
-    /// Interactive preview configuration (hardcoded defaults).
-    pub fn preview() -> Self {
-        PreviewConfig::default().resolve()
+    /// Interactive preview configuration loaded from the nearest project
+    /// `murali.toml`, falling back to defaults when absent.
+    pub fn preview() -> Result<Self> {
+        let cwd = std::env::current_dir()?;
+        Ok(PreviewConfig::load_nearest_project_file(cwd)?.resolve())
     }
 
     /// Export configuration (file-backed, deterministic).

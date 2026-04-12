@@ -1,174 +1,80 @@
 # Murali
 
-Murali is a **Rust-based, GPU-accelerated animation engine** inspired by Manim. It is designed for creating **precise, semantic mathematical graphics and animations** with a strong focus on correctness, determinism, and long-term maintainability.
+Murali is a Rust-based animation engine for semantic graphics and mathematical scenes. It is built around deterministic timelines, a frontend scene model, CPU-side projection, and a GPU-backed runtime.
 
-## Why Murali when Manim exists?
+## Goals
 
-Manim is an excellent tool and has played a major role in popularizing mathematical animations. Today, there are two prominent variants: the community-maintained Manim, which emphasizes stability and backward compatibility, and the original Manim by 3Blue1Brown, which is more experimental and leverages full OpenGL capabilities.
+- Predictable, explicit animation behavior
+- World-space authoring instead of pixel-first APIs
+- Clear separation between authored scene state and render/runtime state
+- A modern GPU path built on `wgpu`
 
-Despite its strengths, Manim has some limitations that motivated the creation of Murali.
+## Current Shape
 
-### 1. GPU backend and future compatibility
+- `src/frontend/` contains user-facing tattvas, animations, layout helpers, and scene authoring APIs
+- `src/projection/` contains backend-neutral render primitives and meshes
+- `src/backend/` contains the sync boundary, ECS cache, and renderer
+- `src/engine/` contains scene ownership, app lifecycle, timeline stepping, export, and config
+- `examples/` contains runnable examples and feature showcases
+- `docs/` contains the longer-form documentation site
 
-Manim is built on top of OpenGL. While this works well on many platforms, OpenGL is effectively deprecated on macOS, where only older versions are supported and no future updates are planned by Apple.
+## Getting Started
 
-For a niche, open-source tool, it is difficult to continuously chase evolving GPU standards across platforms. **WebGPU (via wgpu)** offers a more future-proof, cross-platform abstraction over modern graphics APIs (Vulkan, Metal, DX12), making it a better long-term foundation.
+Requirements:
 
----
+- Rust toolchain
+- A working graphics environment for preview
+- `ffmpeg` if you want video export
 
-### 2. Predictability and intent
-
-Manim is powerful, but it can sometimes behave in ways that are hard to predict unless you are a power user deeply familiar with its internal conventions. This can lead to frustration when the output does not match the author’s intent.
-
-Murali aims to prioritize **explicitness and predictability** in its core abstractions, so that animations do what they are meant to do, without relying on undocumented behaviors or fragile tricks.
-
----
-
-### 3. Strongly typed, engine-first design
-
-Murali is written in **Rust**, a strongly typed language that enables:
-
-- Clear and explicit APIs
-- Better tooling support (autocomplete, static analysis, AI-assisted tooling)
-- Fewer runtime surprises
-
-An engine-first design also encourages clean separation between:
-- Rendering
-- Layout
-- Time
-- Semantics
-
----
-
-### 4. Performance potential
-
-While performance is not the primary goal, a Rust-based engine with a modern GPU backend has the potential to significantly improve rendering performance. Actual performance gains will be evaluated later through benchmarking once the engine matures.
-
----
-
-### 5. Community interest
-
-There has been growing interest within the community (including Manim’s own Discord) around alternative implementations in Rust. Murali explores this space with a focus on sound engine architecture rather than a direct feature-by-feature port.
-
----
-
-## What this project is not
-
-- Murali is **not** a line-by-line reimplementation of Manim in Rust.
-- It does **not** aim to replicate all Manim APIs verbatim.
-- It intentionally respects Rust’s idioms and engineering constraints.
-
-Early development reflects some personal design opinions. As the project matures and gains adoption, these decisions are expected to evolve with community input.
-
----
-
-## Project Status
-
-Murali is under **active development**.
-
-### Currently implemented
-- WGPU-based rendering backend
-- World-space rendering pipeline (in progress)
-- Embedded **Typst** integration (Typst → SVG → RGBA)
-- Text rendered as textured quads
-- Multiple basic tattvas rendered in a scene
-
-### Under active development
-- Coordinate system & camera
-- World-space text sizing and positioning
-- Anchors and relative placement
-- Time-driven animation system
-
-See [`ROADMAP.md`](./ROADMAP.md) for the full development plan.
-
----
-
-## Repository Structure
-
-```text
-murali/
-├── engine/          # Core animation engine (rendering, scene, tattvas, time)
-├── examples/        # Example scenes using the engine
-├── ROADMAP.md       # Development roadmap
-└── README.md
-````
-
----
-
-## Running Examples
-
-### Run a basic scene with multiple tattvas
+Run an example in preview mode:
 
 ```bash
-cargo run -p examples --example scene_many_tattvas
-```
-
-This example renders a scene containing multiple basic tattvas using the engine.
-
----
-
-### Run the Typst text example
-
-```bash
-cargo run -p examples \
-  --features engine/typst_embedded \
-  --example typst_hello
-```
-
-or 
-
-```bash
-cargo run -p examples \
-  --features engine/typst_embedded \
-  --example typst_world_text
-```
-
-This example demonstrates:
-
-* Embedded Typst compilation
-* SVG → RGBA rasterization
-* Rendering Typst text inside Murali
-
-
-``` bash
 cargo run --example primitives_showcase
-cargo run --example axes_and_labels
-cargo run --example animated_motion
 ```
 
----
+Some useful examples:
 
-## Design Principles
+```bash
+cargo run --example animated_motion
+cargo run --example axes_and_labels
+cargo run --example agentic_flow_chart
+cargo run --example export_aiu_attention
+```
 
-Murali is built around the following principles:
+## Preview And Export Config
 
-* **World space first, pixels last**
-  All layout and animation operate in mathematical world units.
+Murali looks for the nearest `murali.toml` next to a `Cargo.toml`. If no config file is present, sensible defaults are used.
 
-* **Time-driven, not frame-driven**
-  Animations depend on time, not frame count, ensuring determinism.
+Example config:
 
-* **Semantic math over visual hacks**
-  Mathematical meaning is preserved through transformations and morphing.
+```toml
+[preview]
+fps = 60
 
-* **Ergonomics without compromising correctness**
-  Expressive APIs are built on top of solid engine foundations.
+[export]
+fps = 60
+width = 1920
+height = 1080
+```
 
----
+A sample file is included at [murali.toml.example](/Users/ravishankar/personal-work/animation/murali/murali.toml.example:1).
 
-## Inspiration
+## Documentation
 
-Murali is inspired by:
+- Project overview: [docs/docs/intro.mdx](/Users/ravishankar/personal-work/animation/murali/docs/docs/intro.mdx:1)
+- Scene and app docs: [docs/docs/scene-and-app.md](/Users/ravishankar/personal-work/animation/murali/docs/docs/scene-and-app.md:1)
+- Internal architecture: [docs/docs/internals/architecture.md](/Users/ravishankar/personal-work/animation/murali/docs/docs/internals/architecture.md:1)
 
-* [Manim](https://www.manim.community/) — semantic math animation concepts
-* GPU-first rendering engines
-* Mathematical visualization tools
+## Status
 
-Murali does **not** aim to be a direct Manim clone. Instead, it rethinks similar ideas with a strong emphasis on engine architecture, determinism, and Rust’s type system.
+Murali is under active development. The repository already includes:
 
----
+- scene and timeline infrastructure
+- preview and headless export paths
+- text, LaTeX, and Typst support
+- primitives, layout helpers, tables, graph tattvas, and utility tattvas
+- write/unwrite, transform, text, and surface animation building blocks
 
 ## License
 
 Murali is licensed under the Apache License, Version 2.0.
-See [LICENSE](./LICENSE) for details.
