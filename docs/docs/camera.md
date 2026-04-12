@@ -27,7 +27,7 @@ scene.camera_mut().projection = Projection::Orthographic {
 };
 ```
 
-The default is `width: 16.0, height: 9.0` — a 16:9 world. Moving the camera position in orthographic mode does **not** change what's visible. Use `set_view_width` instead.
+The default is `width: 16.0, height: 9.0` — giving a canonical `[-8, 8] × [-4.5, 4.5]` world space. Moving the camera position in orthographic mode does not change what's visible. Use `set_view_width` instead.
 
 ### Perspective
 
