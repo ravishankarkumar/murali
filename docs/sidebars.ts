@@ -1,4 +1,4 @@
-import type {SidebarsConfig} from '@docusaurus/types';
+import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
   tutorialSidebar: [
@@ -12,6 +12,18 @@ const sidebars: SidebarsConfig = {
     'arrows-and-vectors',
     'updaters',
     'roadmap',
+    {
+      type: 'category',
+      label: 'Internals',
+      items: [
+        'internals/architecture',
+        'internals/dirty-flags',
+        'internals/ecs',
+        'internals/renderer',
+        'internals/projection',
+        'internals/text-and-latex',
+      ],
+    },
   ],
 };
 

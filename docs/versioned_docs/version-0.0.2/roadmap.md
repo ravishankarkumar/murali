@@ -4,7 +4,7 @@ sidebar_position: 7
 
 # Roadmap
 
-## v0.1.0 (current)
+## v0.0.2 (current)
 
 - wgpu rendering backend (Vulkan / Metal / DX12)
 - World-space coordinate system and camera
