@@ -12,6 +12,12 @@
 pub mod controller;
 use glam::{Mat4, Vec3};
 
+/// Canonical world-space constants.
+/// These define Murali's default coordinate canvas.
+pub const DEFAULT_VIEW_WIDTH: f32 = 16.0;
+pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
+pub const DEFAULT_VIEW_HEIGHT: f32 = DEFAULT_VIEW_WIDTH / ASPECT_RATIO;
+
 /// Projection mode for the camera.
 #[derive(Debug, Copy, Clone)]
 pub enum Projection {
@@ -110,6 +116,40 @@ impl Camera {
     pub fn right(&self) -> Vec3 {
         self.forward().cross(self.up).normalize()
     }
+
+    /// Returns the visible world width (orthographic only).
+    /// For perspective cameras, returns 0.0.
+    pub fn view_width(&self) -> f32 {
+        match self.projection {
+            Projection::Orthographic { width, .. } => width,
+            Projection::Perspective { .. } => 0.0,
+        }
+    }
+
+    /// Sets the visible world width, maintaining 16:9 aspect ratio.
+    /// Smaller values zoom in (objects appear larger).
+    /// Larger values zoom out (more world is visible).
+    /// No-op for perspective cameras.
+    pub fn set_view_width(&mut self, width: f32) {
+        if let Projection::Orthographic { width: w, height: h, .. } = &mut self.projection {
+            *w = width.max(0.01);
+            *h = width.max(0.01) / ASPECT_RATIO;
+        }
+    }
+
+    /// Zoom in by a factor — objects appear `factor` times larger.
+    /// Equivalent to `set_view_width(view_width() / factor)`.
+    pub fn zoom_in(&mut self, factor: f32) {
+        let w = self.view_width();
+        self.set_view_width(w / factor.max(0.001));
+    }
+
+    /// Zoom out by a factor — objects appear `factor` times smaller.
+    /// Equivalent to `set_view_width(view_width() * factor)`.
+    pub fn zoom_out(&mut self, factor: f32) {
+        let w = self.view_width();
+        self.set_view_width(w * factor.max(0.001));
+    }
 }
 
 /// Canonical default camera:
@@ -124,8 +164,8 @@ impl Default for Camera {
             target: Vec3::ZERO,
             up: Vec3::Y,
             projection: Projection::Orthographic {
-                width: 16.0,
-                height: 9.0,
+                width: DEFAULT_VIEW_WIDTH,
+                height: DEFAULT_VIEW_HEIGHT,
                 near: -100.0,
                 far: 100.0,
             },

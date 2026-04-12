@@ -287,8 +287,9 @@ impl Scene {
     }
 
     pub fn frame_bounds(&self) -> Bounds {
-        let half_height = 4.0;
-        let half_width = half_height * (16.0 / 9.0);
+        let view_width = self.camera.view_width();
+        let half_width = view_width / 2.0;
+        let half_height = half_width / crate::engine::camera::ASPECT_RATIO;
         Bounds::new(
             vec2(-half_width, -half_height),
             vec2(half_width, half_height),

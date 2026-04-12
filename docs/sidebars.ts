@@ -21,6 +21,7 @@ const sidebars: SidebarsConfig = {
     },
     'animations',
     'scene-and-app',
+    'camera',
     'updaters',
     'roadmap',
     {
@@ -37,6 +38,7 @@ const sidebars: SidebarsConfig = {
         'internals/text-and-latex',
       ],
     },
+
   ],
 };
 
