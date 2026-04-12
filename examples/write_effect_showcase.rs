@@ -19,21 +19,21 @@ fn main() -> anyhow::Result<()> {
         Circle::new(1.0, 48, Vec4::new(0.19, 0.64, 0.33, 1.0)),
         Vec3::new(-5.5, 2.5, 0.0),
     );
-    scene.hide(circle_id);
+
 
     // Square, fill only
     let square_id = scene.add_tattva(
         Square::new(1.8, Vec4::new(0.92, 0.26, 0.21, 1.0)),
         Vec3::new(-1.8, 2.5, 0.0),
     );
-    scene.hide(square_id);
+
 
     // Rectangle, fill only
     let rect_id = scene.add_tattva(
         Rectangle::new(2.4, 1.4, Vec4::new(0.22, 0.50, 0.96, 1.0)),
         Vec3::new(2.5, 2.5, 0.0),
     );
-    scene.hide(rect_id);
+
 
     // --- Row 2: stroke outline ---
 
@@ -43,7 +43,7 @@ fn main() -> anyhow::Result<()> {
             .with_stroke(0.06, Vec4::new(0.19, 0.64, 0.33, 1.0)),
         Vec3::new(-5.5, -0.5, 0.0),
     );
-    scene.hide(circle_stroke_id);
+
 
     // Square with stroke
     let square_stroke_id = scene.add_tattva(
@@ -51,7 +51,7 @@ fn main() -> anyhow::Result<()> {
             .with_stroke(0.06, Vec4::new(0.92, 0.26, 0.21, 1.0)),
         Vec3::new(-1.8, -0.5, 0.0),
     );
-    scene.hide(square_stroke_id);
+
 
     // Rectangle with stroke
     let rect_stroke_id = scene.add_tattva(
@@ -59,7 +59,7 @@ fn main() -> anyhow::Result<()> {
             .with_stroke(0.06, Vec4::new(0.22, 0.50, 0.96, 1.0)),
         Vec3::new(2.5, -0.5, 0.0),
     );
-    scene.hide(rect_stroke_id);
+
 
     // --- Row 3: fill + stroke ---
 
@@ -68,14 +68,14 @@ fn main() -> anyhow::Result<()> {
             .with_stroke(0.06, Vec4::new(0.19, 0.64, 0.33, 1.0)),
         Vec3::new(-5.5, -3.5, 0.0),
     );
-    scene.hide(circle_both_id);
+
 
     let square_both_id = scene.add_tattva(
         Square::new(1.8, Vec4::new(0.92, 0.26, 0.21, 0.35))
             .with_stroke(0.06, Vec4::new(0.92, 0.26, 0.21, 1.0)),
         Vec3::new(-1.8, -3.5, 0.0),
     );
-    scene.hide(square_both_id);
+
 
     // Custom path — always works directly
     let star_id = scene.add_tattva(
@@ -94,7 +94,7 @@ fn main() -> anyhow::Result<()> {
             .with_color(Vec4::new(0.96, 0.80, 0.19, 1.0)),
         Vec3::new(2.5, -3.5, 0.0),
     );
-    scene.hide(star_id);
+
 
     scene.camera_mut().position = Vec3::new(0.0, 0.0, 10.0);
 

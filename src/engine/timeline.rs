@@ -19,6 +19,7 @@ pub struct ScheduledAnimation {
     pub anim: Box<dyn Animation>,
     pub state: AnimState,
     initialized: bool, // Track if on_start was called
+    reset_performed: bool, // Track if we've performed initial pending reset
 }
 
 impl ScheduledAnimation {
@@ -30,6 +31,7 @@ impl ScheduledAnimation {
             anim,
             state: AnimState::Pending,
             initialized: false,
+            reset_performed: false,
         }
     }
 }
@@ -112,6 +114,10 @@ impl Timeline {
             let elapsed = scene_time - sa.start_time;
 
             if elapsed < 0.0 {
+                if !sa.reset_performed {
+                    sa.anim.reset(scene);
+                    sa.reset_performed = true;
+                }
                 sa.state = AnimState::Pending;
                 continue;
             }
@@ -142,6 +148,7 @@ impl Timeline {
         for sa in &mut self.scheduled {
             sa.anim.reset(scene);
             sa.initialized = false;
+            sa.reset_performed = true; // Since we just did it
             sa.state = AnimState::Pending;
         }
         self.update(scene_time, scene);

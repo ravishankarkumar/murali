@@ -326,6 +326,20 @@ impl Animation for FadeTo {
             },
         );
     }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        if let Some(from) = self.from {
+            with_props_mut(
+                scene,
+                self.target_id,
+                DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+                |props| {
+                    props.opacity = from.clamp(0.0, 1.0);
+                    props.visible = from > 0.001;
+                },
+            );
+        }
+    }
 }
 
 pub struct Create {
@@ -366,6 +380,18 @@ impl Animation for Create {
             |props| {
                 props.visible = true;
                 props.opacity = opacity.clamp(0.0, target);
+            },
+        );
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        with_props_mut(
+            scene,
+            self.target_id,
+            DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+            |props| {
+                props.visible = false;
+                props.opacity = 0.0;
             },
         );
     }
@@ -2094,12 +2120,24 @@ impl Animation for WritePath {
 
     fn reset(&mut self, scene: &mut Scene) {
         self.cleanup(scene);
+        // Direct Path case reset
         if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
             path.state.trim_start = 0.0;
             path.state.trim_end = 0.0;
             path.state.fill_opacity = 1.0;
             path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
+        
+        // Ensure the original object is hidden before the animation begins
+        with_props_mut(
+            scene,
+            self.target_id,
+            DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+            |props| {
+                props.visible = false;
+                props.opacity = 0.0;
+            },
+        );
     }
 }
 
@@ -2196,6 +2234,16 @@ impl Animation for UnwritePath {
 
     fn reset(&mut self, scene: &mut Scene) {
         self.cleanup(scene);
+        // Reset original visibility to visible (Unwrite goes from visible to invisible)
+        with_props_mut(
+            scene,
+            self.target_id,
+            DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+            |props| {
+                props.visible = true;
+                props.opacity = 1.0;
+            },
+        );
         if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
             path.state.trim_start = 0.0;
             path.state.trim_end = 1.0;
