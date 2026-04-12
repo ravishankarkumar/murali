@@ -75,11 +75,78 @@ impl Stepwise {
         self.debug = debug;
         self
     }
+
+    /// Computes signal intensity (0.0 to 1.0) and visited status for a node
+    fn node_signal_state(&self, node_idx: usize) -> (f32, bool) {
+        if self.signal_progress < 0.001 {
+            return (0.0, false);
+        }
+
+        let n = self.model.sequence.len();
+        if n < 2 {
+            return (0.0, false);
+        }
+
+        let total_hops = (n - 1) as f32;
+        let current_pos = self.signal_progress * total_hops;
+        let current_hop = current_pos.floor() as usize;
+        let t = current_pos - current_hop as f32;
+
+        let mut intensity = 0.0;
+        let mut visited = false;
+
+        for h in 0..n {
+            let s_idx = self.model.sequence[h];
+            if s_idx == node_idx {
+                // Determine visitation
+                if (h as f32) < current_pos {
+                    visited = true;
+                }
+
+                // Determine active intensity
+                if h == current_hop {
+                    // Hit at start of hop
+                    intensity = (1.0 - t * 2.0).clamp(0.0, 1.0);
+                } else if h == current_hop + 1 {
+                    // Hit at end of hop
+                    intensity = (t * 2.0 - 1.0).clamp(0.0, 1.0);
+                }
+            }
+        }
+
+        (intensity, visited)
+    }
+
+    fn is_transition_signaled(&self, transition_idx: usize) -> bool {
+        if self.signal_progress < 0.001 {
+            return false;
+        }
+
+        let transition = &self.model.transitions[transition_idx];
+        let n = self.model.sequence.len();
+        if n < 2 {
+            return false;
+        }
+
+        let total_hops = (n - 1) as f32;
+        let current_pos = self.signal_progress * total_hops;
+
+        for h in 0..(n - 1) {
+            let from = self.model.sequence[h];
+            let to = self.model.sequence[h + 1];
+            if from == transition.from && to == transition.to {
+                if (h as f32) < current_pos {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 // ── internal rendering helpers using primitives ─────────────────────────────────
 
-fn render_node_path(ctx: &mut ProjectionCtx, trim: f32, fill_alpha: f32, stroke_color: Vec4, fill_color: Vec4) {
+fn render_node_path(ctx: &mut ProjectionCtx, size: f32, trim: f32, fill_alpha: f32, stroke_color: Vec4, fill_color: Vec4) {
     let mut style = Style::new();
     style.stroke = Some(StrokeParams {
         thickness: STROKE_THICK,
@@ -88,7 +155,7 @@ fn render_node_path(ctx: &mut ProjectionCtx, trim: f32, fill_alpha: f32, stroke_
     });
     style.fill = Some(ColorSource::Solid(fill_color));
 
-    let mut path = Square::new(NODE_SIZE, fill_color)
+    let mut path = Square::new(size, fill_color)
         .with_style(style)
         .to_path();
     
@@ -98,8 +165,15 @@ fn render_node_path(ctx: &mut ProjectionCtx, trim: f32, fill_alpha: f32, stroke_
     path.project(ctx);
 }
 
-fn render_default_node(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, label: &str) {
+fn render_default_node(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, label: &str, scale: f32, is_visited: bool) {
+    let node_size = NODE_SIZE * scale;
     ctx.with_offset(pos, |ctx| {
+        let (stroke, fill) = if is_visited {
+            (STROKE_ACTIVE, FILL_ACTIVE)
+        } else {
+            (STROKE_ACTIVE, FILL_ACTIVE) // We'll tune these colors later
+        };
+
         match state {
             StepState::Pending => {}
             StepState::Active { t } => {
@@ -107,11 +181,11 @@ fn render_default_node(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, la
                 let outline_t = (t * 2.0).clamp(0.0, 1.0);
                 let fill_t = ((t - 0.5) * 2.0).clamp(0.0, 1.0);
 
-                render_node_path(ctx, outline_t, fill_t, STROKE_ACTIVE, FILL_ACTIVE);
+                render_node_path(ctx, node_size, outline_t, fill_t, stroke, fill);
 
                 if fill_t > 0.001 {
                     ctx.with_offset(Vec3::new(0.0, 0.0, 0.1), |ctx| {
-                        Label::new(label, LABEL_HEIGHT)
+                        Label::new(label, LABEL_HEIGHT * scale)
                             .with_color(Vec4::new(COLOR_LABEL.x, COLOR_LABEL.y, COLOR_LABEL.z, COLOR_LABEL.w * fill_t))
                             .with_char_reveal(fill_t)
                             .project(ctx);
@@ -119,10 +193,13 @@ fn render_default_node(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, la
                 }
             }
             StepState::Completed => {
-                render_node_path(ctx, 1.0, 1.0, STROKE_COMPLETED, FILL_COMPLETED);
+                let s_color = if is_visited { STROKE_ACTIVE } else { STROKE_COMPLETED };
+                let f_color = if is_visited { FILL_ACTIVE } else { FILL_COMPLETED };
+
+                render_node_path(ctx, node_size, 1.0, 1.0, s_color, f_color);
                 
                 ctx.with_offset(Vec3::new(0.0, 0.0, 0.1), |ctx| {
-                    Label::new(label, LABEL_HEIGHT)
+                    Label::new(label, LABEL_HEIGHT * scale)
                         .with_color(Vec4::new(COLOR_LABEL.x, COLOR_LABEL.y, COLOR_LABEL.z, COLOR_LABEL.w * 0.8))
                         .project(ctx);
                 });
@@ -131,18 +208,27 @@ fn render_default_node(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, la
     });
 }
 
-fn render_background(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState) {
+fn render_background(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, scale: f32, is_visited: bool) {
+    let node_size = NODE_SIZE * scale;
     ctx.with_offset(pos, |ctx| {
+        let (stroke, fill) = if is_visited {
+            (STROKE_ACTIVE, FILL_ACTIVE)
+        } else {
+            (STROKE_ACTIVE, FILL_ACTIVE)
+        };
+
         match state {
             StepState::Pending => {}
             StepState::Active { t } => {
                 let t = Ease::InOutSmooth.eval(*t);
                 let outline_t = (t * 2.0).clamp(0.0, 1.0);
                 let fill_t = ((t - 0.5) * 2.0).clamp(0.0, 1.0);
-                render_node_path(ctx, outline_t, fill_t, STROKE_ACTIVE, FILL_ACTIVE);
+                render_node_path(ctx, node_size, outline_t, fill_t, stroke, fill);
             }
             StepState::Completed => {
-                render_node_path(ctx, 1.0, 1.0, STROKE_COMPLETED, FILL_COMPLETED);
+                let s_color = if is_visited { STROKE_ACTIVE } else { STROKE_COMPLETED };
+                let f_color = if is_visited { FILL_ACTIVE } else { FILL_COMPLETED };
+                render_node_path(ctx, node_size, 1.0, 1.0, s_color, f_color);
             }
         }
     });
@@ -156,8 +242,11 @@ impl Project for Stepwise {
 
         // ── transitions ───────────────────────────────────────────────────
         for (i, transition) in self.model.transitions.iter().enumerate() {
-            let from = self.layout.position_for(transition.from);
-            let to   = self.layout.position_for(transition.to);
+            let from_raw = self.layout.position_for(transition.from);
+            let to_raw   = self.layout.position_for(transition.to);
+            
+            // Clip edges to node boundaries
+            let (from, to) = clip_edge(from_raw, to_raw, NODE_SIZE, 0.05);
 
             match &state.transitions[i] {
                 TransitionState::Hidden => {}
@@ -172,11 +261,19 @@ impl Project for Stepwise {
                     path.project(ctx);
                 }
                 TransitionState::Completed => {
+                    // Check if signal has passed this edge
+                    let is_signaled = self.is_transition_signaled(i);
+                    let color = if is_signaled {
+                        STROKE_ACTIVE // Use a bright color for "activated" edges
+                    } else {
+                        Vec4::new(FILL_EDGE.x, FILL_EDGE.y, FILL_EDGE.z, FILL_EDGE.w * 0.6)
+                    };
+
                     Path::new()
                         .move_to(from.truncate())
                         .line_to(to.truncate())
                         .with_thickness(EDGE_THICKNESS)
-                        .with_color(Vec4::new(FILL_EDGE.x, FILL_EDGE.y, FILL_EDGE.z, FILL_EDGE.w * 0.6))
+                        .with_color(color)
                         .project(ctx);
                 }
             }
@@ -187,17 +284,29 @@ impl Project for Stepwise {
             let step_state = &state.steps[i];
             let pos = self.layout.position_for(i);
 
-            match &step.content {
-                None => render_default_node(ctx, pos, step_state, &step.label),
-                Some(content) => {
-                    if !content.draws_own_background() {
-                        render_background(ctx, pos, step_state);
+            // Determine signal-based indication for this node
+            let (signal_intensity, is_visited) = self.node_signal_state(i);
+            let scale_mod = 1.0 + 0.15 * signal_intensity; // 15% pulse
+            
+            ctx.with_offset(pos, |ctx| {
+                // Apply pulse scale
+                ctx.with_offset(Vec3::ZERO, |ctx| {
+                    // Note: We'd need a way to apply scale to the ctx or children.
+                    // For now, we'll manually apply it to the primitives inside helpers.
+                    
+                    match &step.content {
+                        None => render_default_node(ctx, Vec3::ZERO, step_state, &step.label, scale_mod, is_visited),
+                        Some(content) => {
+                            if !content.draws_own_background() {
+                                render_background(ctx, Vec3::ZERO, step_state, scale_mod, is_visited);
+                            }
+                            ctx.with_offset(Vec3::ZERO, |ctx| {
+                                content.project(ctx, step_state);
+                            });
+                        }
                     }
-                    ctx.with_offset(pos, |ctx| {
-                        content.project(ctx, step_state);
-                    });
-                }
-            }
+                });
+            });
         }
 
         // ── signal dot ────────────────────────────────────────────────────
@@ -239,6 +348,33 @@ impl Project for Stepwise {
             }
         }
     }
+}
+
+/// Ray-box intersection for a square node.
+/// Returns clipped (start, end) points.
+fn clip_edge(from: Vec3, to: Vec3, size: f32, padding: f32) -> (Vec3, Vec3) {
+    let dir = to - from;
+    let dist = dir.length();
+    if dist < 1e-6 {
+        return (from, to);
+    }
+    let d = dir / dist;
+
+    // Distance to edge of square: max(|t*dx|, |t*dy|) = size/2
+    // t = (size/2) / max(|dx|, |dy|)
+    let get_t = |d: Vec3| {
+        let mag = d.x.abs().max(d.y.abs());
+        if mag < 1e-6 {
+            0.0
+        } else {
+            (size * 0.5 + padding) / mag
+        }
+    };
+
+    let t_start = get_t(d);
+    let t_end = get_t(-d);
+
+    (from + d * t_start, to - d * t_end)
 }
 
 // ── Bounded ───────────────────────────────────────────────────────────────────
