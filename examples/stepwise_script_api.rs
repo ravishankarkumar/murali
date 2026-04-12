@@ -34,9 +34,9 @@ fn main() -> anyhow::Result<()> {
         .with_layout(StepwiseLayout::vertical(2.0))
         .with_debug(true);
 
-    let sw_id = scene.add_tattva(sw, Vec3::ZERO);
+    let sw_id = scene.add_tattva(sw, Vec3::new(0.0, 3.5, 0.0));
 
-    scene.camera_mut().position = Vec3::new(0.0, -4.0, 12.0);
+    scene.camera_mut().position = Vec3::new(0.0, 0.0, 12.0);
 
     let mut timeline = Timeline::new();
 
