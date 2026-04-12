@@ -31,7 +31,7 @@ fn main() -> anyhow::Result<()> {
     });
 
     let sw = Stepwise::new(model)
-        .with_layout(StepwiseLayout::vertical(2.0))
+        .with_layout(StepwiseLayout::vertical(0.4))
         .with_debug(true);
 
     let sw_id = scene.add_tattva(sw, Vec3::new(0.0, 3.5, 0.0));

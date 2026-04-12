@@ -1,7 +1,7 @@
 // src/frontend/collection/storytelling/stepwise/tattva.rs
 //! `Stepwise` — a first-class Murali tattva.
 
-use glam::{Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4};
 
 use crate::frontend::animation::Ease;
 use crate::frontend::layout::{Bounded, Bounds};
@@ -83,14 +83,14 @@ impl Stepwise {
         }
 
         let n = self.model.sequence.len();
-        if n < 2 {
+        if n == 0 {
             return (0.0, false);
         }
 
-        let total_hops = (n - 1) as f32;
-        let current_pos = self.signal_progress * total_hops;
-        let current_hop = current_pos.floor() as usize;
-        let t = current_pos - current_hop as f32;
+        let total_segments = (2 * n - 1) as f32;
+        let raw_pos = self.signal_progress * total_segments;
+        let segment = (raw_pos.floor() as usize).min(2 * n - 2);
+        let segment_t = (raw_pos - segment as f32).clamp(0.0, 1.0);
 
         let mut intensity = 0.0;
         let mut visited = false;
@@ -98,18 +98,22 @@ impl Stepwise {
         for h in 0..n {
             let s_idx = self.model.sequence[h];
             if s_idx == node_idx {
+                let pulse_segment = h * 2;
+                
                 // Determine visitation
-                if (h as f32) < current_pos {
+                if segment >= pulse_segment {
                     visited = true;
                 }
 
-                // Determine active intensity
-                if h == current_hop {
-                    // Hit at start of hop
-                    intensity = (1.0 - t * 2.0).clamp(0.0, 1.0);
-                } else if h == current_hop + 1 {
-                    // Hit at end of hop
-                    intensity = (t * 2.0 - 1.0).clamp(0.0, 1.0);
+                // Determine pulse intensity (during its specific even segment)
+                if segment == pulse_segment {
+                    // Triangle pulse peaked at 0.5
+                    intensity = if segment_t < 0.5 {
+                        segment_t * 2.0
+                    } else {
+                        2.0 - segment_t * 2.0
+                    };
+                    intensity = Ease::InOutSmooth.eval(intensity);
                 }
             }
         }
@@ -128,14 +132,16 @@ impl Stepwise {
             return false;
         }
 
-        let total_hops = (n - 1) as f32;
-        let current_pos = self.signal_progress * total_hops;
+        let total_segments = (2 * n - 1) as f32;
+        let raw_pos = self.signal_progress * total_segments;
+        let current_segment = raw_pos.floor() as usize;
 
         for h in 0..(n - 1) {
             let from = self.model.sequence[h];
             let to = self.model.sequence[h + 1];
             if from == transition.from && to == transition.to {
-                if (h as f32) < current_pos {
+                let transit_segment = h * 2 + 1;
+                if current_segment >= transit_segment {
                     return true;
                 }
             }
@@ -146,7 +152,37 @@ impl Stepwise {
 
 // ── internal rendering helpers using primitives ─────────────────────────────────
 
-fn render_node_path(ctx: &mut ProjectionCtx, size: f32, trim: f32, fill_alpha: f32, stroke_color: Vec4, fill_color: Vec4) {
+fn node_size_for(label: &str) -> glam::Vec2 {
+    let layout = crate::resource::text::layout::measure_label(label, LABEL_HEIGHT);
+    let min_width = NODE_SIZE;
+    let width = (layout.width + 0.6).max(min_width);
+    glam::vec2(width, NODE_SIZE) // Keep height consistent at basic node size
+}
+
+fn rounded_rect_path(size: glam::Vec2, radius: f32, color: glam::Vec4) -> Path {
+    let hw = size.x * 0.5;
+    let hh = size.y * 0.5;
+    let r = radius.min(hw).min(hh);
+
+    let mut path = Path::new();
+    path.style.fill = Some(ColorSource::Solid(color));
+    path.closed = true;
+
+    // Start at top-left after corner
+    path = path.move_to(glam::vec2(-hw + r, -hh))
+        .line_to(glam::vec2(hw - r, -hh))
+        .quad_to(glam::vec2(hw, -hh), glam::vec2(hw, -hh + r))
+        .line_to(glam::vec2(hw, hh - r))
+        .quad_to(glam::vec2(hw, hh), glam::vec2(hw - r, hh))
+        .line_to(glam::vec2(-hw + r, hh))
+        .quad_to(glam::vec2(-hw, hh), glam::vec2(-hw, hh - r))
+        .line_to(glam::vec2(-hw, -hh + r))
+        .quad_to(glam::vec2(-hw, -hh), glam::vec2(-hw + r, -hh));
+
+    path
+}
+
+fn render_node_path(ctx: &mut ProjectionCtx, size: glam::Vec2, trim: f32, fill_alpha: f32, stroke_color: Vec4, fill_color: Vec4) {
     let mut style = Style::new();
     style.stroke = Some(StrokeParams {
         thickness: STROKE_THICK,
@@ -155,9 +191,8 @@ fn render_node_path(ctx: &mut ProjectionCtx, size: f32, trim: f32, fill_alpha: f
     });
     style.fill = Some(ColorSource::Solid(fill_color));
 
-    let mut path = Square::new(size, fill_color)
-        .with_style(style)
-        .to_path();
+    let mut path = rounded_rect_path(size, 0.15, fill_color);
+    path.style = style;
     
     path.trim_end = trim;
     path.fill_opacity = fill_alpha;
@@ -166,13 +201,9 @@ fn render_node_path(ctx: &mut ProjectionCtx, size: f32, trim: f32, fill_alpha: f
 }
 
 fn render_default_node(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, label: &str, scale: f32, is_visited: bool) {
-    let node_size = NODE_SIZE * scale;
+    let size = node_size_for(label) * scale;
     ctx.with_offset(pos, |ctx| {
-        let (stroke, fill) = if is_visited {
-            (STROKE_ACTIVE, FILL_ACTIVE)
-        } else {
-            (STROKE_ACTIVE, FILL_ACTIVE) // We'll tune these colors later
-        };
+        let (stroke, fill) = (STROKE_ACTIVE, FILL_ACTIVE);
 
         match state {
             StepState::Pending => {}
@@ -181,7 +212,7 @@ fn render_default_node(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, la
                 let outline_t = (t * 2.0).clamp(0.0, 1.0);
                 let fill_t = ((t - 0.5) * 2.0).clamp(0.0, 1.0);
 
-                render_node_path(ctx, node_size, outline_t, fill_t, stroke, fill);
+                render_node_path(ctx, size, outline_t, fill_t, stroke, fill);
 
                 if fill_t > 0.001 {
                     ctx.with_offset(Vec3::new(0.0, 0.0, 0.1), |ctx| {
@@ -196,7 +227,7 @@ fn render_default_node(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, la
                 let s_color = if is_visited { STROKE_ACTIVE } else { STROKE_COMPLETED };
                 let f_color = if is_visited { FILL_ACTIVE } else { FILL_COMPLETED };
 
-                render_node_path(ctx, node_size, 1.0, 1.0, s_color, f_color);
+                render_node_path(ctx, size, 1.0, 1.0, s_color, f_color);
                 
                 ctx.with_offset(Vec3::new(0.0, 0.0, 0.1), |ctx| {
                     Label::new(label, LABEL_HEIGHT * scale)
@@ -208,14 +239,10 @@ fn render_default_node(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, la
     });
 }
 
-fn render_background(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, scale: f32, is_visited: bool) {
-    let node_size = NODE_SIZE * scale;
+fn render_background(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, label: &str, scale: f32, is_visited: bool) {
+    let size = node_size_for(label) * scale;
     ctx.with_offset(pos, |ctx| {
-        let (stroke, fill) = if is_visited {
-            (STROKE_ACTIVE, FILL_ACTIVE)
-        } else {
-            (STROKE_ACTIVE, FILL_ACTIVE)
-        };
+        let (stroke, fill) = (STROKE_ACTIVE, FILL_ACTIVE);
 
         match state {
             StepState::Pending => {}
@@ -223,12 +250,12 @@ fn render_background(ctx: &mut ProjectionCtx, pos: Vec3, state: &StepState, scal
                 let t = Ease::InOutSmooth.eval(*t);
                 let outline_t = (t * 2.0).clamp(0.0, 1.0);
                 let fill_t = ((t - 0.5) * 2.0).clamp(0.0, 1.0);
-                render_node_path(ctx, node_size, outline_t, fill_t, stroke, fill);
+                render_node_path(ctx, size, outline_t, fill_t, stroke, fill);
             }
             StepState::Completed => {
                 let s_color = if is_visited { STROKE_ACTIVE } else { STROKE_COMPLETED };
                 let f_color = if is_visited { FILL_ACTIVE } else { FILL_COMPLETED };
-                render_node_path(ctx, node_size, 1.0, 1.0, s_color, f_color);
+                render_node_path(ctx, size, 1.0, 1.0, s_color, f_color);
             }
         }
     });
@@ -240,13 +267,47 @@ impl Project for Stepwise {
     fn project(&self, ctx: &mut ProjectionCtx) {
         let state = TimelineEngine::compute(&self.model, self.progress);
 
+        // 1. Precalculate node sizes and positions based on actual labels
+        let mut node_sizes = Vec::with_capacity(self.model.steps.len());
+        let mut node_positions = Vec::with_capacity(self.model.steps.len());
+        
+        let mut cursor = 0.0;
+        let gap = self.layout.spacing; // Repurpose spacing as "Gap"
+
+        for (i, step) in self.model.steps.iter().enumerate() {
+            let size = node_size_for(&step.label);
+            node_sizes.push(size);
+            
+            if i == 0 {
+                cursor = 0.0;
+            } else {
+                let prev_size = node_sizes[i-1];
+                let dist = match self.layout.direction {
+                    StepwiseDirection::Horizontal => prev_size.x * 0.5 + gap + size.x * 0.5,
+                    StepwiseDirection::Vertical   => prev_size.y * 0.5 + gap + size.y * 0.5,
+                };
+                cursor += dist;
+            }
+            
+            let pos = match self.layout.direction {
+                StepwiseDirection::Horizontal => Vec3::new(cursor, 0.0, 0.0),
+                StepwiseDirection::Vertical   => Vec3::new(0.0, -cursor, 0.0),
+            };
+            node_positions.push(pos);
+        }
+
         // ── transitions ───────────────────────────────────────────────────
         for (i, transition) in self.model.transitions.iter().enumerate() {
-            let from_raw = self.layout.position_for(transition.from);
-            let to_raw   = self.layout.position_for(transition.to);
+            let from_idx = transition.from;
+            let to_idx   = transition.to;
             
-            // Clip edges to node boundaries
-            let (from, to) = clip_edge(from_raw, to_raw, NODE_SIZE, 0.05);
+            let from_raw = node_positions[from_idx];
+            let to_raw   = node_positions[to_idx];
+            let from_size = node_sizes[from_idx];
+            let to_size   = node_sizes[to_idx];
+            
+            // Clip edges to node boundaries (Rectangular clipping)
+            let (from, to) = clip_edge_rect(from_raw, to_raw, from_size, to_size, 0.05);
 
             match &state.transitions[i] {
                 TransitionState::Hidden => {}
@@ -282,51 +343,57 @@ impl Project for Stepwise {
         // ── nodes ─────────────────────────────────────────────────────────
         for (i, step) in self.model.steps.iter().enumerate() {
             let step_state = &state.steps[i];
-            let pos = self.layout.position_for(i);
+            let pos = node_positions[i];
 
             // Determine signal-based indication for this node
             let (signal_intensity, is_visited) = self.node_signal_state(i);
             let scale_mod = 1.0 + 0.15 * signal_intensity; // 15% pulse
             
             ctx.with_offset(pos, |ctx| {
-                // Apply pulse scale
-                ctx.with_offset(Vec3::ZERO, |ctx| {
-                    // Note: We'd need a way to apply scale to the ctx or children.
-                    // For now, we'll manually apply it to the primitives inside helpers.
-                    
-                    match &step.content {
-                        None => render_default_node(ctx, Vec3::ZERO, step_state, &step.label, scale_mod, is_visited),
-                        Some(content) => {
-                            if !content.draws_own_background() {
-                                render_background(ctx, Vec3::ZERO, step_state, scale_mod, is_visited);
-                            }
-                            ctx.with_offset(Vec3::ZERO, |ctx| {
-                                content.project(ctx, step_state);
-                            });
+                match &step.content {
+                    None => render_default_node(ctx, Vec3::ZERO, step_state, &step.label, scale_mod, is_visited),
+                    Some(content) => {
+                        if !content.draws_own_background() {
+                            render_background(ctx, Vec3::ZERO, step_state, &step.label, scale_mod, is_visited);
                         }
+                        ctx.with_offset(Vec3::ZERO, |ctx| {
+                            content.project(ctx, step_state);
+                        });
                     }
-                });
+                }
             });
         }
 
         // ── signal dot ────────────────────────────────────────────────────
         if self.signal_progress > 0.001 {
             let n = self.model.sequence.len();
-            if n >= 2 {
-                let total_hops = (n - 1) as f32;
-                let raw = self.signal_progress.clamp(0.0, 1.0) * total_hops;
-                let hop = (raw.floor() as usize).min(n - 2);
-                let t   = raw - hop as f32;
+            if n >= 1 {
+                let total_segments = (2 * n - 1) as f32;
+                let raw_pos = self.signal_progress.clamp(0.0, 1.0) * total_segments;
+                let segment = (raw_pos.floor() as usize).min(2 * n - 2);
+                let segment_t = (raw_pos - segment as f32).clamp(0.0, 1.0);
 
-                let from_idx = self.model.sequence[hop];
-                let to_idx   = self.model.sequence[hop + 1];
-                let eased    = Ease::InOutSmooth.eval(t);
-                let p        = self.layout.lerp_position(from_idx, to_idx, eased);
+                // Even segment: Node Pulse (Node i = segment / 2)
+                // Odd segment:  Transit (h = (segment - 1) / 2)
+                if segment % 2 == 1 && n >= 2 {
+                    let hop = (segment - 1) / 2;
+                    let from_idx = self.model.sequence[hop];
+                    let to_idx   = self.model.sequence[hop + 1];
+                    
+                    let from_raw = node_positions[from_idx];
+                    let to_raw   = node_positions[to_idx];
+                    let from_size = node_sizes[from_idx];
+                    let to_size   = node_sizes[to_idx];
 
-                ctx.with_offset(Vec3::new(p.x, p.y, 0.2), |ctx| {
-                    crate::frontend::collection::primitives::circle::Circle::new(SIGNAL_RADIUS, 20, FILL_SIGNAL)
-                        .project(ctx);
-                });
+                    let (from, to) = clip_edge_rect(from_raw, to_raw, from_size, to_size, 0.0);
+
+                    let p = from.lerp(to, Ease::InOutSmooth.eval(segment_t));
+
+                    ctx.with_offset(Vec3::new(p.x, p.y, 0.2), |ctx| {
+                        crate::frontend::collection::primitives::circle::Circle::new(SIGNAL_RADIUS, 20, FILL_SIGNAL)
+                            .project(ctx);
+                    });
+                }
             }
         }
 
@@ -350,9 +417,9 @@ impl Project for Stepwise {
     }
 }
 
-/// Ray-box intersection for a square node.
+/// Ray-rectangle intersection.
 /// Returns clipped (start, end) points.
-fn clip_edge(from: Vec3, to: Vec3, size: f32, padding: f32) -> (Vec3, Vec3) {
+fn clip_edge_rect(from: Vec3, to: Vec3, from_size: Vec2, to_size: Vec2, padding: f32) -> (Vec3, Vec3) {
     let dir = to - from;
     let dist = dir.length();
     if dist < 1e-6 {
@@ -360,19 +427,18 @@ fn clip_edge(from: Vec3, to: Vec3, size: f32, padding: f32) -> (Vec3, Vec3) {
     }
     let d = dir / dist;
 
-    // Distance to edge of square: max(|t*dx|, |t*dy|) = size/2
-    // t = (size/2) / max(|dx|, |dy|)
-    let get_t = |d: Vec3| {
-        let mag = d.x.abs().max(d.y.abs());
-        if mag < 1e-6 {
-            0.0
-        } else {
-            (size * 0.5 + padding) / mag
-        }
+    let get_t = |dir: Vec3, size: Vec2| {
+        let mag_x = dir.x.abs();
+        let mag_y = dir.y.abs();
+        
+        let tx = if mag_x > 1e-6 { (size.x * 0.5 + padding) / mag_x } else { f32::INFINITY };
+        let ty = if mag_y > 1e-6 { (size.y * 0.5 + padding) / mag_y } else { f32::INFINITY };
+        
+        tx.min(ty)
     };
 
-    let t_start = get_t(d);
-    let t_end = get_t(-d);
+    let t_start = get_t(d, from_size);
+    let t_end   = get_t(-d, to_size);
 
     (from + d * t_start, to - d * t_end)
 }

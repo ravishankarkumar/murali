@@ -17,7 +17,7 @@ pub struct StepwiseLayout {
 
 impl Default for StepwiseLayout {
     fn default() -> Self {
-        Self { spacing: 2.0, direction: StepwiseDirection::Horizontal }
+        Self { spacing: 1.0, direction: StepwiseDirection::Horizontal }
     }
 }
 
