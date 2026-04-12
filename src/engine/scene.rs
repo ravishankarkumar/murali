@@ -30,6 +30,7 @@ pub struct Scene {
 
     /// Identity bookkeeping
     next_tattva_id: TattvaId,
+    removed_tattva_ids: Vec<TattvaId>,
 }
 
 impl Scene {
@@ -42,6 +43,7 @@ impl Scene {
             camera: Camera::default(),
             global_model: Mat4::IDENTITY,
             next_tattva_id: 1,
+            removed_tattva_ids: Vec::new(),
         }
     }
 
@@ -302,6 +304,7 @@ impl Scene {
         self.updaters.clear();
         self.scene_time = 0.0;
         self.next_tattva_id = 1;
+        self.removed_tattva_ids.clear();
         self.camera = Camera::default();
     }
 
@@ -318,6 +321,20 @@ impl Scene {
     /// This is used for shape morphing where we swap types (e.g., Circle -> Path).
     pub fn replace_tattva(&mut self, id: TattvaId, tattva: Box<dyn TattvaTrait>) {
         self.tattvas.insert(id, tattva);
+    }
+
+    /// Removes a tattva from the scene and records its ID so the backend can
+    /// despawn any cached render entities tied to it.
+    pub fn remove_tattva(&mut self, id: TattvaId) -> Option<Box<dyn TattvaTrait>> {
+        let removed = self.tattvas.remove(&id);
+        if removed.is_some() {
+            self.removed_tattva_ids.push(id);
+        }
+        removed
+    }
+
+    pub fn take_removed_tattva_ids(&mut self) -> Vec<TattvaId> {
+        std::mem::take(&mut self.removed_tattva_ids)
     }
 
     /// Add an updater callback for a tattva

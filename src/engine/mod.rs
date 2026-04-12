@@ -43,6 +43,11 @@ impl Engine {
         // Project dirty tattvas and materialize GPU resources
         let device = &self.backend.renderer.device_mgr.device;
 
+        for tattva_id in self.scene.take_removed_tattva_ids() {
+            self.sync_boundary
+                .remove_tattva(&mut self.backend.world, tattva_id);
+        }
+
         for (_id, tattva) in self.scene.tattvas_iter_mut() {
             self.sync_boundary.sync_tattva(
                 &mut self.backend.world,

@@ -2016,7 +2016,7 @@ impl WritePath {
     fn cleanup(&mut self, scene: &mut Scene) {
         // Remove shadow tattva
         if let Some(sid) = self.shadow_id.take() {
-            scene.tattvas.remove(&sid);
+            scene.remove_tattva(sid);
         }
         // Restore original visibility
         if let Some(vis) = self.original_visibility.take() {
@@ -2045,7 +2045,7 @@ impl Animation for WritePath {
             if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
                 path.state.trim_start = 0.0;
                 path.state.trim_end = 0.0;
-                path.state.fill_opacity = 1.0;
+                path.state.fill_opacity = 0.0;
                 path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             }
             return;
@@ -2059,8 +2059,9 @@ impl Animation for WritePath {
                 let mut props = DrawableProps::write(tattva.props());
                 let v = props.visible;
                 props.visible = false;
+                props.opacity = 0.0; // Ensure it's completely out of the rendering pipeline
                 drop(props);
-                tattva.mark_dirty(DirtyFlags::VISIBILITY);
+                tattva.mark_dirty(DirtyFlags::VISIBILITY | DirtyFlags::STYLE);
                 v
             };
             self.original_visibility = Some(vis);
@@ -2069,7 +2070,7 @@ impl Animation for WritePath {
             let mut shadow = derived;
             shadow.trim_start = 0.0;
             shadow.trim_end = 0.0;
-            shadow.fill_opacity = 1.0;
+            shadow.fill_opacity = 0.0;
 
             // Get position from original
             let pos = {
@@ -2085,7 +2086,8 @@ impl Animation for WritePath {
         let eased_t = self.ease.eval(t);
         if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.active_id()) {
             path.state.trim_end = eased_t;
-            path.state.fill_opacity = 1.0;
+            // Delay fill fade slightly for better visual establishing of the outline
+            path.state.fill_opacity = eased_t.powi(2);
             path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
     }
@@ -2105,6 +2107,9 @@ impl Animation for WritePath {
                 drop(props);
                 tattva.mark_dirty(DirtyFlags::VISIBILITY | DirtyFlags::STYLE);
             }
+            // Write should end with the original target visible, so don't let
+            // cleanup restore the pre-animation hidden state from reset().
+            self.original_visibility = None;
             self.cleanup(scene);
         } else {
             // Direct Path case — restore visibility
@@ -2124,7 +2129,7 @@ impl Animation for WritePath {
         if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
             path.state.trim_start = 0.0;
             path.state.trim_end = 0.0;
-            path.state.fill_opacity = 1.0;
+            path.state.fill_opacity = 0.0;
             path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
         
@@ -2161,7 +2166,7 @@ impl UnwritePath {
 
     fn cleanup(&mut self, scene: &mut Scene) {
         if let Some(sid) = self.shadow_id.take() {
-            scene.tattvas.remove(&sid);
+            scene.remove_tattva(sid);
         }
         if let Some(vis) = self.original_visibility.take() {
             if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
@@ -2192,8 +2197,9 @@ impl Animation for UnwritePath {
                 let mut props = DrawableProps::write(tattva.props());
                 let v = props.visible;
                 props.visible = false;
+                props.opacity = 0.0; // Ensure it's completely out of the rendering pipeline
                 drop(props);
-                tattva.mark_dirty(DirtyFlags::VISIBILITY);
+                tattva.mark_dirty(DirtyFlags::VISIBILITY | DirtyFlags::STYLE);
                 v
             };
             self.original_visibility = Some(vis);
@@ -2215,8 +2221,10 @@ impl Animation for UnwritePath {
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
         let eased_t = self.ease.eval(t);
         if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.active_id()) {
-            path.state.trim_start = eased_t;
-            path.state.trim_end = 1.0;
+            path.state.trim_start = 0.0;
+            path.state.trim_end = 1.0 - eased_t;
+            // Keep the fill alpha stable and let the trimmed fill geometry
+            // create the visual "erasing" effect for closed shapes.
             path.state.fill_opacity = 1.0;
             path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
@@ -2224,11 +2232,26 @@ impl Animation for UnwritePath {
 
     fn on_finish(&mut self, scene: &mut Scene) {
         if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.active_id()) {
-            path.state.trim_start = 1.0;
-            path.state.trim_end = 1.0;
+            path.state.trim_start = 0.0;
+            path.state.trim_end = 0.0;
             path.state.fill_opacity = 1.0;
             path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
+
+        // IMPORTANT: Clear original visibility so cleanup doesn't restore it to TRUE
+        self.original_visibility = None;
+        
+        // Ensure the target is hidden
+        with_props_mut(
+            scene,
+            self.target_id,
+            DirtyFlags::STYLE | DirtyFlags::VISIBILITY,
+            |props| {
+                props.visible = false;
+                props.opacity = 0.0;
+            },
+        );
+
         self.cleanup(scene);
     }
 

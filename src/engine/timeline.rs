@@ -39,6 +39,7 @@ impl ScheduledAnimation {
 pub struct Timeline {
     pub scheduled: Vec<ScheduledAnimation>,
     next_order: usize,
+    initialized: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,6 +93,7 @@ impl Timeline {
         Self {
             scheduled: Vec::new(),
             next_order: 0,
+            initialized: false,
         }
     }
 
@@ -110,11 +112,22 @@ impl Timeline {
 
     /// Advances the timeline frame-by-frame.
     pub fn update(&mut self, scene_time: f32, scene: &mut Scene) {
+        if !self.initialized {
+            // Perform a global reverse reset pass to initialize the scene state at t=0
+            for sa in self.scheduled.iter_mut().rev() {
+                sa.anim.reset(scene);
+                sa.reset_performed = true;
+            }
+            self.initialized = true;
+        }
+
         for sa in &mut self.scheduled {
             let elapsed = scene_time - sa.start_time;
 
             if elapsed < 0.0 {
                 if !sa.reset_performed {
+                    // Note: This chronological pass is still okay for individual resets,
+                    // but the first-run block below will handle the global scene initialization.
                     sa.anim.reset(scene);
                     sa.reset_performed = true;
                 }
@@ -145,10 +158,12 @@ impl Timeline {
     /// Jump to a specific point in time (Seek).
     /// Critical for "Previewing" in an editor.
     pub fn seek_to(&mut self, scene_time: f32, scene: &mut Scene) {
-        for sa in &mut self.scheduled {
+        // Perform resets in REVERSE chronological order
+        // This ensures the EARLIEST animation for a given Tattva has the final say on the t=0 state.
+        for sa in self.scheduled.iter_mut().rev() {
             sa.anim.reset(scene);
             sa.initialized = false;
-            sa.reset_performed = true; // Since we just did it
+            sa.reset_performed = true;
             sa.state = AnimState::Pending;
         }
         self.update(scene_time, scene);

@@ -75,6 +75,10 @@ impl SyncBoundary {
         self.sync_runtime_only(tattva);
     }
 
+    pub fn remove_tattva(&mut self, world: &mut World, tattva_id: TattvaId) {
+        self.despawn_cached_entities(world, tattva_id);
+    }
+
     fn sync_runtime_only(&mut self, tattva: &mut dyn TattvaTrait) {
         tattva.clear_dirty(DirtyFlags::TRANSFORM | DirtyFlags::STYLE | DirtyFlags::VISIBILITY);
     }
