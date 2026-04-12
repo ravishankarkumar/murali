@@ -1944,44 +1944,156 @@ impl Animation for MorphGeometry {
 pub struct WritePath {
     pub target_id: TattvaId,
     pub ease: Ease,
+    /// Set when target is not a Path — shadow tattva owned by this animation
+    shadow_id: Option<TattvaId>,
+    /// Original visibility of the target, preserved so reset/finish can restore it
+    original_visibility: Option<bool>,
 }
 
 impl WritePath {
     pub fn new(target_id: TattvaId, ease: Ease) -> Self {
-        Self { target_id, ease }
+        Self { target_id, ease, shadow_id: None, original_visibility: None }
+    }
+
+    /// Returns the active tattva ID to drive trim on (shadow if present, else target).
+    fn active_id(&self) -> TattvaId {
+        self.shadow_id.unwrap_or(self.target_id)
+    }
+
+    /// Try to derive a Path from the target tattva via downcasting.
+    /// Returns None if the type is not convertible.
+    fn derive_path(scene: &Scene, id: TattvaId) -> Option<Path> {
+        use crate::frontend::collection::primitives::to_path::ToPath;
+        let tattva = scene.get_tattva_any(id)?;
+        let any = tattva.as_any();
+        if let Some(t) = any.downcast_ref::<Tattva<Circle>>() {
+            return Some(t.state.to_path());
+        }
+        if let Some(t) = any.downcast_ref::<Tattva<Rectangle>>() {
+            return Some(t.state.to_path());
+        }
+        if let Some(t) = any.downcast_ref::<Tattva<Square>>() {
+            return Some(t.state.to_path());
+        }
+        if let Some(t) = any.downcast_ref::<Tattva<Ellipse>>() {
+            return Some(t.state.to_path());
+        }
+        if let Some(t) = any.downcast_ref::<Tattva<Polygon>>() {
+            return Some(t.state.to_path());
+        }
+        if let Some(t) = any.downcast_ref::<Tattva<Line>>() {
+            return Some(t.state.to_path());
+        }
+        None
+    }
+
+    fn cleanup(&mut self, scene: &mut Scene) {
+        // Remove shadow tattva
+        if let Some(sid) = self.shadow_id.take() {
+            scene.tattvas.remove(&sid);
+        }
+        // Restore original visibility
+        if let Some(vis) = self.original_visibility.take() {
+            if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
+                let mut props = DrawableProps::write(tattva.props());
+                props.visible = vis;
+                drop(props);
+                tattva.mark_dirty(DirtyFlags::VISIBILITY);
+            }
+        }
     }
 }
 
 impl Animation for WritePath {
     fn on_start(&mut self, scene: &mut Scene) {
-        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
-            path.state.trim_start = 0.0;
-            path.state.trim_end = 0.0;
-            path.state.fill_opacity = 1.0;
-            path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        // If target is already a Path, drive it directly
+        if scene.get_tattva_typed_mut::<Path>(self.target_id).is_some() {
+            if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
+                let mut props = DrawableProps::write(tattva.props());
+                self.original_visibility = Some(props.visible);
+                props.visible = true; // must be visible for trim animation to show
+                props.opacity = 1.0;  // Ensure it's not hidden via opacity
+                drop(props);
+                tattva.mark_dirty(DirtyFlags::VISIBILITY | DirtyFlags::STYLE);
+            }
+            if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
+                path.state.trim_start = 0.0;
+                path.state.trim_end = 0.0;
+                path.state.fill_opacity = 1.0;
+                path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            }
+            return;
+        }
+
+        // Otherwise derive a shadow path, preserving original visibility
+        if let Some(derived) = Self::derive_path(scene, self.target_id) {
+            // Store and hide original
+            let vis = {
+                let tattva = scene.get_tattva_any_mut(self.target_id).unwrap();
+                let mut props = DrawableProps::write(tattva.props());
+                let v = props.visible;
+                props.visible = false;
+                drop(props);
+                tattva.mark_dirty(DirtyFlags::VISIBILITY);
+                v
+            };
+            self.original_visibility = Some(vis);
+
+            // Add shadow with trim at 0
+            let mut shadow = derived;
+            shadow.trim_start = 0.0;
+            shadow.trim_end = 0.0;
+            shadow.fill_opacity = 1.0;
+
+            // Get position from original
+            let pos = {
+                let t = scene.get_tattva_any(self.target_id).unwrap();
+                DrawableProps::read(t.props()).position
+            };
+            let sid = scene.add_tattva(shadow, pos);
+            self.shadow_id = Some(sid);
         }
     }
 
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
         let eased_t = self.ease.eval(t);
-        
-        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
-            // Draw the outline and fill the completed sector simultaneously
+        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.active_id()) {
             path.state.trim_end = eased_t;
-            path.state.fill_opacity = 1.0; // Fill is clipped to the trimmed portion
-            path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
-        }
-    }
-
-    fn on_finish(&mut self, scene: &mut Scene) {
-        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
-            path.state.trim_end = 1.0;
             path.state.fill_opacity = 1.0;
             path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
     }
 
+    fn on_finish(&mut self, scene: &mut Scene) {
+        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.active_id()) {
+            path.state.trim_end = 1.0;
+            path.state.fill_opacity = 1.0;
+            path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+        // Restore original and remove shadow (shadow path case)
+        if self.shadow_id.is_some() {
+            if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
+                let mut props = DrawableProps::write(tattva.props());
+                props.visible = true;
+                props.opacity = 1.0;
+                drop(props);
+                tattva.mark_dirty(DirtyFlags::VISIBILITY | DirtyFlags::STYLE);
+            }
+            self.cleanup(scene);
+        } else {
+            // Direct Path case — restore visibility
+            if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
+                let mut props = DrawableProps::write(tattva.props());
+                props.visible = true;
+                props.opacity = 1.0;
+                drop(props);
+                tattva.mark_dirty(DirtyFlags::VISIBILITY | DirtyFlags::STYLE);
+            }
+        }
+    }
+
     fn reset(&mut self, scene: &mut Scene) {
+        self.cleanup(scene);
         if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
             path.state.trim_start = 0.0;
             path.state.trim_end = 0.0;
@@ -1996,30 +2108,75 @@ impl Animation for WritePath {
 pub struct UnwritePath {
     pub target_id: TattvaId,
     pub ease: Ease,
+    shadow_id: Option<TattvaId>,
+    original_visibility: Option<bool>,
 }
 
 impl UnwritePath {
     pub fn new(target_id: TattvaId, ease: Ease) -> Self {
-        Self { target_id, ease }
+        Self { target_id, ease, shadow_id: None, original_visibility: None }
+    }
+
+    fn active_id(&self) -> TattvaId {
+        self.shadow_id.unwrap_or(self.target_id)
+    }
+
+    fn cleanup(&mut self, scene: &mut Scene) {
+        if let Some(sid) = self.shadow_id.take() {
+            scene.tattvas.remove(&sid);
+        }
+        if let Some(vis) = self.original_visibility.take() {
+            if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
+                let mut props = DrawableProps::write(tattva.props());
+                props.visible = vis;
+                drop(props);
+                tattva.mark_dirty(DirtyFlags::VISIBILITY);
+            }
+        }
     }
 }
 
 impl Animation for UnwritePath {
     fn on_start(&mut self, scene: &mut Scene) {
-        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
-            path.state.trim_start = 0.0;
-            path.state.trim_end = 1.0;
-            path.state.fill_opacity = 1.0;
-            path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        if scene.get_tattva_typed_mut::<Path>(self.target_id).is_some() {
+            if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
+                path.state.trim_start = 0.0;
+                path.state.trim_end = 1.0;
+                path.state.fill_opacity = 1.0;
+                path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            }
+            return;
+        }
+
+        if let Some(derived) = WritePath::derive_path(scene, self.target_id) {
+            let vis = {
+                let tattva = scene.get_tattva_any_mut(self.target_id).unwrap();
+                let mut props = DrawableProps::write(tattva.props());
+                let v = props.visible;
+                props.visible = false;
+                drop(props);
+                tattva.mark_dirty(DirtyFlags::VISIBILITY);
+                v
+            };
+            self.original_visibility = Some(vis);
+
+            let mut shadow = derived;
+            shadow.trim_start = 0.0;
+            shadow.trim_end = 1.0;
+            shadow.fill_opacity = 1.0;
+
+            let pos = {
+                let t = scene.get_tattva_any(self.target_id).unwrap();
+                DrawableProps::read(t.props()).position
+            };
+            let sid = scene.add_tattva(shadow, pos);
+            self.shadow_id = Some(sid);
         }
     }
 
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
         let eased_t = self.ease.eval(t);
-        
-        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
-            // Erase from the end by increasing trim_start
-            // The fill remains in the portion that hasn't been erased yet
+        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.active_id()) {
             path.state.trim_start = eased_t;
             path.state.trim_end = 1.0;
             path.state.fill_opacity = 1.0;
@@ -2028,15 +2185,17 @@ impl Animation for UnwritePath {
     }
 
     fn on_finish(&mut self, scene: &mut Scene) {
-        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
+        if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.active_id()) {
             path.state.trim_start = 1.0;
             path.state.trim_end = 1.0;
             path.state.fill_opacity = 1.0;
             path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
+        self.cleanup(scene);
     }
 
     fn reset(&mut self, scene: &mut Scene) {
+        self.cleanup(scene);
         if let Some(path) = scene.get_tattva_typed_mut::<Path>(self.target_id) {
             path.state.trim_start = 0.0;
             path.state.trim_end = 1.0;

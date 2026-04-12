@@ -516,6 +516,8 @@ impl Project for Path {
                             });
                         }
                         cumulative_dist += len;
+                    } else {
+                        cumulative_dist += (p - current_point).length();
                     }
                     current_point = p;
                     all_points.push(p);
@@ -597,16 +599,33 @@ impl Project for Path {
         if self.closed {
             if let Some(first) = first_point {
                 let len = (current_point - first).length();
-                if len > 0.001 {
+                let seg_start = cumulative_dist;
+                let seg_end = cumulative_dist + len;
+
+                if len > 0.001 && seg_end > trim_start_dist && seg_start < trim_end_dist {
                     if let Some(stroke) = &self.style.stroke {
+                        let t_start = if seg_start < trim_start_dist {
+                            (trim_start_dist - seg_start) / len
+                        } else {
+                            0.0
+                        };
+                        let t_end = if seg_end > trim_end_dist {
+                            (trim_end_dist - seg_start) / len
+                        } else {
+                            1.0
+                        };
+
+                        let start_pt = current_point.lerp(first, t_start);
+                        let end_pt = current_point.lerp(first, t_end);
+
                         ctx.emit(RenderPrimitive::Line {
-                            start: vec3(current_point.x, current_point.y, 0.0),
-                            end: vec3(first.x, first.y, 0.0),
+                            start: vec3(start_pt.x, start_pt.y, 0.0),
+                            end: vec3(end_pt.x, end_pt.y, 0.0),
                             thickness: stroke.thickness,
                             color: stroke.color,
                             dash_length: stroke.dash_length,
                             gap_length: stroke.gap_length,
-                            dash_offset: stroke.dash_offset + cumulative_dist,
+                            dash_offset: stroke.dash_offset + seg_start,
                         });
                     }
                 }
