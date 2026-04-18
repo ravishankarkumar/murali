@@ -16,6 +16,8 @@ pub struct ProjectionCtx {
     offset_stack: Vec<Vec3>,
     /// Stack of local alpha multipliers
     alpha_stack: Vec<f32>,
+    /// Stack of local scale multipliers
+    scale_stack: Vec<f32>,
 }
 
 impl ProjectionCtx {
@@ -25,6 +27,7 @@ impl ProjectionCtx {
             props,
             offset_stack: vec![Vec3::ZERO],
             alpha_stack: vec![1.0],
+            scale_stack: vec![1.0],
         }
     }
 
@@ -32,9 +35,13 @@ impl ProjectionCtx {
     pub fn emit(&mut self, primitive: RenderPrimitive) {
         let offset = self.offset_stack.last().copied().unwrap_or(Vec3::ZERO);
         let alpha = self.alpha_stack.last().copied().unwrap_or(1.0);
-        
-        // Apply local transformation before collecting
-        let p = primitive.translated(offset).with_opacity(alpha);
+        let scale = self.scale_stack.last().copied().unwrap_or(1.0);
+
+        // Apply local transformations before collecting
+        let p = primitive
+            .scaled(scale)
+            .translated(offset)
+            .with_opacity(alpha);
         self.primitives.push(p);
     }
 
@@ -62,6 +69,25 @@ impl ProjectionCtx {
         if self.alpha_stack.len() > 1 {
             self.alpha_stack.pop();
         }
+    }
+
+    /// Push a local scale multiplier onto the stack.
+    pub fn push_scale(&mut self, scale: f32) {
+        let current = self.scale_stack.last().copied().unwrap_or(1.0);
+        self.scale_stack.push(current * scale);
+    }
+
+    pub fn pop_scale(&mut self) {
+        if self.scale_stack.len() > 1 {
+            self.scale_stack.pop();
+        }
+    }
+
+    /// RAII helper for scoped scale
+    pub fn with_scale<F: FnOnce(&mut Self)>(&mut self, scale: f32, f: F) {
+        self.push_scale(scale);
+        f(self);
+        self.pop_scale();
     }
 
     /// RAII helper for scoped offsets

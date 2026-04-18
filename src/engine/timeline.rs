@@ -4,6 +4,7 @@ use crate::frontend::animation::{
     Animation, Ease, RunSceneCallback, RunSceneCallbackOverTime, builder::AnimationBuilder,
     camera_animation_builder::CameraAnimationBuilder,
 };
+use crate::frontend::collection::math::equation::VectorEquationHandle;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnimState {
@@ -18,7 +19,7 @@ pub struct ScheduledAnimation {
     pub duration: f32,
     pub anim: Box<dyn Animation>,
     pub state: AnimState,
-    initialized: bool, // Track if on_start was called
+    initialized: bool,     // Track if on_start was called
     reset_performed: bool, // Track if we've performed initial pending reset
 }
 
@@ -40,6 +41,7 @@ pub struct Timeline {
     pub scheduled: Vec<ScheduledAnimation>,
     next_order: usize,
     initialized: bool,
+    hold_until: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,6 +96,7 @@ impl Timeline {
             scheduled: Vec::new(),
             next_order: 0,
             initialized: false,
+            hold_until: 0.0,
         }
     }
 
@@ -350,14 +353,6 @@ impl Timeline {
                 .move_to(target_pos)
                 .from_vec3(source_pos)
                 .spawn();
-
-            // Also ensure it fades in if it was hidden
-            self.animate(tgt)
-                .at(start_time)
-                .for_duration(duration * 0.2)
-                .fade_to(1.0)
-                .from(0.0)
-                .spawn();
         }
 
         // Fade out unmatched sources
@@ -374,15 +369,156 @@ impl Timeline {
             self.animate(tgt)
                 .at(start_time + duration * 0.5)
                 .for_duration(duration * 0.5)
-                .create()
+                .appear()
+                .spawn();
+        }
+    }
+
+    fn stage_targets(scene: &mut Scene, targets: &[TattvaId]) {
+        for &id in targets {
+            scene.hide_tattva(id);
+        }
+    }
+
+    pub fn morph_matching_staged(
+        &mut self,
+        sources: Vec<TattvaId>,
+        targets: Vec<TattvaId>,
+        scene: &mut Scene,
+        start_time: f32,
+        duration: f32,
+        ease: crate::frontend::animation::Ease,
+    ) {
+        Self::stage_targets(scene, &targets);
+        self.morph_matching(sources, targets, scene, start_time, duration, ease);
+    }
+
+    pub fn morph_vector_equations(
+        &mut self,
+        source: &VectorEquationHandle,
+        target: &VectorEquationHandle,
+        scene: &mut Scene,
+        start_time: f32,
+        duration: f32,
+        ease: crate::frontend::animation::Ease,
+    ) {
+        self.morph_matching_staged(
+            source.ids().to_vec(),
+            target.ids().to_vec(),
+            scene,
+            start_time,
+            duration,
+            ease,
+        );
+    }
+
+    pub fn morph_vector_formulas(
+        &mut self,
+        source: &VectorEquationHandle,
+        target: &VectorEquationHandle,
+        scene: &mut Scene,
+        start_time: f32,
+        duration: f32,
+        ease: crate::frontend::animation::Ease,
+    ) {
+        self.morph_vector_equations(source, target, scene, start_time, duration, ease);
+    }
+
+    fn ordered_tattvas(ids: &[TattvaId], scene: &Scene) -> Vec<TattvaId> {
+        use crate::frontend::props::DrawableProps;
+
+        let mut ordered = ids.to_vec();
+        ordered.sort_by(|a, b| {
+            let a_pos = scene
+                .get_tattva_any(*a)
+                .map(|t| DrawableProps::read(t.props()).position)
+                .unwrap_or_default();
+            let b_pos = scene
+                .get_tattva_any(*b)
+                .map(|t| DrawableProps::read(t.props()).position)
+                .unwrap_or_default();
+
+            a_pos
+                .x
+                .partial_cmp(&b_pos.x)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| {
+                    b_pos
+                        .y
+                        .partial_cmp(&a_pos.y)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+        });
+        ordered
+    }
+
+    pub fn write_vector_equation(
+        &mut self,
+        ids: Vec<TattvaId>,
+        scene: &Scene,
+        start_time: f32,
+        duration: f32,
+        ease: Ease,
+    ) {
+        let ordered = Self::ordered_tattvas(&ids, scene);
+        if ordered.is_empty() {
+            return;
+        }
+
+        let window = 1.8_f32;
+        let step = duration.max(0.0) / ((ordered.len().saturating_sub(1)) as f32 + window);
+        let item_duration = step * window;
+
+        for (idx, id) in ordered.into_iter().enumerate() {
+            self.animate(id)
+                .at(start_time + idx as f32 * step)
+                .for_duration(item_duration)
+                .ease(ease)
+                .draw()
+                .spawn();
+        }
+    }
+
+    pub fn unwrite_vector_equation(
+        &mut self,
+        ids: Vec<TattvaId>,
+        scene: &Scene,
+        start_time: f32,
+        duration: f32,
+        ease: Ease,
+    ) {
+        let mut ordered = Self::ordered_tattvas(&ids, scene);
+        if ordered.is_empty() {
+            return;
+        }
+        ordered.reverse();
+
+        let window = 1.8_f32;
+        let step = duration.max(0.0) / ((ordered.len().saturating_sub(1)) as f32 + window);
+        let item_duration = step * window;
+
+        for (idx, id) in ordered.into_iter().enumerate() {
+            self.animate(id)
+                .at(start_time + idx as f32 * step)
+                .for_duration(item_duration)
+                .ease(ease)
+                .undraw()
                 .spawn();
         }
     }
 
     pub fn end_time(&self) -> f32 {
-        self.scheduled
+        let anim_end = self
+            .scheduled
             .iter()
             .map(|sa| sa.start_time + sa.duration.max(0.0))
-            .fold(0.0, f32::max)
+            .fold(0.0, f32::max);
+        anim_end.max(self.hold_until)
+    }
+
+    /// Ensures the scene runs at least until `timestamp`, even if all animations
+    /// finish earlier. Useful for adding a pause at the end of a scene.
+    pub fn wait_until(&mut self, timestamp: f32) {
+        self.hold_until = self.hold_until.max(timestamp);
     }
 }

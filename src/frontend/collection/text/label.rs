@@ -1,3 +1,4 @@
+use crate::frontend::animation::indicate::Indicate;
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 use crate::resource::text::layout::measure_label;
@@ -17,6 +18,8 @@ pub struct Label {
     pub char_reveal: f32,
     /// Reveal mode: true = typewriter (fixed position), false = reveal (shifting)
     pub typewriter_mode: bool,
+    /// Indication event progress: 0.0 = inactive, 1.0 = event complete
+    pub indicate_t: f32,
 }
 
 impl Label {
@@ -28,6 +31,7 @@ impl Label {
             color: Vec4::new(1.0, 1.0, 1.0, 1.0), // Default to white
             char_reveal: 1.0,
             typewriter_mode: false, // Default to reveal mode
+            indicate_t: 0.0,
         }
     }
 
@@ -49,40 +53,60 @@ impl Label {
         let reveal_count = (char_count as f32 * self.char_reveal.clamp(0.0, 1.0)).ceil() as usize;
         self.text.chars().take(reveal_count).collect()
     }
+
+    fn indicate_intensity(t: f32) -> f32 {
+        let t = t.clamp(0.0, 1.0);
+        let pulse = 1.0 - (2.0 * t - 1.0).abs();
+        pulse * pulse * (3.0 - 2.0 * pulse)
+    }
+
+    fn indicated_color(&self, intensity: f32) -> Vec4 {
+        let lift = 0.28 * intensity.clamp(0.0, 1.0);
+        let target = Vec4::new(1.0, 1.0, 1.0, self.color.w);
+        self.color.lerp(target, lift)
+    }
+
+    fn emit_revealed_text(&self, ctx: &mut ProjectionCtx, color: Vec4) {
+        let revealed_text = self.get_revealed_text();
+
+        if self.typewriter_mode {
+            let full_layout = measure_label(&self.text, self.world_height);
+            let revealed_layout = measure_label(&revealed_text, self.world_height);
+            let offset_x = (revealed_layout.width - full_layout.width) / 2.0;
+
+            ctx.emit(RenderPrimitive::Text {
+                content: revealed_text,
+                height: self.world_height,
+                color,
+                offset: glam::Vec3::new(offset_x, 0.0, 0.0),
+            });
+        } else {
+            ctx.emit(RenderPrimitive::Text {
+                content: revealed_text,
+                height: self.world_height,
+                color,
+                offset: glam::Vec3::ZERO,
+            });
+        }
+    }
 }
 
 impl Project for Label {
     fn project(&self, ctx: &mut ProjectionCtx) {
-        // We emit a primitive that describes the requirement.
-        // The Backend's Sync Boundary will use resource/text/layout.rs
-        // to convert this string into renderable glyph quads.
-        let revealed_text = self.get_revealed_text();
-        
-        if self.typewriter_mode {
-            // Typewriter mode: text grows from left to right, stays left-aligned
-            // The mesh is centered, so we need to offset it to align the left edges
-            let full_layout = measure_label(&self.text, self.world_height);
-            let revealed_layout = measure_label(&revealed_text, self.world_height);
-            
-            // Offset to keep left edge aligned as text grows
-            let offset_x = (revealed_layout.width - full_layout.width) / 2.0;
-            
-            ctx.emit(RenderPrimitive::Text {
-                content: revealed_text,
-                height: self.world_height,
-                color: self.color,
-                offset: glam::Vec3::new(offset_x, 0.0, 0.0),
-            });
+        if self.indicate_t > 0.0 {
+            self.project_indicated(ctx, self.indicate_t);
         } else {
-            // Reveal mode: text grows from center, stays centered
-            // The mesh is already centered, so no offset needed
-            ctx.emit(RenderPrimitive::Text {
-                content: revealed_text,
-                height: self.world_height,
-                color: self.color,
-                offset: glam::Vec3::ZERO,
-            });
+            self.emit_revealed_text(ctx, self.color);
         }
+    }
+}
+
+impl Indicate for Label {
+    fn project_indicated(&self, ctx: &mut ProjectionCtx, t: f32) {
+        let intensity = Self::indicate_intensity(t);
+        let scale = 1.0 + 0.12 * intensity;
+        let color = self.indicated_color(intensity);
+        ctx.with_scale(scale, |ctx| self.emit_revealed_text(ctx, color));
     }
 }
 

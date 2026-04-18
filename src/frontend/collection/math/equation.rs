@@ -1,6 +1,7 @@
 use glam::{Vec2, Vec3, Vec4};
 
 use crate::engine::scene::Scene;
+use crate::frontend::TattvaId;
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::frontend::props::DrawableProps;
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
@@ -167,13 +168,32 @@ impl Bounded for EquationLayout {
 }
 
 #[derive(Debug, Clone)]
-pub struct VectorEquation {
+pub struct VectorTypstEquation {
     pub content: String,
     pub world_height: f32,
     pub color: Vec4,
 }
 
-impl VectorEquation {
+#[derive(Debug, Clone)]
+pub struct VectorEquationHandle {
+    ids: Vec<TattvaId>,
+}
+
+impl VectorEquationHandle {
+    pub fn new(ids: Vec<TattvaId>) -> Self {
+        Self { ids }
+    }
+
+    pub fn ids(&self) -> &[TattvaId] {
+        &self.ids
+    }
+
+    pub fn into_ids(self) -> Vec<TattvaId> {
+        self.ids
+    }
+}
+
+impl VectorTypstEquation {
     pub fn new(content: impl Into<String>, world_height: f32) -> Self {
         Self {
             content: content.into(),
@@ -187,12 +207,14 @@ impl VectorEquation {
         self
     }
 
-    /// Compiles the equation into a set of individual Path Tattvas added to the scene.
-    /// Returns the IDs of the spawned Tattvas.
+    /// Advanced insertion API: compiles the equation into individual path tattvas and
+    /// inserts them into the scene, returning their raw IDs.
+    ///
+    /// Prefer [`add_to_scene`](Self::add_to_scene) or `scene.add_vector_typst(...)`
+    /// in authored code.
     pub fn spawn(&self, scene: &mut Scene) -> Vec<usize> {
-        use crate::frontend::Tattva;
         use crate::resource::typst_resource::compiler::TypstBackend;
-        use crate::resource::typst_resource::vector::parse_typst_svg_to_paths;
+        use crate::resource::typst_resource::vector::parse_svg_to_paths;
 
         let backend = TypstBackend::new().expect("Failed to init Typst backend");
 
@@ -206,7 +228,7 @@ impl VectorEquation {
             }
         };
 
-        let symbols = match parse_typst_svg_to_paths(&svg, self.color) {
+        let symbols = match parse_svg_to_paths(&svg, self.color) {
             Ok(s) => s,
             Err(e) => {
                 eprintln!("SVG parsing failed: {}", e);
@@ -214,50 +236,119 @@ impl VectorEquation {
             }
         };
 
-        // Typst SVGs are sized relative to the base_size.
-        // We need to scale them to our world_height.
-        let world_scale = self.world_height / base_size;
+        spawn_vector_symbols(scene, symbols, self.world_height / base_size)
+    }
 
-        let mut ids = Vec::new();
-        for symbol in symbols {
-            let mut path = symbol.path;
-            // Scale the geometry to world space
-            for seg in &mut path.segments {
-                match seg {
-                    crate::frontend::collection::primitives::path::PathSegment::MoveTo(p) => {
-                        *p *= world_scale
-                    }
-                    crate::frontend::collection::primitives::path::PathSegment::LineTo(p) => {
-                        *p *= world_scale
-                    }
-                    crate::frontend::collection::primitives::path::PathSegment::QuadTo(c, p) => {
-                        *c *= world_scale;
-                        *p *= world_scale;
-                    }
-                    crate::frontend::collection::primitives::path::PathSegment::CubicTo(
-                        c1,
-                        c2,
-                        p,
-                    ) => {
-                        *c1 *= world_scale;
-                        *c2 *= world_scale;
-                        *p *= world_scale;
-                    }
-                }
+    /// Preferred authored API: insert the vector equation and keep a typed handle
+    /// for later morphing/animation helpers.
+    pub fn add_to_scene(&self, scene: &mut Scene) -> VectorEquationHandle {
+        VectorEquationHandle::new(self.spawn(scene))
+    }
+}
+
+pub type VectorEquation = VectorTypstEquation;
+
+#[derive(Debug, Clone)]
+pub struct VectorLatexEquation {
+    pub content: String,
+    pub world_height: f32,
+    pub color: Vec4,
+}
+
+impl VectorLatexEquation {
+    pub fn new(content: impl Into<String>, world_height: f32) -> Self {
+        Self {
+            content: content.into(),
+            world_height,
+            color: Vec4::ONE,
+        }
+    }
+
+    pub fn with_color(mut self, color: Vec4) -> Self {
+        self.color = color;
+        self
+    }
+
+    /// Advanced insertion API: compiles LaTeX into path tattvas and inserts them
+    /// directly into the scene, returning raw IDs.
+    ///
+    /// Prefer [`add_to_scene`](Self::add_to_scene) or `scene.add_vector_latex(...)`
+    /// in authored code.
+    pub fn spawn(&self, scene: &mut Scene) -> Vec<usize> {
+        use crate::resource::latex_resource::backend::compile_latex;
+        use crate::resource::typst_resource::vector::parse_svg_to_paths;
+
+        let cache_dir = std::env::temp_dir().join("murali_latex_cache");
+        let latex = match compile_latex(&self.content, &cache_dir) {
+            Ok(resource) => resource,
+            Err(error) => {
+                eprintln!("LaTeX vectorization failed: {}", error);
+                return Vec::new();
             }
+        };
 
-            let tattva = Tattva::new(0, path);
-            let id = scene.add(tattva);
-
-            // Set the ID/Key for animation matching
-            if let Some(t) = scene.get_tattva_any_mut(id) {
-                let mut props = DrawableProps::write(t.props());
-                props.tag = Some(symbol.key);
+        let symbols = match parse_svg_to_paths(&latex.svg_content, self.color) {
+            Ok(symbols) => symbols,
+            Err(error) => {
+                eprintln!("LaTeX SVG parsing failed: {}", error);
+                return Vec::new();
             }
+        };
 
-            ids.push(id);
+        // The LaTeX pipeline emits path-based SVG sized around the source formula.
+        // Matching the world height with a 32pt authoring baseline keeps parity with
+        // the Typst vector equation path.
+        let base_size = 32.0;
+        spawn_vector_symbols(scene, symbols, self.world_height / base_size)
+    }
+
+    /// Preferred authored API: insert the vector equation and keep a typed handle
+    /// for later morphing/animation helpers.
+    pub fn add_to_scene(&self, scene: &mut Scene) -> VectorEquationHandle {
+        VectorEquationHandle::new(self.spawn(scene))
+    }
+}
+
+fn scale_path(path: &mut crate::frontend::collection::primitives::path::Path, factor: f32) {
+    for seg in &mut path.segments {
+        match seg {
+            crate::frontend::collection::primitives::path::PathSegment::MoveTo(p) => *p *= factor,
+            crate::frontend::collection::primitives::path::PathSegment::LineTo(p) => *p *= factor,
+            crate::frontend::collection::primitives::path::PathSegment::QuadTo(c, p) => {
+                *c *= factor;
+                *p *= factor;
+            }
+            crate::frontend::collection::primitives::path::PathSegment::CubicTo(c1, c2, p) => {
+                *c1 *= factor;
+                *c2 *= factor;
+                *p *= factor;
+            }
+        }
+    }
+}
+
+fn spawn_vector_symbols(
+    scene: &mut Scene,
+    symbols: Vec<crate::resource::typst_resource::vector::VectorSymbol>,
+    world_scale: f32,
+) -> Vec<usize> {
+    use crate::frontend::Tattva;
+
+    let mut ids = Vec::new();
+    for symbol in symbols {
+        let mut path = symbol.path;
+        scale_path(&mut path, world_scale);
+
+        let tattva = Tattva::new(0, path);
+        let id = scene.add(tattva);
+
+        if let Some(t) = scene.get_tattva_any_mut(id) {
+            let mut props = DrawableProps::write(t.props());
+            props.tag = Some(symbol.key);
         }
 
-        ids
+        ids.push(id);
     }
+
+    ids
 }

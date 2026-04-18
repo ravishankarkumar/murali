@@ -1,4 +1,4 @@
-use crate::frontend::collection::primitives::path::Path;
+use crate::frontend::collection::primitives::path::{Path, PathFillRule};
 use crate::frontend::style::Style;
 use crate::projection::style::ColorSource;
 use anyhow::Result;
@@ -13,8 +13,8 @@ pub struct VectorSymbol {
     pub center: Vec2,
 }
 
-/// Parses a Typst-generated SVG string into a collection of morphable Path objects.
-pub fn parse_typst_svg_to_paths(svg_str: &str, color: Vec4) -> Result<Vec<VectorSymbol>> {
+/// Parses an SVG string into a collection of morphable Path objects.
+pub fn parse_svg_to_paths(svg_str: &str, color: Vec4) -> Result<Vec<VectorSymbol>> {
     let opt = usvg::Options::default();
     let tree = usvg::Tree::from_str(svg_str, &opt)?;
     let size = tree.size();
@@ -33,10 +33,14 @@ pub fn parse_typst_svg_to_paths(svg_str: &str, color: Vec4) -> Result<Vec<Vector
         half_w,
         half_h,
         color,
-        usvg::Transform::default(),
     );
 
     Ok(symbols)
+}
+
+/// Backward-compatible alias for Typst-produced SVGs.
+pub fn parse_typst_svg_to_paths(svg_str: &str, color: Vec4) -> Result<Vec<VectorSymbol>> {
+    parse_svg_to_paths(svg_str, color)
 }
 
 fn traverse_group(
@@ -46,15 +50,15 @@ fn traverse_group(
     half_w: f32,
     half_h: f32,
     color: Vec4,
-    parent_transform: usvg::Transform,
 ) {
-    let group_transform = parent_transform.pre_concat(group.transform());
-
     for node in group.children() {
         match node {
             usvg::Node::Path(usvg_path) => {
                 let mut path = Path::new();
-                let transform = group_transform.pre_concat(usvg_path.abs_transform());
+                // `abs_transform()` already includes the full ancestor transform chain.
+                // Re-applying parent/group transforms here distorts glyph geometry and can
+                // produce mirrored or displaced fragments before morphing even begins.
+                let transform = usvg_path.abs_transform();
 
                 for segment in usvg_path.data().segments() {
                     match segment {
@@ -109,6 +113,10 @@ fn traverse_group(
                     fill: Some(ColorSource::Solid(color)),
                     stroke: None,
                 };
+                path.fill_rule = match usvg_path.fill().map(|fill| fill.rule()) {
+                    Some(usvg::FillRule::EvenOdd) => PathFillRule::EvenOdd,
+                    _ => PathFillRule::NonZero,
+                };
 
                 let key = usvg_path.id().to_string();
                 let key = if key.is_empty() {
@@ -133,15 +141,7 @@ fn traverse_group(
                 symbols.push(VectorSymbol { key, path, center });
             }
             usvg::Node::Group(g) => {
-                traverse_group(
-                    g,
-                    symbols,
-                    char_count,
-                    half_w,
-                    half_h,
-                    color,
-                    group_transform,
-                );
+                traverse_group(g, symbols, char_count, half_w, half_h, color);
             }
             _ => {}
         }

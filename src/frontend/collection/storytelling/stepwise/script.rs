@@ -1,5 +1,5 @@
 use crate::frontend::collection::storytelling::stepwise::model::{
-    Direction, Step, StepwiseModel, Transition,
+    Direction, Step, StepContent, StepwiseModel, Transition,
 };
 
 pub fn stepwise<F: FnOnce(&mut ScriptBuilder)>(f: F) -> StepwiseModel {
@@ -7,18 +7,40 @@ pub fn stepwise<F: FnOnce(&mut ScriptBuilder)>(f: F) -> StepwiseModel {
         steps: Vec::new(),
         explicit_connections: Vec::new(),
         has_explicit_connections: false,
+        explicit_sequence: None,
     };
     f(&mut builder);
     builder.build()
 }
 
+/// A fluent builder for defining `Stepwise` storytelling models.
+///
+/// The builder allows you to define nodes (steps), the connections between them,
+/// and the high-level sequence of the "journey".
+///
+/// ### Example: Loop Transition
+/// ```rust
+/// use murali::frontend::collection::storytelling::stepwise::model::Direction;
+/// use murali::frontend::collection::storytelling::stepwise::script::stepwise;
+///
+/// let model = stepwise(|s| {
+///     let a = s.step("Start");
+///     let b = s.step("Process");
+///     s.connect(a, b);
+///     s.connect(b, a).route(vec![Direction::Up, Direction::Left]);
+///     s.with_sequence(vec![a, b, a, b]);
+/// });
+/// ```
 pub struct ScriptBuilder {
     steps: Vec<Step>,
     explicit_connections: Vec<(usize, usize, Option<Vec<Direction>>)>,
     has_explicit_connections: bool,
+    explicit_sequence: Option<Vec<usize>>,
 }
 
 impl ScriptBuilder {
+    /// Adds a basic labeled node to the storytelling model.
+    /// Returns the stable index of the step for use in `connect` or `with_sequence`.
     pub fn step(&mut self, label: &str) -> usize {
         let idx = self.steps.len();
         self.steps.push(Step {
@@ -28,6 +50,21 @@ impl ScriptBuilder {
         idx
     }
 
+    /// Adds a node with custom projected content.
+    pub fn step_with_content(&mut self, label: &str, content: Box<dyn StepContent>) -> usize {
+        let idx = self.steps.len();
+        self.steps.push(Step {
+            label: label.to_string(),
+            content: Some(content),
+        });
+        idx
+    }
+
+    /// Defines a directional transition from one step to another.
+    ///
+    /// If no explicit connections are provided, `Stepwise` will default to a
+    /// linear chain (0 -> 1 -> 2...). If any explicit connections are defined,
+    /// the default chain is suppressed.
     pub fn connect(&mut self, from: usize, to: usize) -> ConnectionBuilder<'_> {
         let n = self.steps.len();
         for &idx in &[from, to] {
@@ -47,72 +84,97 @@ impl ScriptBuilder {
         }
     }
 
+    /// Overrides the automatically computed story sequence.
+    ///
+    /// By default, `Stepwise` performs a topological sort of your connections.
+    /// Use `with_sequence` to define manual paths, repeats, or complex loops
+    /// (e.g. `[0, 1, 2, 1, 2, 3]`).
+    pub fn with_sequence(&mut self, sequence: Vec<usize>) -> &mut Self {
+        self.explicit_sequence = Some(sequence);
+        self
+    }
+
     fn build(self) -> StepwiseModel {
         let n = self.steps.len();
 
-        if !self.has_explicit_connections {
+        let sequence = if let Some(seq) = self.explicit_sequence {
+            seq
+        } else if !self.has_explicit_connections {
             // Auto-generate linear chain
-            let sequence: Vec<usize> = (0..n).collect();
-            let transitions: Vec<Transition> = (0..n.saturating_sub(1))
+            (0..n).collect()
+        } else {
+            // Topological sort via Kahn's algorithm
+            let mut in_degree = vec![0usize; n];
+            let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
+            for &(from, to, _) in &self.explicit_connections {
+                if from < n && to < n {
+                    adj[from].push(to);
+                    in_degree[to] += 1;
+                }
+            }
+
+            let mut queue: std::collections::VecDeque<usize> =
+                (0..n).filter(|&i| in_degree[i] == 0).collect();
+
+            let mut seq = Vec::with_capacity(n);
+            while let Some(node) = queue.pop_front() {
+                seq.push(node);
+                for &neighbor in &adj[node] {
+                    in_degree[neighbor] -= 1;
+                    if in_degree[neighbor] == 0 {
+                        queue.push_back(neighbor);
+                    }
+                }
+            }
+            seq
+        };
+
+        // Build final transitions
+        let transitions: Vec<Transition> = if !self.has_explicit_connections {
+            // Linear defaults
+            (0..n.saturating_sub(1))
                 .map(|i| Transition {
                     from: i,
                     to: i + 1,
                     route: None,
                 })
-                .collect();
-            return StepwiseModel {
-                steps: self.steps,
-                transitions,
-                sequence,
-            };
-        }
-
-        // Build transitions from explicit connections
-        let transitions: Vec<Transition> = self
-            .explicit_connections
-            .into_iter()
-            .map(|(from, to, route)| Transition { from, to, route })
-            .collect();
-
-        // Topological sort via Kahn's algorithm
-        let mut in_degree = vec![0usize; n];
-        let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
-        for t in &transitions {
-            adj[t.from].push(t.to);
-            in_degree[t.to] += 1;
-        }
-
-        let mut queue: std::collections::VecDeque<usize> = (0..n)
-            .filter(|&i| in_degree[i] == 0)
-            .collect();
-
-        let mut sequence = Vec::with_capacity(n);
-        while let Some(node) = queue.pop_front() {
-            sequence.push(node);
-            for &neighbor in &adj[node] {
-                in_degree[neighbor] -= 1;
-                if in_degree[neighbor] == 0 {
-                    queue.push_back(neighbor);
-                }
-            }
-        }
-
-        // If cycle exists, remaining nodes are not added (spec says use whatever was produced)
+                .collect()
+        } else {
+            self.explicit_connections
+                .into_iter()
+                .map(|(from, to, route)| Transition { from, to, route })
+                .collect()
+        };
 
         StepwiseModel {
             steps: self.steps,
             transitions,
+            build_sequence: deduplicate(&sequence),
             sequence,
         }
     }
 }
 
+/// Returns unique elements in first-appearance order.
+fn deduplicate(seq: &[usize]) -> Vec<usize> {
+    let mut seen = std::collections::HashSet::new();
+    seq.iter().filter(|&&x| seen.insert(x)).copied().collect()
+}
+
+/// Helper for configuring an individual transition (routing, styles, etc.)
 pub struct ConnectionBuilder<'a> {
     builder: &'a mut ScriptBuilder,
     transition_index: usize,
 }
 
 impl<'a> ConnectionBuilder<'a> {
+    /// Configures a deterministic grid-based route for this transition.
+    ///
+    /// Routes use simple directions (`Up`, `Down`, `Left`, `Right`).
+    /// - `Left`/`Right`: Move precisely to the X-center of the previous/next node on the grid.
+    /// - `Up`/`Down`: Move to a "lane" above or below the node centers.
+    /// - **Spatial Anchoring**: The engine automatically picks the best entry face (top, bottom, side)
+    ///   based on where your final route segment terminates.
     pub fn route(self, directions: Vec<Direction>) -> Self {
         self.builder.explicit_connections[self.transition_index].2 = Some(directions);
         self
@@ -123,8 +185,7 @@ impl<'a> ConnectionBuilder<'a> {
 mod tests {
     use super::*;
     use crate::frontend::collection::storytelling::stepwise::{
-        model::Direction,
-        timeline::TimelineEngine,
+        model::Direction, timeline::TimelineEngine,
     };
 
     // Feature: stepwise-component, Property 1: Step index assignment is sequential
@@ -250,6 +311,7 @@ mod tests {
                 transitions: (0..n.saturating_sub(1))
                     .map(|i| Transition { from: i, to: i + 1, route: None })
                     .collect(),
+                build_sequence: (0..n).collect(),
                 sequence: (0..n).collect(),
             };
 

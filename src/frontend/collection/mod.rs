@@ -6,10 +6,10 @@ pub mod graph;
 pub mod layout;
 pub mod math;
 pub mod primitives;
+pub mod storytelling;
 pub mod table;
 pub mod text;
 pub mod utility;
-pub mod storytelling;
 
 pub mod prelude {
     pub use super::ai::*;
@@ -18,8 +18,8 @@ pub mod prelude {
     pub use super::layout::*;
     pub use super::math::*;
     pub use super::primitives::*;
+    pub use super::storytelling::*;
     pub use super::table::*;
     pub use super::text::*;
     pub use super::utility::*;
-    pub use super::storytelling::*;
 }

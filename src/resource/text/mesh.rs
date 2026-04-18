@@ -67,5 +67,6 @@ pub fn build_label_mesh(layout: &LabelLayout, atlas: &GlyphAtlas, color: Vec4) -
     Arc::new(Mesh {
         data: MeshData::Text(vertices),
         indices,
+        texture: None,
     })
 }

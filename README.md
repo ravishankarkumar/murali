@@ -57,13 +57,24 @@ width = 1920
 height = 1080
 ```
 
-A sample file is included at [murali.toml.example](/Users/ravishankar/personal-work/animation/murali/murali.toml.example:1).
+A sample file is included at [murali.toml.example](./murali.toml.example).
 
 ## Documentation
 
-- Project overview: [docs/docs/intro.mdx](/Users/ravishankar/personal-work/animation/murali/docs/docs/intro.mdx:1)
-- Scene and app docs: [docs/docs/scene-and-app.md](/Users/ravishankar/personal-work/animation/murali/docs/docs/scene-and-app.md:1)
-- Internal architecture: [docs/docs/internals/architecture.md](/Users/ravishankar/personal-work/animation/murali/docs/docs/internals/architecture.md:1)
+- Project overview: [docs/docs/intro.mdx](./docs/docs/intro.mdx)
+- Scene and app docs: [docs/docs/scene-and-app.md](./docs/docs/scene-and-app.md)
+- Internal architecture: [docs/docs/architecture/overview.md](./docs/docs/architecture/overview.md)
+
+
+## Examples
+
+### Shapes 
+
+[![Watch the video](./resources/shapes.png)](https://youtu.be/rzQZHta2PQM)
+
+### Animation showcase
+
+[![Watch the video](./resources/animation_showcase.png)](https://youtu.be/W8WQQbSo70Y)
 
 ## Status
 

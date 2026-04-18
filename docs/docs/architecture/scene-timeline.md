@@ -68,6 +68,8 @@ That determines whether the animation should:
 
 The timeline does not decide what the visual result is. It decides when an animation should be given control.
 
+Murali can host multiple named timelines on a scene, but they all advance against the same `scene_time`. Multiple timelines are separate scheduling lanes over one shared clock, not independent playback systems.
+
 ## Animation Lifecycle
 
 Each animation participates in a small lifecycle:
@@ -224,6 +226,6 @@ This page is the home for:
 
 For the next layer in the pipeline, continue with:
 
-- [Tattva](/docs/architecture/tattva)
-- [Dirty flags](/docs/architecture/dirty-flags)
-- [Projection](/docs/architecture/projection)
+- [Tattva](./tattva)
+- [Dirty flags](./dirty-flags)
+- [Projection](./projection)

@@ -9,14 +9,17 @@ use crate::projection::mesh::MeshData;
 use crate::projection::{Mesh, Project, ProjectionCtx, RenderPrimitive};
 
 // Import from our submodules
-use super::types::*;
-use super::node::{FlowNode, FlowNodeContent, ProjectedFlowNodeContent};
-use super::edge::FlowEdge;
-use super::shapes::{shape_mesh, shape_outline, partial_polyline, polyline_length, dedup_points, next_level_val, sample_polyline};
-use super::layout::{calculate_node_layouts, layout_extents};
-use super::routing::EdgeRouter;
 use super::animation::{AnimationEngine, FlowAnimationState};
+use super::edge::FlowEdge;
+use super::layout::{calculate_node_layouts, layout_extents};
+use super::node::{FlowNode, FlowNodeContent, ProjectedFlowNodeContent};
 use super::renderer::{FlowRenderer, RenderContext};
+use super::routing::EdgeRouter;
+use super::shapes::{
+    dedup_points, next_level_val, partial_polyline, polyline_length, sample_polyline, shape_mesh,
+    shape_outline,
+};
+use super::types::*;
 
 #[derive(Debug, Clone)]
 pub struct AgenticFlowChart {
@@ -434,7 +437,9 @@ impl AgenticFlowChart {
     }
 
     fn edge_definition(&self, from: usize, to: usize) -> Option<&FlowEdge> {
-        self.edges.iter().find(|edge| edge.from == from && edge.to == to)
+        self.edges
+            .iter()
+            .find(|edge| edge.from == from && edge.to == to)
     }
 
     fn edge_route(&self, layouts: &[NodeLayout], from: usize, to: usize) -> Option<Vec<Vec3>> {
@@ -510,13 +515,9 @@ impl Project for AgenticFlowChart {
         };
 
         // Render pipeline
-        FlowRenderer::render(
-            ctx,
-            &render_ctx,
-            &layouts,
-            &anim_state,
-            |from, to| self.edge_route(&layouts, from, to),
-        );
+        FlowRenderer::render(ctx, &render_ctx, &layouts, &anim_state, |from, to| {
+            self.edge_route(&layouts, from, to)
+        });
     }
 }
 
@@ -603,6 +604,26 @@ fn emit_transformed_primitive(
                             .collect(),
                     ),
                     indices: mesh.indices.clone(),
+                    texture: mesh.texture.clone(),
+                }),
+                MeshData::Textured(vertices) => std::sync::Arc::new(Mesh {
+                    data: MeshData::Textured(
+                        vertices
+                            .iter()
+                            .map(|vertex| TextVertex {
+                                position: transform_position(
+                                    vertex.position,
+                                    source_center,
+                                    target_center,
+                                    scale,
+                                ),
+                                uv: vertex.uv,
+                                color: vertex.color,
+                            })
+                            .collect(),
+                    ),
+                    indices: mesh.indices.clone(),
+                    texture: mesh.texture.clone(),
                 }),
                 MeshData::Text(vertices) => std::sync::Arc::new(Mesh {
                     data: MeshData::Text(
@@ -621,6 +642,7 @@ fn emit_transformed_primitive(
                             .collect(),
                     ),
                     indices: mesh.indices.clone(),
+                    texture: mesh.texture.clone(),
                 }),
             };
             ctx.emit(RenderPrimitive::Mesh(transformed));

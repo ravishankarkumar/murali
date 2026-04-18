@@ -1,11 +1,11 @@
 use glam::{Vec2, Vec4, vec2};
-use std::sync::Arc;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx};
 
-use super::types::{FlowNodeShape, FlowNodePlacement, FlowNodeContentVisibility};
+use super::types::{FlowNodeContentVisibility, FlowNodePlacement, FlowNodeShape};
 
 pub trait FlowNodeContent: Debug + Send + Sync {
     fn local_bounds(&self) -> Bounds;

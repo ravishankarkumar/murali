@@ -6,7 +6,7 @@ sidebar_position: 4
 
 Dirty flags are how Murali classifies changes on a tattva and decides what kind of sync work has to happen next.
 
-This page is specifically about change classification and sync consequences. For broader time progression, see [Scene & Timeline](/docs/architecture/scene-timeline).
+This page is specifically about change classification and sync consequences. For broader time progression, see [Scene & Timeline](./scene-timeline).
 
 ## Why Dirty Flags Exist
 
@@ -143,4 +143,4 @@ This page is the home for:
 - rebuild vs non-rebuild paths
 - why transform changes can be cheaper
 
-For the next stage after dirty flag classification, see [Projection](/docs/architecture/projection) and [ECS](/docs/architecture/ecs).
+For the next stage after dirty flag classification, see [Projection](./projection) and [ECS](./ecs).

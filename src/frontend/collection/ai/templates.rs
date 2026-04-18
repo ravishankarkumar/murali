@@ -8,7 +8,7 @@ pub struct AiUnderTheHoodTemplates;
 
 impl AiUnderTheHoodTemplates {
     pub fn neural_network(layers: Vec<usize>) -> NeuralNetworkDiagram {
-        let theme = Theme::ai_under_the_hood();
+        let theme = Theme::global();
         let mut diagram = NeuralNetworkDiagram::new(layers);
         diagram.node_color = theme.accent;
         diagram.edge_color = theme.surface_alt;
@@ -16,7 +16,7 @@ impl AiUnderTheHoodTemplates {
     }
 
     pub fn token_sequence(tokens: Vec<impl Into<String>>, token_height: f32) -> TokenSequence {
-        let theme = Theme::ai_under_the_hood();
+        let theme = Theme::global();
         let mut sequence = TokenSequence::new(tokens, token_height);
         sequence.text_color = theme.text_primary;
         sequence.box_color = theme.accent;
@@ -24,7 +24,7 @@ impl AiUnderTheHoodTemplates {
     }
 
     pub fn attention_matrix(values: Vec<Vec<f32>>, tokens: Option<Vec<String>>) -> AttentionMatrix {
-        let theme = Theme::ai_under_the_hood();
+        let theme = Theme::global();
         let mut matrix = AttentionMatrix::new(values, tokens);
         matrix.low_color = theme.surface;
         matrix.high_color = theme.accent;
@@ -33,7 +33,7 @@ impl AiUnderTheHoodTemplates {
     }
 
     pub fn transformer_block() -> TransformerBlockDiagram {
-        let theme = Theme::ai_under_the_hood();
+        let theme = Theme::global();
         let mut block = TransformerBlockDiagram::new();
         block.accent_color = theme.accent_alt;
         block.frame_color = theme.surface_alt;

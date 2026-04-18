@@ -1,10 +1,10 @@
 use glam::{Vec2, Vec4};
 use std::collections::HashSet;
 
-use crate::frontend::TattvaId;
-use super::types::{FlowChartDirection, NodeAnimationStyle, EdgeAnimationStyle};
-use super::node::FlowNode;
 use super::edge::FlowEdge;
+use super::node::FlowNode;
+use super::types::{EdgeAnimationStyle, FlowChartDirection, NodeAnimationStyle};
+use crate::frontend::TattvaId;
 
 /// Core data model for the flowchart
 #[derive(Debug, Clone)]

@@ -1,4 +1,5 @@
 use crate::backend::renderer::vertex::{mesh::MeshVertex, text::TextVertex};
+use crate::resource::texture::TextureImage;
 use glam::{Vec3, Vec4};
 use std::sync::Arc;
 
@@ -7,6 +8,7 @@ use std::sync::Arc;
 pub enum MeshData {
     Empty,
     Mesh(Vec<MeshVertex>),
+    Textured(Vec<TextVertex>),
     Text(Vec<TextVertex>),
 }
 
@@ -18,6 +20,7 @@ pub enum MeshData {
 pub struct Mesh {
     pub data: MeshData,
     pub indices: Vec<u16>,
+    pub texture: Option<Arc<TextureImage>>,
 }
 
 impl Mesh {
@@ -25,6 +28,19 @@ impl Mesh {
         Arc::new(Self {
             data: MeshData::Mesh(vertices),
             indices,
+            texture: None,
+        })
+    }
+
+    pub fn from_textured_vertices(
+        vertices: Vec<TextVertex>,
+        indices: Vec<u16>,
+        texture: Arc<TextureImage>,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            data: MeshData::Textured(vertices),
+            indices,
+            texture: Some(texture),
         })
     }
 
@@ -32,6 +48,7 @@ impl Mesh {
         Self {
             data: MeshData::Empty,
             indices: Vec::new(),
+            texture: None,
         }
     }
 
@@ -85,6 +102,7 @@ impl Mesh {
         Arc::new(Self {
             data: MeshData::Mesh(vertices),
             indices,
+            texture: None,
         })
     }
 
@@ -135,6 +153,7 @@ impl Mesh {
         Arc::new(Self {
             data: MeshData::Mesh(vertices),
             indices,
+            texture: None,
         })
     }
 
@@ -184,6 +203,7 @@ impl Mesh {
         Arc::new(Self {
             data: MeshData::Mesh(vertices),
             indices,
+            texture: None,
         })
     }
 
@@ -234,6 +254,7 @@ impl Mesh {
         Arc::new(Self {
             data: MeshData::Mesh(vertices),
             indices,
+            texture: None,
         })
     }
 
@@ -279,6 +300,7 @@ impl Mesh {
         Arc::new(Self {
             data: MeshData::Mesh(vertices),
             indices,
+            texture: None,
         })
     }
 
@@ -329,6 +351,7 @@ impl Mesh {
         Arc::new(Self {
             data: MeshData::Mesh(vertices),
             indices,
+            texture: None,
         })
     }
 
@@ -336,6 +359,7 @@ impl Mesh {
         match self.data {
             MeshData::Empty => "Empty",
             MeshData::Mesh(_) => "Mesh",
+            MeshData::Textured(_) => "Textured",
             MeshData::Text(_) => "Text",
         }
     }
@@ -357,6 +381,23 @@ impl Mesh {
                         .collect(),
                 ),
                 indices: self.indices.clone(),
+                texture: self.texture.clone(),
+            }),
+            MeshData::Textured(vertices) => Arc::new(Self {
+                data: MeshData::Textured(
+                    vertices
+                        .iter()
+                        .map(|v| {
+                            let mut v = *v;
+                            v.position[0] += offset.x;
+                            v.position[1] += offset.y;
+                            v.position[2] += offset.z;
+                            v
+                        })
+                        .collect(),
+                ),
+                indices: self.indices.clone(),
+                texture: self.texture.clone(),
             }),
             MeshData::Text(vertices) => Arc::new(Self {
                 data: MeshData::Text(
@@ -372,6 +413,114 @@ impl Mesh {
                         .collect(),
                 ),
                 indices: self.indices.clone(),
+                texture: self.texture.clone(),
+            }),
+        }
+    }
+
+    pub fn scaled(&self, scale: f32) -> Arc<Self> {
+        match &self.data {
+            MeshData::Empty => Arc::new(self.clone()),
+            MeshData::Mesh(vertices) => Arc::new(Self {
+                data: MeshData::Mesh(
+                    vertices
+                        .iter()
+                        .map(|v| {
+                            let mut v = *v;
+                            v.position[0] *= scale;
+                            v.position[1] *= scale;
+                            v.position[2] *= scale;
+                            v
+                        })
+                        .collect(),
+                ),
+                indices: self.indices.clone(),
+                texture: self.texture.clone(),
+            }),
+            MeshData::Textured(vertices) => Arc::new(Self {
+                data: MeshData::Textured(
+                    vertices
+                        .iter()
+                        .map(|v| {
+                            let mut v = *v;
+                            v.position[0] *= scale;
+                            v.position[1] *= scale;
+                            v.position[2] *= scale;
+                            v
+                        })
+                        .collect(),
+                ),
+                indices: self.indices.clone(),
+                texture: self.texture.clone(),
+            }),
+            MeshData::Text(vertices) => Arc::new(Self {
+                data: MeshData::Text(
+                    vertices
+                        .iter()
+                        .map(|v| {
+                            let mut v = *v;
+                            v.position[0] *= scale;
+                            v.position[1] *= scale;
+                            v.position[2] *= scale;
+                            v
+                        })
+                        .collect(),
+                ),
+                indices: self.indices.clone(),
+                texture: self.texture.clone(),
+            }),
+        }
+    }
+
+    pub fn with_opacity(&self, alpha: f32) -> Arc<Self> {
+        // Optimization: return Arc to self if opacity is 1.0
+        if (alpha - 1.0).abs() < 1e-6 {
+            return Arc::new(self.clone());
+        }
+
+        match &self.data {
+            MeshData::Empty => Arc::new(self.clone()),
+            MeshData::Mesh(vertices) => Arc::new(Self {
+                data: MeshData::Mesh(
+                    vertices
+                        .iter()
+                        .map(|v| {
+                            let mut v = *v;
+                            v.color[3] *= alpha;
+                            v
+                        })
+                        .collect(),
+                ),
+                indices: self.indices.clone(),
+                texture: self.texture.clone(),
+            }),
+            MeshData::Textured(vertices) => Arc::new(Self {
+                data: MeshData::Textured(
+                    vertices
+                        .iter()
+                        .map(|v| {
+                            let mut v = *v;
+                            v.color[3] *= alpha;
+                            v
+                        })
+                        .collect(),
+                ),
+                indices: self.indices.clone(),
+                texture: self.texture.clone(),
+            }),
+            MeshData::Text(vertices) => Arc::new(Self {
+                data: MeshData::Text(
+                    vertices
+                        .iter()
+                        .map(|v| {
+                            let mut v = *v;
+                            v.color[3] *= alpha;
+                            v
+                        })
+                        .collect(),
+                ),
+                indices: self.indices.clone(),
+                texture: self.texture.clone(),
             }),
         }
     }

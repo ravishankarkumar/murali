@@ -19,13 +19,13 @@ impl TypstBackend {
             use typst_svg::svg;
 
             let effective_font_size = if _font_size > 0.0 { _font_size } else { 11.0 };
-            let bottom_margin_pt = effective_font_size * 0.3;
+            let vertical_margin_pt = effective_font_size * 0.3;
 
             let configured_src = format!(
                 "#set page(
                 width: auto, 
                 height: auto, 
-                margin: (top: 0pt, bottom: {}pt),
+                margin: (top: {}pt, bottom: {}pt),
                 fill: none)
                 #set text(
                   size: {}pt,
@@ -40,7 +40,7 @@ impl TypstBackend {
                   ),
                 )
                 {}",
-                bottom_margin_pt, effective_font_size, typst_src
+                vertical_margin_pt, vertical_margin_pt, effective_font_size, typst_src
             );
 
             let engine = TypstEngine::builder()

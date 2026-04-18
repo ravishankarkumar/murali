@@ -77,4 +77,4 @@ This page is the home for:
 - Typst raster pipeline
 - the shared textured-quad final step
 
-For the more general rendering pipeline, see [Projection](/docs/architecture/projection) and [Renderer](/docs/architecture/renderer).
+For the more general rendering pipeline, see [Projection](./projection) and [Renderer](./renderer).

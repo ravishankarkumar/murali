@@ -1,7 +1,7 @@
 // src/frontend/collection/storytelling/stepwise/model.rs
-use glam::Vec3;
-use crate::projection::{ProjectionCtx, Project};
 use super::state::StepState;
+use crate::projection::{Project, ProjectionCtx};
+use glam::Vec3;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Direction {
@@ -27,7 +27,10 @@ impl std::fmt::Debug for Step {
 
 impl Clone for Step {
     fn clone(&self) -> Self {
-        Self { label: self.label.clone(), content: None }
+        Self {
+            label: self.label.clone(),
+            content: None,
+        }
     }
 }
 
@@ -42,7 +45,13 @@ pub struct Transition {
 pub struct StepwiseModel {
     pub steps: Vec<Step>,
     pub transitions: Vec<Transition>,
+    /// The signal/journey sequence — may contain repeated indices for loops.
+    /// Used by `signal_progress` animation.
     pub sequence: Vec<usize>,
+    /// Deduplicated build sequence — unique nodes in first-appearance order.
+    /// Used by `TimelineEngine::compute` (the `progress` build animation).
+    /// Automatically derived from `sequence` by the script builder.
+    pub build_sequence: Vec<usize>,
 }
 
 // ── StepContent trait ────────────────────────────────────────────────────────
@@ -50,8 +59,18 @@ pub struct StepwiseModel {
 pub trait StepContent: Send + Sync {
     fn project(&self, ctx: &mut ProjectionCtx, state: &StepState);
 
+    /// Projects the content when it is being "indicated" (pulsed by the storyteller).
+    /// Default implementation performs a local 1.15x scale pulse.
+    fn project_indicated(&self, ctx: &mut ProjectionCtx, state: &StepState, intensity: f32) {
+        ctx.with_scale(1.0 + 0.15 * intensity, |ctx| {
+            self.project(ctx, state);
+        });
+    }
+
     /// Return `true` if this content draws its own background container.
-    fn draws_own_background(&self) -> bool { false }
+    fn draws_own_background(&self) -> bool {
+        false
+    }
 }
 
 // ── TattvaContent adapter ────────────────────────────────────────────────────
@@ -69,9 +88,9 @@ impl<T: Project + Send + Sync> TattvaContent<T> {
 impl<T: Project + Send + Sync> StepContent for TattvaContent<T> {
     fn project(&self, ctx: &mut ProjectionCtx, state: &StepState) {
         let opacity = match state {
-            StepState::Pending        => 0.0,
-            StepState::Active { t }   => *t,
-            StepState::Completed      => 0.75,
+            StepState::Pending => 0.0,
+            StepState::Active { t } => *t,
+            StepState::Completed => 0.75,
         };
 
         // Use the new tiered opacity stack in the engine:

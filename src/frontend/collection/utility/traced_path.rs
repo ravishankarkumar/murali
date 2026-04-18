@@ -1,13 +1,13 @@
+use crate::frontend::DirtyFlags;
+use crate::frontend::TattvaId;
+use crate::frontend::layout::Bounded;
+use crate::frontend::layout::Bounds;
+use crate::frontend::props::SharedProps;
+use crate::frontend::tattva_trait::TattvaTrait;
+use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
 /// TracedPath: Tracks and visualizes the path of a point on a moving object
 /// Similar to Manim's TracedPath animation
 use glam::{Vec2, Vec3, Vec4};
-use crate::frontend::layout::Bounded;
-use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
-use crate::frontend::layout::Bounds;
-use crate::frontend::DirtyFlags;
-use crate::frontend::tattva_trait::TattvaTrait;
-use crate::frontend::props::SharedProps;
-use crate::frontend::TattvaId;
 
 /// A traced path that records the trajectory of a point on a moving object
 pub struct TracedPath {
@@ -40,7 +40,7 @@ pub struct TracedPath {
 
 impl TracedPath {
     /// Create a new traced path that tracks a point on an object
-    /// 
+    ///
     /// # Arguments
     /// * `tracked_object_id` - The ID of the object to track
     /// * `point_fn` - Function that returns the traced point position given the object's position and rotation

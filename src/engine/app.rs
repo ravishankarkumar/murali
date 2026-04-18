@@ -2,12 +2,13 @@
 
 use anyhow::Result;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalSize,
     event::{ElementState, MouseButton, WindowEvent},
-    event_loop::{ActiveEventLoop, EventLoop},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
     window::Window,
 };
@@ -20,6 +21,7 @@ use crate::engine::config::RenderConfig;
 use crate::engine::export::{ExportSettings, export_scene};
 use crate::engine::render::RenderOptions;
 use crate::engine::scene::Scene;
+use crate::frontend::theme::Theme;
 
 pub struct App {
     window: Option<Arc<Window>>,
@@ -28,6 +30,9 @@ pub struct App {
     explicit_export_settings: Option<ExportSettings>,
     render_options: RenderOptions,
     preview_dt: f32,
+    preview_frame_duration: Duration,
+    preview_start_time: Option<Instant>,
+    preview_frame_count: u64,
     camera_controller: ActiveCameraController,
     is_left_mouse_down: bool,
     last_cursor_position: Option<(f64, f64)>,
@@ -35,8 +40,12 @@ pub struct App {
 
 impl App {
     pub fn new() -> Result<Self> {
+        let preview_dt = 1.0 / RenderConfig::preview()?.fps.max(1) as f32;
         Ok(Self {
-            preview_dt: 1.0 / RenderConfig::preview()?.fps.max(1) as f32,
+            preview_dt,
+            preview_frame_duration: Duration::from_secs_f32(preview_dt),
+            preview_start_time: None,
+            preview_frame_count: 0,
             window: None,
             engine: None,
             pending_scene: None,
@@ -115,11 +124,17 @@ impl<'a> ApplicationHandler for App {
 
         let scene = self.pending_scene.take().unwrap_or_else(Scene::new);
 
-        let engine =
+        let mut engine =
             pollster::block_on(async { Engine::new_with_scene(arc_window.clone(), scene).await });
+
+        // let bg = Theme::global().background;
+        engine.set_clear_color(Theme::global().background);
 
         self.window = Some(arc_window.clone());
         self.engine = Some(engine);
+        self.preview_start_time = Some(Instant::now());
+        self.preview_frame_count = 0;
+        event_loop.set_control_flow(ControlFlow::Poll);
         arc_window.request_redraw();
     }
 
@@ -140,12 +155,30 @@ impl<'a> ApplicationHandler for App {
             WindowEvent::CloseRequested => event_loop.exit(),
 
             WindowEvent::RedrawRequested => {
+                let Some(start_time) = self.preview_start_time else {
+                    return;
+                };
+
                 // Drive the engine
                 engine.update(self.preview_dt);
+                self.preview_frame_count += 1;
 
                 if let Err(e) = engine.render() {
                     eprintln!("Render error: {:?}", e);
                     event_loop.exit();
+                    return;
+                }
+
+                let target_elapsed = self
+                    .preview_frame_duration
+                    .mul_f64(self.preview_frame_count as f64);
+                let actual_elapsed = start_time.elapsed();
+
+                if actual_elapsed < target_elapsed {
+                    event_loop
+                        .set_control_flow(ControlFlow::WaitUntil(start_time + target_elapsed));
+                } else {
+                    event_loop.set_control_flow(ControlFlow::Poll);
                 }
 
                 window.request_redraw();

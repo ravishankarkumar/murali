@@ -1,3 +1,3 @@
 pub mod table;
 
-pub use table::{Table, TableConfig};
+pub use table::{Table, TableConfig, TableTitlePosition, TableV1};

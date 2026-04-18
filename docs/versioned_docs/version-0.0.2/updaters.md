@@ -12,7 +12,7 @@ Updaters are callbacks that run every frame. They let you drive tattva propertie
 scene.add_updater(tattva_id, |scene, id, dt| {
     // dt = delta time in seconds since last frame
     let t = scene.scene_time;
-    scene.set_position(id, glam::Vec2::new(t.sin() * 3.0, t.cos() * 2.0));
+    scene.set_position_2d(id, glam::Vec2::new(t.sin() * 3.0, t.cos() * 2.0));
 });
 ```
 
@@ -29,13 +29,13 @@ let speed = 1.0; // radians per second
 
 scene.add_updater(particle_id, move |scene, id, _dt| {
     let t = scene.scene_time * speed;
-    scene.set_position(id, glam::Vec2::new(t.cos() * radius, t.sin() * radius));
+    scene.set_position_2d(id, glam::Vec2::new(t.cos() * radius, t.sin() * radius));
 });
 ```
 
 ## Reactive tattvas
 
-One tattva can read another's state and respond to it. This is how force field visualizations work — each vector arrow reads the particle position and updates its own rotation and scale:
+One tattva can read another's state and respond to it. This is how force field visualizations work — each vector arrow reads the particle position and updates its own rotation:
 
 ```rust
 scene.add_updater(vector_id, move |scene, vid, _dt| {
@@ -47,10 +47,7 @@ scene.add_updater(vector_id, move |scene, vid, _dt| {
         let delta = vector_pos - particle_pos;
         let angle = delta.y.atan2(delta.x);
 
-        if let Some(t) = scene.get_tattva_any_mut(vid) {
-            let mut p = murali::frontend::props::DrawableProps::write(t.props());
-            p.rotation = glam::Quat::from_rotation_z(angle);
-        }
+        scene.set_rotation(vid, glam::Quat::from_rotation_z(angle));
     }
 });
 ```

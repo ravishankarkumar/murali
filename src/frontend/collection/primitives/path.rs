@@ -2,7 +2,7 @@ use crate::frontend::layout::{Bounded, Bounds};
 use crate::frontend::style::{StrokeParams, Style};
 use crate::math::bezier::{cubic_bezier, quadratic_bezier};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
-use glam::{Vec2, Vec4, vec2, vec3, FloatExt};
+use glam::{FloatExt, Vec2, Vec4, vec2, vec3};
 
 #[derive(Debug, Clone, Copy)]
 pub enum PathSegment {
@@ -77,12 +77,19 @@ impl PathSegment {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PathFillRule {
+    NonZero,
+    EvenOdd,
+}
+
 /// A Tattva for drawing complex paths consisting of lines and Bézier curves.
 #[derive(Debug, Clone)]
 pub struct Path {
     pub segments: Vec<PathSegment>,
     pub style: Style,
     pub closed: bool,
+    pub fill_rule: PathFillRule,
     /// Trim start: 0.0 = start of path, 1.0 = end of path
     pub trim_start: f32,
     /// Trim end: 0.0 = start of path, 1.0 = end of path
@@ -97,6 +104,7 @@ impl Path {
             segments: Vec::new(),
             style: Style::new().with_stroke(StrokeParams::default()),
             closed: false,
+            fill_rule: PathFillRule::NonZero,
             trim_start: 0.0,
             trim_end: 1.0,
             fill_opacity: 1.0,
@@ -193,20 +201,38 @@ impl Path {
         }
     }
 
-    /// Reorders the segments of a closed path to minimize the travel distance to another path.
-    /// This prevents "spinning" or "twisting" during morphing.
-    pub fn align_to(&self, other: &Self) -> Self {
-        if self.segments.len() != other.segments.len() || !self.closed || self.segments.is_empty() {
-            return self.clone();
+    fn move_to_count(&self) -> usize {
+        self.segments
+            .iter()
+            .filter(|seg| matches!(seg, PathSegment::MoveTo(_)))
+            .count()
+    }
+
+    fn is_single_contour_closed(&self) -> bool {
+        self.closed
+            && !self.segments.is_empty()
+            && matches!(self.segments.first(), Some(PathSegment::MoveTo(_)))
+            && self.move_to_count() == 1
+    }
+
+    fn end_points(&self) -> Vec<Vec2> {
+        self.segments.iter().map(|seg| seg.end_point()).collect()
+    }
+
+    fn aligned_single_contour_to(&self, other: &Self) -> Option<(Self, f32)> {
+        if self.segments.len() != other.segments.len()
+            || !self.is_single_contour_closed()
+            || !other.is_single_contour_closed()
+        {
+            return None;
         }
 
         let n = self.segments.len();
+        let other_points = other.end_points();
+        let self_points = self.end_points();
+
         let mut best_shift = 0;
         let mut min_dist_sq = f32::MAX;
-
-        // Extract points for comparison
-        let other_points: Vec<Vec2> = other.segments.iter().map(|s| s.end_point()).collect();
-        let self_points: Vec<Vec2> = self.segments.iter().map(|s| s.end_point()).collect();
 
         for shift in 0..n {
             let mut current_dist_sq = 0.0;
@@ -223,35 +249,91 @@ impl Path {
         }
 
         if best_shift == 0 {
-            return self.clone();
+            return Some((self.clone(), min_dist_sq));
         }
 
-        // Perform the cyclic shift
-        let mut new_segments = Vec::with_capacity(n);
-
-        // The point before the new start becomes the new MoveTo
-        let new_start_idx = (best_shift + n) % n;
+        let new_start_idx = best_shift % n;
         let start_point = if new_start_idx == 0 {
             self_points[n - 1]
         } else {
             self_points[new_start_idx - 1]
         };
 
+        let mut new_segments = Vec::with_capacity(n);
         new_segments.push(PathSegment::MoveTo(start_point));
-        for i in 0..n {
-            let idx = (new_start_idx + i) % n;
-            let seg = self.segments[idx];
-            match seg {
-                PathSegment::MoveTo(p) => {
-                    new_segments.push(PathSegment::LineTo(p));
-                }
-                _ => new_segments.push(seg),
-            }
+
+        for i in 0..n.saturating_sub(1) {
+            let idx = (new_start_idx + i + 1) % n;
+            new_segments.push(self.segments[idx]);
         }
 
         let mut new_path = self.clone();
         new_path.segments = new_segments;
-        new_path
+        Some((new_path, min_dist_sq))
+    }
+
+    fn reversed_single_contour(&self) -> Option<Self> {
+        if !self.is_single_contour_closed() {
+            return None;
+        }
+
+        let mut edges = Vec::new();
+        let mut start = vec2(0.0, 0.0);
+
+        for seg in &self.segments {
+            match *seg {
+                PathSegment::MoveTo(p) => start = p,
+                _ => {
+                    edges.push((start, *seg));
+                    start = seg.end_point();
+                }
+            }
+        }
+
+        let start_point = edges.last()?.1.end_point();
+        let mut reversed = Vec::with_capacity(self.segments.len());
+        reversed.push(PathSegment::MoveTo(start_point));
+
+        for (seg_start, seg) in edges.iter().rev() {
+            let reversed_seg = match *seg {
+                PathSegment::LineTo(_) => PathSegment::LineTo(*seg_start),
+                PathSegment::QuadTo(ctrl, _) => PathSegment::QuadTo(ctrl, *seg_start),
+                PathSegment::CubicTo(c1, c2, _) => PathSegment::CubicTo(c2, c1, *seg_start),
+                PathSegment::MoveTo(_) => continue,
+            };
+            reversed.push(reversed_seg);
+        }
+
+        let mut reversed_path = self.clone();
+        reversed_path.segments = reversed;
+        Some(reversed_path)
+    }
+
+    /// Reorders the segments of a closed path to minimize the travel distance to another path.
+    /// This prevents "spinning" or "twisting" during morphing.
+    pub fn align_to(&self, other: &Self) -> Self {
+        if self.segments.len() != other.segments.len() || self.segments.is_empty() {
+            return self.clone();
+        }
+
+        // Complex glyphs can contain multiple subpaths. Reordering across
+        // MoveTo boundaries corrupts contour topology and produces mirrored or
+        // inside-out intermediates, so only rotate/reverse simple closed loops.
+        let Some((forward_path, forward_score)) = self.aligned_single_contour_to(other) else {
+            return self.clone();
+        };
+
+        if let Some(reversed_path) = self.reversed_single_contour() {
+            if let Some((aligned_reversed, reversed_score)) =
+                reversed_path.aligned_single_contour_to(other)
+            {
+                if reversed_score < forward_score {
+                    return aligned_reversed;
+                }
+            }
+        }
+
+        forward_path
     }
 
     pub fn lerp(&self, target: &Self, t: f32) -> Path {
@@ -269,6 +351,7 @@ impl Path {
             segments: new_segments,
             style: self.style.lerp(&target.style, t),
             closed: self.closed,
+            fill_rule: self.fill_rule,
             trim_start: self.trim_start.lerp(target.trim_start, t),
             trim_end: self.trim_end.lerp(target.trim_end, t),
             fill_opacity: self.fill_opacity.lerp(target.fill_opacity, t),
@@ -414,6 +497,76 @@ impl Path {
         }
 
         points
+    }
+
+    fn build_lyon_fill_path(&self) -> Option<lyon_tessellation::path::Path> {
+        use lyon_tessellation as lyon;
+        use lyon_tessellation::path::Path as LyonPath;
+
+        let mut builder = LyonPath::builder();
+        let mut started = false;
+        let mut subpath_start = vec2(0.0, 0.0);
+        let mut current_point = vec2(0.0, 0.0);
+
+        for segment in &self.segments {
+            match *segment {
+                PathSegment::MoveTo(p) => {
+                    if started {
+                        let closed = (current_point - subpath_start).length_squared() <= 1e-8;
+                        builder.end(closed);
+                    }
+                    builder.begin(lyon::math::point(p.x, p.y));
+                    started = true;
+                    subpath_start = p;
+                    current_point = p;
+                }
+                PathSegment::LineTo(p) => {
+                    if !started {
+                        builder.begin(lyon::math::point(p.x, p.y));
+                        started = true;
+                        subpath_start = p;
+                    } else {
+                        builder.line_to(lyon::math::point(p.x, p.y));
+                    }
+                    current_point = p;
+                }
+                PathSegment::QuadTo(ctrl, end) => {
+                    if !started {
+                        builder.begin(lyon::math::point(end.x, end.y));
+                        started = true;
+                        subpath_start = end;
+                    } else {
+                        builder.quadratic_bezier_to(
+                            lyon::math::point(ctrl.x, ctrl.y),
+                            lyon::math::point(end.x, end.y),
+                        );
+                    }
+                    current_point = end;
+                }
+                PathSegment::CubicTo(ctrl1, ctrl2, end) => {
+                    if !started {
+                        builder.begin(lyon::math::point(end.x, end.y));
+                        started = true;
+                        subpath_start = end;
+                    } else {
+                        builder.cubic_bezier_to(
+                            lyon::math::point(ctrl1.x, ctrl1.y),
+                            lyon::math::point(ctrl2.x, ctrl2.y),
+                            lyon::math::point(end.x, end.y),
+                        );
+                    }
+                    current_point = end;
+                }
+            }
+        }
+
+        if started {
+            let closed = self.closed || (current_point - subpath_start).length_squared() <= 1e-8;
+            builder.end(closed);
+            Some(builder.build())
+        } else {
+            None
+        }
     }
 }
 
@@ -641,32 +794,49 @@ impl Project for Path {
                 use lyon_tessellation::path::Path as LyonPath;
                 use lyon_tessellation::{FillOptions, FillTessellator, VertexBuffers};
 
-                // Build a trimmed closed path for the sector fill
-                let fill_points = self.build_trimmed_fill_path(trim_start_dist, trim_end_dist);
+                let full_fill =
+                    trim_start_dist <= 1e-5 && (trim_end_dist - total_length).abs() <= 1e-5;
 
-                if fill_points.len() >= 3 {
-                    let mut builder = LyonPath::builder();
-                    
-                    // Start the path
-                    if let Some(&first_pt) = fill_points.first() {
-                        builder.begin(lyon::math::point(first_pt.x, first_pt.y));
-                        
-                        // Add all points
-                        for &pt in &fill_points[1..] {
-                            builder.line_to(lyon::math::point(pt.x, pt.y));
+                let lpath = if full_fill {
+                    self.build_lyon_fill_path()
+                } else {
+                    // Build a trimmed closed path for the sector fill.
+                    // This simplified sector path is still appropriate for write-style fills.
+                    let fill_points = self.build_trimmed_fill_path(trim_start_dist, trim_end_dist);
+                    if fill_points.len() < 3 {
+                        None
+                    } else {
+                        let mut builder = LyonPath::builder();
+                        if let Some(&first_pt) = fill_points.first() {
+                            builder.begin(lyon::math::point(first_pt.x, first_pt.y));
+                            for &pt in &fill_points[1..] {
+                                builder.line_to(lyon::math::point(pt.x, pt.y));
+                            }
+                            builder.end(true);
                         }
-                        
-                        // Close the path
-                        builder.end(true);
+                        Some(builder.build())
                     }
+                };
 
-                    let lpath = builder.build();
+                if let Some(lpath) = lpath {
                     let mut tessellator = FillTessellator::new();
                     let mut geometry: VertexBuffers<lyon::math::Point, u16> = VertexBuffers::new();
 
+                    let fill_rule = match self.fill_rule {
+                        PathFillRule::NonZero => lyon::FillRule::NonZero,
+                        PathFillRule::EvenOdd => lyon::FillRule::EvenOdd,
+                    };
+
+                    let fill_options = FillOptions::default()
+                        .with_fill_rule(fill_rule)
+                        // Text/vector glyphs look visibly faceted with Lyon's default
+                        // tolerance at our world-unit scales. Tighten it so static
+                        // letterforms render smoothly, especially in equations.
+                        .with_tolerance(0.01);
+
                     let res = tessellator.tessellate_path(
                         &lpath,
-                        &FillOptions::default(),
+                        &fill_options,
                         &mut lyon::geometry_builder::simple_builder(&mut geometry),
                     );
 
@@ -703,7 +873,8 @@ impl Project for Path {
                             })
                             .collect();
 
-                        let mesh = crate::projection::Mesh::from_tessellation(vertices, geometry.indices);
+                        let mesh =
+                            crate::projection::Mesh::from_tessellation(vertices, geometry.indices);
                         ctx.emit(RenderPrimitive::Mesh(mesh));
                     }
                 }

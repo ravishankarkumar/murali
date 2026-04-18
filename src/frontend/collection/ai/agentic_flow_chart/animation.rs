@@ -1,9 +1,9 @@
 use glam::Vec3;
 
-use super::types::{NodeLayout, FlowChartDirection};
-use super::node::FlowNode;
 use super::edge::FlowEdge;
+use super::node::FlowNode;
 use super::shapes::sample_polyline;
+use super::types::{FlowChartDirection, NodeLayout};
 
 /// Computed animation state for a single frame
 /// This is the output of AnimationEngine::compute()
@@ -38,20 +38,13 @@ impl AnimationEngine {
         default_node_size: glam::Vec2,
         edge_route_fn: impl Fn(usize, usize) -> Option<Vec<Vec3>>,
     ) -> FlowAnimationState {
-        let (node_thresholds, edge_thresholds) = Self::compute_reveal_thresholds(
-            nodes,
-            edges,
-            progressive_edges,
-        );
+        let (node_thresholds, edge_thresholds) =
+            Self::compute_reveal_thresholds(nodes, edges, progressive_edges);
 
         let active_hop = Self::compute_active_hop(flow_path, progress);
 
-        let pulse_position = Self::compute_pulse_position(
-            flow_path,
-            layouts,
-            active_hop,
-            edge_route_fn,
-        );
+        let pulse_position =
+            Self::compute_pulse_position(flow_path, layouts, active_hop, edge_route_fn);
 
         FlowAnimationState {
             node_thresholds,
@@ -264,9 +257,8 @@ impl AnimationEngine {
             } else {
                 arrival_idx as f32 / hop_count
             };
-            let delta = ((progress.clamp(0.0, 1.0) - arrival_t).abs()
-                / indicate_window.max(1e-4))
-            .clamp(0.0, 1.0);
+            let delta = ((progress.clamp(0.0, 1.0) - arrival_t).abs() / indicate_window.max(1e-4))
+                .clamp(0.0, 1.0);
             let intensity = (1.0 - delta).sin().max(0.0);
             best = best.max(intensity);
         }

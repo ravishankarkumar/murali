@@ -12,6 +12,8 @@ Records and renders the trajectory of a point on a moving tattva. Similar to Man
 
 `TracedPath` implements `TattvaTrait` directly (not via the `Tattva<T>` wrapper) because it needs to manage its own state across frames.
 
+For normal user code, prefer `scene.add_tattva(...)`. The `scene.add(...)` call shown below is a lower-level exception used here because `TracedPath` is already a concrete tattva implementation rather than a regular state object.
+
 ```rust
 use murali::frontend::collection::utility::traced_path::TracedPath;
 

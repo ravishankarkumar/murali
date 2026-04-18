@@ -131,7 +131,12 @@ impl Camera {
     /// Larger values zoom out (more world is visible).
     /// No-op for perspective cameras.
     pub fn set_view_width(&mut self, width: f32) {
-        if let Projection::Orthographic { width: w, height: h, .. } = &mut self.projection {
+        if let Projection::Orthographic {
+            width: w,
+            height: h,
+            ..
+        } = &mut self.projection
+        {
             *w = width.max(0.01);
             *h = width.max(0.01) / ASPECT_RATIO;
         }

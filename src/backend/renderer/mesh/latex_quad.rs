@@ -58,5 +58,6 @@ pub fn build_textured_quad(
     Arc::new(Mesh {
         data: MeshData::Text(vertices),
         indices,
+        texture: None,
     })
 }

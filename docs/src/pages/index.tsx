@@ -1,72 +1,243 @@
 import type {ReactNode} from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
+import ThemedImage from '@theme/ThemedImage';
 
 import styles from './index.module.css';
 
-function HomepageHeader() {
-  const {siteConfig} = useDocusaurusContext();
+type Card = {
+  title: string;
+  description: string;
+  to?: string;
+  href?: string;
+  label?: string;
+};
+
+const pathways: Card[] = [
+  {
+    title: 'Get started',
+    description: 'Introduction, installation, and your first scene.',
+    to: '/docs/intro',
+    label: 'Quickstart',
+  },
+  {
+    title: 'Learn tattvas',
+    description: 'Shapes, text, layout, and storytelling building blocks.',
+    to: '/docs/next/tattvas/',
+    label: 'Core API',
+  },
+  {
+    title: 'Master timelines',
+    description: 'Animation scheduling, easing, and scene orchestration.',
+    to: '/docs/animations',
+    label: 'Animation',
+  },
+  {
+    title: 'Study the engine',
+    description: 'Architecture, projection, renderer internals, and ECS flow.',
+    to: '/docs/next/architecture/overview/',
+    label: 'Internals',
+  },
+];
+
+const highlights: Card[] = [
+  {
+    title: 'Time-driven animation',
+    description: 'Deterministic scenes built as explicit functions of time.',
+  },
+  {
+    title: 'GPU-native rendering',
+    description: 'Powered by wgpu across Metal, Vulkan, and DirectX 12.',
+  },
+  {
+    title: 'Typed scene construction',
+    description: 'Rust gives large animation codebases structure and safety.',
+  },
+];
+
+const resources: Card[] = [
+  {
+    title: 'Storytelling primitives',
+    description: 'Stepwise diagrams, agentic flows, and visual explanation components.',
+    to: '/docs/next/tattvas/storytelling/',
+  },
+  {
+    title: 'Feature internals',
+    description: 'Implementation notes for major systems such as Stepwise and neural diagrams.',
+    to: '/docs/next/feature-internals/overview/',
+  },
+  {
+    title: 'Canonical examples',
+    description: 'Runnable examples for reference-quality scene code.',
+    href: 'https://github.com/ravishankarkumar/murali/blob/main/examples/README.md',
+  },
+];
+
+const constructs = ['Scene', 'Timeline', 'Tattvas', 'Renderer'];
+
+function SurfaceCard({title, description, to, href, label}: Card) {
+  const content = (
+    <>
+      {label ? <span className={styles.cardLabel}>{label}</span> : null}
+      <Heading as="h3" className={styles.cardTitle}>
+        {title}
+      </Heading>
+      <p className={styles.cardDescription}>{description}</p>
+      <span className={styles.cardCta}>{href ? 'Open resource' : 'Read more'} →</span>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link className={styles.card} href={href}>
+        {content}
+      </Link>
+    );
+  }
+
   return (
-    <header className={clsx('hero hero--primary', styles.heroBanner)}>
-      <div className="container">
-        <Heading as="h1" className="hero__title">
-          {siteConfig.title}
-        </Heading>
-        <p className="hero__subtitle">{siteConfig.tagline}</p>
-        <div className={styles.buttons}>
-          <Link className="button button--secondary button--lg" to="/docs/intro">
-            Get started
-          </Link>
-          <Link
-            className="button button--outline button--secondary button--lg"
-            href="https://github.com/ravishankarkumar/murali"
-            style={{marginLeft: '1rem'}}>
-            GitHub
-          </Link>
+    <Link className={styles.card} to={to!}>
+      {content}
+    </Link>
+  );
+}
+
+function HomepageHeader() {
+  const logoLightUrl = useBaseUrl('img/murali_logo_light.png');
+  const logoDarkUrl = useBaseUrl('img/murali_logo_dark.png');
+
+  return (
+    <header className={styles.hero}>
+      <div className={clsx('container', styles.heroInner)}>
+        <div className={styles.heroCopy}>
+          <p className={styles.eyebrow}>Rust animation engine</p>
+          <Heading as="h1" className={styles.heroTitle}>
+            Build precise animation systems.
+          </Heading>
+          <p className={styles.heroSubtitle}>
+            Murali is a Rust-powered engine for mathematical animation, teaching visuals, and
+            timeline-driven scene construction.
+          </p>
+          <div className={styles.constructRow} aria-label="Murali building blocks">
+            {constructs.map((item) => (
+              <span key={item} className={styles.constructChip}>
+                {item}
+              </span>
+            ))}
+          </div>
+          <div className={styles.heroActions}>
+            <Link className="button button--primary button--lg" to="/docs/intro">
+              Start with the docs
+            </Link>
+            <Link className={styles.secondaryAction} href="https://github.com/ravishankarkumar/murali">
+              View GitHub
+            </Link>
+          </div>
+        </div>
+        <div className={styles.heroArt} aria-hidden="true">
+          <ThemedImage
+            className={styles.heroLogo}
+            alt="Murali logo"
+            sources={{
+              light: logoLightUrl,
+              dark: logoDarkUrl,
+            }}
+          />
         </div>
       </div>
     </header>
   );
 }
 
-const features = [
-  {
-    title: 'GPU-accelerated',
-    description: 'Built on wgpu — runs on Vulkan, Metal, and DX12. No OpenGL, no deprecation surprises.',
-  },
-  {
-    title: 'Time-driven',
-    description: 'Animations are pure functions of time. Same input always produces the same output.',
-  },
-  {
-    title: 'LaTeX & Typst',
-    description: 'Embedded math typesetting. Write LaTeX expressions and they render as crisp textures in world space.',
-  },
-  {
-    title: 'Strongly typed',
-    description: 'Rust\'s type system catches layout and animation errors at compile time, not at render time.',
-  },
-];
+function SectionIntro({
+  eyebrow,
+  title,
+  body,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className={styles.sectionIntro}>
+      <p className={styles.sectionEyebrow}>{eyebrow}</p>
+      <Heading as="h2" className={styles.sectionTitle}>
+        {title}
+      </Heading>
+      <p className={styles.sectionBody}>{body}</p>
+    </div>
+  );
+}
 
 export default function Home(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
+
   return (
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
       <HomepageHeader />
-      <main>
-        <section style={{padding: '3rem 0'}}>
+      <main className={styles.main}>
+        <section className={clsx(styles.section, styles.sectionSoft)}>
           <div className="container">
-            <div className="row">
-              {features.map(({title, description}) => (
-                <div key={title} className="col col--3">
-                  <div style={{padding: '1rem'}}>
-                    <Heading as="h3">{title}</Heading>
-                    <p>{description}</p>
-                  </div>
+            <SectionIntro
+              eyebrow="Overview"
+              title="A cleaner way to build mathematical animation"
+              body="Murali treats animation as system design: composable scene objects, precise timelines, and a renderer built for modern graphics APIs."
+            />
+            <div className={styles.threeUp}>
+              {highlights.map((item) => (
+                <div key={item.title} className={styles.featureCard}>
+                  <Heading as="h3" className={styles.featureTitle}>
+                    {item.title}
+                  </Heading>
+                  <p className={styles.featureBody}>{item.description}</p>
                 </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className={clsx(styles.section, styles.sectionPlain)}>
+          <div className="container">
+            <SectionIntro
+              eyebrow="Paths"
+              title="Choose the right place to begin"
+              body="Start with the basics, move into tattvas and timelines, or go directly into the engine internals."
+            />
+            <div className={styles.cardGrid}>
+              {pathways.map((item) => (
+                <SurfaceCard key={item.title} {...item} />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className={clsx(styles.section, styles.sectionTint)}>
+          <div className="container">
+            <div className={styles.split}>
+              <SectionIntro
+                eyebrow="Explore"
+                title="Documentation, internals, and reference examples"
+                body="Murali includes storytelling primitives, architecture notes, and runnable examples so you can move from concept to scene quickly."
+              />
+              <div className={styles.note}>
+                <p className={styles.noteTitle}>Suggested reading order</p>
+                <ol className={styles.noteList}>
+                  <li>Introduction</li>
+                  <li>Tattvas</li>
+                  <li>Animations</li>
+                  <li>Scene and App</li>
+                  <li>Architecture overview</li>
+                </ol>
+              </div>
+            </div>
+
+            <div className={styles.cardGrid}>
+              {resources.map((item) => (
+                <SurfaceCard key={item.title} {...item} />
               ))}
             </div>
           </div>

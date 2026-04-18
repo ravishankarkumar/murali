@@ -1,8 +1,8 @@
 use glam::{Vec2, Vec3};
 
-use super::types::{NodeLayout, EdgeStep, FlowChartDirection};
 use super::edge::FlowEdge;
-use super::shapes::{dedup_points, polyline_length, next_level_val};
+use super::shapes::{dedup_points, next_level_val, polyline_length};
+use super::types::{EdgeStep, FlowChartDirection, NodeLayout};
 
 /// Edge routing engine - calculates paths between nodes
 pub struct EdgeRouter;
@@ -21,7 +21,7 @@ impl EdgeRouter {
     ) -> Option<Vec<Vec3>> {
         let start = *layouts.get(from)?;
         let end = *layouts.get(to)?;
-        
+
         // Use manual routing if steps are provided
         if let Some(edge) = edge {
             if !edge.route_steps.is_empty() {
@@ -44,12 +44,28 @@ impl EdgeRouter {
         let prefer_horizontal = delta.x.abs() >= delta.y.abs();
 
         let points = match direction {
-            FlowChartDirection::Horizontal => {
-                Self::route_horizontal(start, end, from, to, layouts, prefer_horizontal, delta, stub, lane_offset)
-            }
-            FlowChartDirection::Vertical => {
-                Self::route_vertical(start, end, from, to, layouts, prefer_horizontal, delta, stub, lane_offset)
-            }
+            FlowChartDirection::Horizontal => Self::route_horizontal(
+                start,
+                end,
+                from,
+                to,
+                layouts,
+                prefer_horizontal,
+                delta,
+                stub,
+                lane_offset,
+            ),
+            FlowChartDirection::Vertical => Self::route_vertical(
+                start,
+                end,
+                from,
+                to,
+                layouts,
+                prefer_horizontal,
+                delta,
+                stub,
+                lane_offset,
+            ),
         };
 
         Some(dedup_points(points))
@@ -76,8 +92,22 @@ impl EdgeRouter {
                 from,
                 to,
                 vec![
-                    Self::horizontal_loop_route(start, end, start.size.y * 0.5, end.size.y * 0.5, lane_offset, true),
-                    Self::horizontal_loop_route(start, end, -start.size.y * 0.5, -end.size.y * 0.5, lane_offset, false),
+                    Self::horizontal_loop_route(
+                        start,
+                        end,
+                        start.size.y * 0.5,
+                        end.size.y * 0.5,
+                        lane_offset,
+                        true,
+                    ),
+                    Self::horizontal_loop_route(
+                        start,
+                        end,
+                        -start.size.y * 0.5,
+                        -end.size.y * 0.5,
+                        lane_offset,
+                        false,
+                    ),
                 ],
             )
         }
@@ -104,14 +134,33 @@ impl EdgeRouter {
                 from,
                 to,
                 vec![
-                    Self::vertical_loop_route(start, end, start.size.x * 0.5, end.size.x * 0.5, lane_offset, true),
-                    Self::vertical_loop_route(start, end, -start.size.x * 0.5, -end.size.x * 0.5, lane_offset, false),
+                    Self::vertical_loop_route(
+                        start,
+                        end,
+                        start.size.x * 0.5,
+                        end.size.x * 0.5,
+                        lane_offset,
+                        true,
+                    ),
+                    Self::vertical_loop_route(
+                        start,
+                        end,
+                        -start.size.x * 0.5,
+                        -end.size.x * 0.5,
+                        lane_offset,
+                        false,
+                    ),
                 ],
             )
         }
     }
 
-    fn adjacent_route(start: NodeLayout, end: NodeLayout, prefer_horizontal: bool, delta: Vec3) -> Vec<Vec3> {
+    fn adjacent_route(
+        start: NodeLayout,
+        end: NodeLayout,
+        prefer_horizontal: bool,
+        delta: Vec3,
+    ) -> Vec<Vec3> {
         let (start_anchor, end_anchor) = if prefer_horizontal {
             if delta.x >= 0.0 {
                 (
@@ -138,7 +187,12 @@ impl EdgeRouter {
         vec![start_anchor, end_anchor]
     }
 
-    fn adjacent_route_vertical(start: NodeLayout, end: NodeLayout, prefer_horizontal: bool, delta: Vec3) -> Vec<Vec3> {
+    fn adjacent_route_vertical(
+        start: NodeLayout,
+        end: NodeLayout,
+        prefer_horizontal: bool,
+        delta: Vec3,
+    ) -> Vec<Vec3> {
         let (start_anchor, end_anchor) = if prefer_horizontal {
             if delta.x >= 0.0 {
                 (
@@ -160,7 +214,12 @@ impl EdgeRouter {
         vec![start_anchor, end_anchor]
     }
 
-    fn forward_horizontal_route(start: NodeLayout, end: NodeLayout, stub: f32, lane_offset: f32) -> Vec<Vec3> {
+    fn forward_horizontal_route(
+        start: NodeLayout,
+        end: NodeLayout,
+        stub: f32,
+        lane_offset: f32,
+    ) -> Vec<Vec3> {
         let start_anchor = Vec3::new(start.center.x + start.size.x * 0.5, start.center.y, 0.0);
         let end_anchor = Vec3::new(end.center.x - end.size.x * 0.5, end.center.y, 0.0);
         let lane_y = lane_offset;
@@ -174,7 +233,12 @@ impl EdgeRouter {
         ]
     }
 
-    fn forward_vertical_route(start: NodeLayout, end: NodeLayout, stub: f32, lane_offset: f32) -> Vec<Vec3> {
+    fn forward_vertical_route(
+        start: NodeLayout,
+        end: NodeLayout,
+        stub: f32,
+        lane_offset: f32,
+    ) -> Vec<Vec3> {
         let start_anchor = Vec3::new(start.center.x, start.center.y - start.size.y * 0.5, 0.0);
         let end_anchor = Vec3::new(end.center.x, end.center.y + end.size.y * 0.5, 0.0);
         let lane_x = lane_offset;

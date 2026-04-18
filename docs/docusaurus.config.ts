@@ -11,8 +11,8 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://ravishankarkumar.github.io',
-  baseUrl: '/murali/',
+  url: 'https://muraliengine.com',
+  baseUrl: '/',
 
   organizationName: 'ravishankarkumar',
   projectName: 'murali',
@@ -79,7 +79,8 @@ const config: Config = {
       title: 'Murali',
       logo: {
         alt: 'Murali Logo',
-        src: 'img/short_murali_logo.png',
+        src: 'img/murali_logo_light.png',
+        srcDark: 'img/murali_logo_dark.png',
       },
       items: [
         {
@@ -113,6 +114,7 @@ const config: Config = {
           title: 'More',
           items: [
             {label: 'Blog', to: '/blog'},
+            {label: 'Design Guidelines', to: '/design-guidelines'},
             {label: 'GitHub', href: 'https://github.com/ravishankarkumar/murali'},
           ],
         },

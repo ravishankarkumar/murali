@@ -1,8 +1,8 @@
 use glam::{Vec2, Vec3, vec2};
 use std::sync::Arc;
 
-use crate::projection::Mesh;
 use super::types::FlowNodeShape;
+use crate::projection::Mesh;
 
 /// Generate a mesh for a given shape
 pub(super) fn shape_mesh(shape: FlowNodeShape, size: Vec2, color: glam::Vec4) -> Arc<Mesh> {

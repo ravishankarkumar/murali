@@ -11,10 +11,14 @@ pub enum ColorSource {
 }
 
 impl ColorSource {
+    #[must_use]
     pub fn lerp(&self, other: &Self, t: f32) -> Self {
         match (self, other) {
-            (ColorSource::Solid(v1), ColorSource::Solid(v2)) => ColorSource::Solid(v1.lerp(*v2, t)),
-            // For now, if types mismatch, we snap to 'other' at t > 0.5
+            (ColorSource::Solid(v1), ColorSource::Solid(v2)) => {
+                ColorSource::Solid(v1.lerp(*v2, t))
+            }
+
+            // Fallback for mismatched types (e.g., solid ↔ gradient)
             (_, _) => {
                 if t < 0.5 {
                     self.clone()
@@ -23,6 +27,14 @@ impl ColorSource {
                 }
             }
         }
+    }
+
+    pub fn solid(color: Vec4) -> Self {
+        Self::Solid(color)
+    }
+
+    pub fn linear_gradient(start: Vec2, end: Vec2, stops: Vec<(f32, Vec4)>) -> Self {
+        Self::LinearGradient { start, end, stops }
     }
 }
 
@@ -35,6 +47,12 @@ impl Default for ColorSource {
 impl From<Vec4> for ColorSource {
     fn from(v: Vec4) -> Self {
         Self::Solid(v)
+    }
+}
+
+impl From<&Vec4> for ColorSource {
+    fn from(v: &Vec4) -> Self {
+        Self::Solid(*v)
     }
 }
 
@@ -60,6 +78,7 @@ impl Default for StrokeParams {
 }
 
 impl StrokeParams {
+    #[must_use]
     pub fn lerp(&self, other: &Self, t: f32) -> Self {
         Self {
             thickness: self.thickness + (other.thickness - self.thickness) * t,

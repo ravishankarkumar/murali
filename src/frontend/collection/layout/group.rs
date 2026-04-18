@@ -25,7 +25,7 @@ impl Group {
         let delta = center - group_bounds.center();
         for id in &self.items {
             if let Some(bounds) = scene.world_bounds(*id) {
-                scene.set_position(*id, bounds.center() + delta);
+                scene.set_position_2d(*id, bounds.center() + delta);
             }
         }
     }
@@ -60,7 +60,7 @@ impl Group {
         let delta = target_bounds.anchor(anchor) - group_bounds.anchor(anchor);
         for id in &self.items {
             if let Some(bounds) = scene.world_bounds(*id) {
-                scene.set_position(*id, bounds.center() + delta);
+                scene.set_position_2d(*id, bounds.center() + delta);
             }
         }
     }

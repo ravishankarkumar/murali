@@ -1,8 +1,9 @@
-use glam::{Vec2, Vec3, Vec4, vec2};
-use std::collections::HashSet;
-
+use super::signal_flow::SignalFlow;
+use crate::frontend::animation::indicate::Indicate;
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Mesh, Project, ProjectionCtx, RenderPrimitive};
+use glam::{Vec2, Vec3, Vec4, vec2};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 pub struct NeuralNetworkDiagram {
@@ -18,6 +19,15 @@ pub struct NeuralNetworkDiagram {
     pub inactive_nodes: HashSet<(usize, usize)>,
     pub inactive_node_color: Vec4,
     pub inactive_edge_color: Vec4,
+    pub indication_style: IndicationStyle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum IndicationStyle {
+    /// Fires exactly once over the duration of the indication (t: 0.0 -> 1.0)
+    Single,
+    /// Loops the signal N times over the duration of the indication
+    Loop(usize),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -42,7 +52,53 @@ impl NeuralNetworkDiagram {
             inactive_nodes: HashSet::new(),
             inactive_node_color: Vec4::new(0.26, 0.30, 0.36, 0.95),
             inactive_edge_color: Vec4::new(0.28, 0.32, 0.38, 0.45),
+            indication_style: IndicationStyle::Loop(3),
         }
+    }
+
+    pub fn with_layer_spacing(mut self, spacing: f32) -> Self {
+        self.layer_spacing = spacing;
+        self
+    }
+
+    pub fn with_node_spacing(mut self, spacing: f32) -> Self {
+        self.node_spacing = spacing;
+        self
+    }
+
+    pub fn with_node_radius(mut self, radius: f32) -> Self {
+        self.node_radius = radius;
+        self
+    }
+
+    pub fn with_node_color(mut self, color: Vec4) -> Self {
+        self.node_color = color;
+        self
+    }
+
+    pub fn with_edge_color(mut self, color: Vec4) -> Self {
+        self.edge_color = color;
+        self
+    }
+
+    pub fn with_edge_thickness(mut self, thickness: f32) -> Self {
+        self.edge_thickness = thickness;
+        self
+    }
+
+    pub fn with_inactive_node_color(mut self, color: Vec4) -> Self {
+        self.inactive_node_color = color;
+        self
+    }
+
+    pub fn with_inactive_edge_color(mut self, color: Vec4) -> Self {
+        self.inactive_edge_color = color;
+        self
+    }
+
+    pub fn with_indication_style(mut self, style: IndicationStyle) -> Self {
+        self.indication_style = style;
+        self
     }
 
     pub fn with_labels(mut self, labels: Vec<impl Into<String>>) -> Self {
@@ -306,5 +362,30 @@ impl Bounded for NeuralNetworkDiagram {
                 height.max(self.node_radius * 2.0),
             ),
         )
+    }
+}
+
+impl Indicate for NeuralNetworkDiagram {
+    fn project_indicated(&self, ctx: &mut ProjectionCtx, t: f32) {
+        // Base pulse for the whole diagram
+        let scale = 1.0 + 0.15 * t;
+        ctx.with_scale(scale, |ctx| {
+            self.project(ctx);
+
+            // Internal firing logic
+            let loop_progress = match self.indication_style {
+                IndicationStyle::Single => t,
+                IndicationStyle::Loop(n) => (t * n as f32).fract(),
+            };
+
+            let paths = self.all_path_points();
+            if !paths.is_empty() {
+                SignalFlow::from_paths(paths)
+                    .with_progress(loop_progress)
+                    .with_edge_color(Vec4::new(0.98, 0.76, 0.30, 0.95))
+                    .with_pulse_color(Vec4::new(1.0, 0.96, 0.82, 1.0))
+                    .project(ctx);
+            }
+        });
     }
 }

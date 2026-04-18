@@ -198,12 +198,53 @@ The main extension points today are:
 
 If you want to extend Stepwise without redesigning it, these are usually the safest places to do that.
 
+## Back-Path Routing
+
+Stepwise supports non-linear edges — transitions that go backwards or skip nodes. These are authored with `.route()` on a connection.
+
+### How routing works
+
+Each `Direction` step in a route moves the path by exactly one node in the layout:
+
+- `Direction::Left` — moves one node index to the left (decrements the virtual column)
+- `Direction::Right` — moves one node index to the right
+- `Direction::Up` — jumps to a clear lane above all involved nodes
+- `Direction::Down` — jumps to a clear lane below all involved nodes
+
+`Left` and `Right` snap to the center X of the adjacent node in the layout sequence. Two `Left` steps means two nodes back. This is deterministic — there is no guessing or interpolation.
+
+`Up` and `Down` compute a Y position that clears the bounding boxes of both the source and target nodes, plus a lane margin derived from the layout spacing.
+
+### Spatial arrival
+
+The final connection into the target node is computed spatially. After all route steps are walked, the engine looks at where the path ended up relative to the target node's bounding box:
+
+- if the path is clearly above or below the node, it enters the top or bottom face
+- if the path is clearly to the left or right, it enters the side face
+- a clean Manhattan elbow is inserted to connect the last waypoint to the selected face anchor
+
+This means the route directions describe the shape of the path, and the engine handles the final entry cleanly without requiring the author to specify the arrival face explicitly.
+
+### Example
+
+```rust
+// D is index 3, A is index 0 — three hops back
+s.connect(d, a).route(vec![
+    Direction::Up,    // exit top of D, rise to clear lane
+    Direction::Left,  // move to C's column
+    Direction::Left,  // move to B's column
+    Direction::Left,  // move to A's column
+    // spatial arrival: path is above A → enters top face automatically
+]);
+```
+
+The signal dot follows the same computed polyline, so it travels the routed path correctly during signal animation.
+
 ## Current Tradeoffs And Limitations
 
 A few important limitations are visible in the current design:
 
 - layout is simple and sequence-based, not a full graph layout engine
-- non-adjacent edge routing is still limited
 - custom content opacity for mesh-heavy content is best-effort rather than perfect, because some alpha is baked into projected geometry
 - the default rendering style is strongly opinionated
 

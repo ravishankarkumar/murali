@@ -4,47 +4,87 @@ use std::sync::Arc;
 
 /// CPU-side render primitives produced by the Projection layer.
 /// These are later materialized into GPU resources by the Backend.
+/// CPU-side render primitives produced by the Projection layer.
+///
+/// These are intermediate representations of visual elements after they have
+/// been projected into 3D space but before they are materialized into
+/// GPU-specific resources (like vertex buffers or texture handles).
 pub enum RenderPrimitive {
-    /// CPU-side triangle mesh (to be uploaded to GPU later)
+    /// A pre-computed 3D triangle mesh.
+    ///
+    /// Meshes are wrapped in an [`Arc`] for efficient reuse across frames and
+    /// multiple instances (e.g., in [`NeuralNetworkDiagram`]).
     Mesh(Arc<Mesh>),
 
-    /// Line primitive (may be rendered as instanced quad or mesh)
+    /// A 3D line segment with fixed thickness.
+    ///
+    /// Lines can be rendered as solid colors or dashed patterns. The backend
+    /// typically materializes these into instanced quads or specialized line-meshes.
     Line {
+        /// Start position in 3D world space.
         start: Vec3,
+        /// End position in 3D world space.
         end: Vec3,
+        /// Thickness of the line in world units.
         thickness: f32,
+        /// Base color (subject to opacity stack).
         color: Vec4,
+        /// Length of a single dash (0.0 for solid lines).
         dash_length: f32,
+        /// Gap between dashes.
         gap_length: f32,
+        /// Offset for the dash pattern (for 'marching ants' effects).
         dash_offset: f32,
     },
 
-    /// Text primitive (resolved by text system)
+    /// A text string rendered at a specific world position.
+    ///
+    /// Character layout and glyph generation are handled by the [`TextSystem`]
+    /// in the Projection context during materialization.
     Text {
+        /// String content to render.
         content: String,
+        /// Font height in world units.
         height: f32,
+        /// Text color.
         color: Vec4,
+        /// Bottom-left or center anchor position in 3D space.
         offset: Vec3,
     },
 
-    /// LaTeX primitive (resolved by LaTeX system)
+    /// A LaTeX mathematical formula.
+    ///
+    /// The formula is typically converted into a [`crate::frontend::collection::primitives::path::Path`]
+    /// or pre-rendered texture depending on the Backend implementation.
     Latex {
+        /// LaTeX source string (e.g., `e^{i\pi} + 1 = 0`).
         source: String,
+        /// Vertical height of the rendered formula.
         height: f32,
+        /// Fill color for the math symbols.
         color: Vec4,
+        /// World position for the formula center.
         offset: Vec3,
     },
 
-    /// Typst primitive (resolved by Typst system)
+    /// A Typst document fragment.
+    ///
+    /// Typst allows for complex layout and high-fidelity typesetting
+    /// within the 3D scene.
     Typst {
+        /// Typst source content.
         source: String,
+        /// Vertical scale factor.
         height: f32,
+        /// Text color.
         color: Vec4,
+        /// World position anchor.
         offset: Vec3,
     },
 }
 
 impl RenderPrimitive {
+    /// Returns a new primitive translated by the given offset.
     pub fn translated(self, offset: Vec3) -> Self {
         match self {
             RenderPrimitive::Mesh(mesh) => RenderPrimitive::Mesh(mesh.as_ref().translated(offset)),
@@ -101,15 +141,13 @@ impl RenderPrimitive {
         }
     }
 
+    /// returns a new primitive with updated opacity.
+    ///
+    /// The `alpha` value is multiplied with the existing color's alpha channel.
     pub fn with_opacity(self, alpha: f32) -> Self {
         let f = |c: Vec4| Vec4::new(c.x, c.y, c.z, c.w * alpha);
         match self {
-            RenderPrimitive::Mesh(mesh) => {
-                // Mesh vertices have baked colors. Scaling opacity here requires re-tessellation
-                // or a shader uniform. For now, we return it as is or handle it at projection.
-                // TODO: support global alpha in Mesh
-                RenderPrimitive::Mesh(mesh)
-            }
+            RenderPrimitive::Mesh(mesh) => RenderPrimitive::Mesh(mesh.with_opacity(alpha)),
             RenderPrimitive::Line {
                 start,
                 end,
@@ -159,6 +197,63 @@ impl RenderPrimitive {
                 height,
                 color: f(color),
                 offset,
+            },
+        }
+    }
+
+    /// Returns a new primitive scaled by the given factor.
+    pub fn scaled(self, scale: f32) -> Self {
+        match self {
+            RenderPrimitive::Mesh(mesh) => RenderPrimitive::Mesh(mesh.as_ref().scaled(scale)),
+            RenderPrimitive::Line {
+                start,
+                end,
+                thickness,
+                color,
+                dash_length,
+                gap_length,
+                dash_offset,
+            } => RenderPrimitive::Line {
+                start: start * scale,
+                end: end * scale,
+                thickness: thickness * scale,
+                color,
+                dash_length: dash_length * scale,
+                gap_length: gap_length * scale,
+                dash_offset: dash_offset * scale,
+            },
+            RenderPrimitive::Text {
+                content,
+                height,
+                color,
+                offset,
+            } => RenderPrimitive::Text {
+                content,
+                height: height * scale,
+                color,
+                offset: offset * scale,
+            },
+            RenderPrimitive::Latex {
+                source,
+                height,
+                color,
+                offset,
+            } => RenderPrimitive::Latex {
+                source,
+                height: height * scale,
+                color,
+                offset: offset * scale,
+            },
+            RenderPrimitive::Typst {
+                source,
+                height,
+                color,
+                offset,
+            } => RenderPrimitive::Typst {
+                source,
+                height: height * scale,
+                color,
+                offset: offset * scale,
             },
         }
     }

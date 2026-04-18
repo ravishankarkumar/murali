@@ -2,14 +2,15 @@ use std::collections::HashSet;
 
 use glam::{Vec2, Vec3, Vec4};
 
-use crate::projection::{ProjectionCtx, RenderPrimitive, Mesh};
-use crate::backend::renderer::vertex::mesh::MeshVertex;
+use crate::backend::renderer::vertex::{mesh::MeshVertex, text::TextVertex};
+use crate::projection::mesh::MeshData;
+use crate::projection::{Mesh, ProjectionCtx, RenderPrimitive};
 
-use super::types::*;
-use super::node::FlowNode;
-use super::edge::FlowEdge;
 use super::animation::{AnimationEngine, FlowAnimationState};
-use super::shapes::{shape_outline, shape_mesh, partial_polyline};
+use super::edge::FlowEdge;
+use super::node::FlowNode;
+use super::shapes::{partial_polyline, shape_mesh, shape_outline};
+use super::types::*;
 
 /// Rendering context - decoupled from AgenticFlowChart
 pub struct RenderContext<'a> {
@@ -18,7 +19,7 @@ pub struct RenderContext<'a> {
     pub flow_path: &'a [usize],
     pub label_ids: &'a [Option<crate::frontend::TattvaId>],
     pub active_content_nodes: &'a HashSet<usize>,
-    
+
     // Style
     pub edge_color: Vec4,
     pub active_edge_color: Vec4,
@@ -29,7 +30,7 @@ pub struct RenderContext<'a> {
     pub indicate_color: Vec4,
     pub indicate_scale: f32,
     pub text_height: f32,
-    
+
     // Animation config
     pub node_animation_style: NodeAnimationStyle,
     pub edge_animation_style: EdgeAnimationStyle,
@@ -55,19 +56,19 @@ impl FlowRenderer {
     ) {
         // 1. Draw static edges
         Self::render_static_edges(ctx, render_ctx, layouts, anim_state, &edge_route_fn);
-        
+
         // 2. Draw flow path edges
         Self::render_flow_edges(ctx, render_ctx, layouts, anim_state, &edge_route_fn);
-        
+
         // 3. Draw nodes
         Self::render_nodes(ctx, render_ctx, layouts, anim_state);
-        
+
         // 4. Draw indication highlights
         Self::render_indications(ctx, render_ctx, layouts, anim_state);
-        
+
         // 5. Draw node content (text labels)
         Self::render_node_content(ctx, render_ctx, layouts, anim_state);
-        
+
         // 6. Draw pulse
         Self::render_pulse(ctx, render_ctx, anim_state);
     }
@@ -100,11 +101,15 @@ impl FlowRenderer {
                 let window = edge.reveal_window.unwrap_or(render_ctx.edge_reveal_window);
                 let (draw_route, draw_color) = match render_ctx.edge_animation_style {
                     EdgeAnimationStyle::Write => {
-                        let edge_progress = ((render_ctx.reveal_progress - threshold) / window).clamp(0.0, 1.0);
+                        let edge_progress =
+                            ((render_ctx.reveal_progress - threshold) / window).clamp(0.0, 1.0);
                         if edge_progress <= 0.001 {
                             continue;
                         }
-                        (partial_polyline(&route, edge_progress), render_ctx.edge_color)
+                        (
+                            partial_polyline(&route, edge_progress),
+                            render_ctx.edge_color,
+                        )
                     }
                     EdgeAnimationStyle::Instant => (route, render_ctx.edge_color),
                 };
@@ -113,7 +118,8 @@ impl FlowRenderer {
 
                 let show_arrow = match render_ctx.edge_animation_style {
                     EdgeAnimationStyle::Write => {
-                        let edge_progress = ((render_ctx.reveal_progress - threshold) / window).clamp(0.0, 1.0);
+                        let edge_progress =
+                            ((render_ctx.reveal_progress - threshold) / window).clamp(0.0, 1.0);
                         edge_progress > 0.95
                     }
                     EdgeAnimationStyle::Instant => true,
@@ -162,7 +168,11 @@ impl FlowRenderer {
                 .position(|e| e.from == from_idx && e.to == to_idx);
 
             if let Some(e_idx) = edge_idx {
-                let threshold = anim_state.edge_thresholds.get(e_idx).copied().unwrap_or(0.0);
+                let threshold = anim_state
+                    .edge_thresholds
+                    .get(e_idx)
+                    .copied()
+                    .unwrap_or(0.0);
                 if render_ctx.reveal_progress < threshold {
                     continue;
                 }
@@ -229,7 +239,11 @@ impl FlowRenderer {
 
         for (idx, node) in render_ctx.nodes.iter().enumerate() {
             let v_idx = v_node_indices[idx];
-            let threshold = anim_state.node_thresholds.get(v_idx).copied().unwrap_or(0.0);
+            let threshold = anim_state
+                .node_thresholds
+                .get(v_idx)
+                .copied()
+                .unwrap_or(0.0);
 
             let draw_threshold = match render_ctx.node_animation_style {
                 NodeAnimationStyle::Write => threshold + render_ctx.node_reveal_delay,
@@ -304,7 +318,9 @@ impl FlowRenderer {
                     outline_3d.clone()
                 };
 
-                let has_external_label = render_ctx.label_ids.get(node_index)
+                let has_external_label = render_ctx
+                    .label_ids
+                    .get(node_index)
                     .and_then(|id| id.as_ref())
                     .is_some();
 
@@ -424,8 +440,26 @@ impl FlowRenderer {
                     0.18,
                 );
                 let scale = 1.0 + render_ctx.indicate_scale * intensity * 0.82;
+                let content_is_visible = match node.content_visibility {
+                    FlowNodeContentVisibility::Always => true,
+                    FlowNodeContentVisibility::ActiveOnly => {
+                        render_ctx.active_content_nodes.contains(&idx)
+                    }
+                };
 
-                let should_render_text = render_ctx.label_ids.get(idx)
+                if content_is_visible {
+                    if let Some(content) = &node.embedded_content {
+                        let content_size = Vec2::new(
+                            (layout.size.x - node.content_padding.x * 2.0).max(0.01),
+                            (layout.size.y - node.content_padding.y * 2.0).max(0.01),
+                        ) * scale;
+                        project_content_in_node(ctx, content.as_ref(), layout.center, content_size);
+                    }
+                }
+
+                let should_render_text = render_ctx
+                    .label_ids
+                    .get(idx)
                     .and_then(|id| id.as_ref())
                     .is_none();
 
@@ -441,8 +475,10 @@ impl FlowRenderer {
                             );
 
                             let total_chars = node.label.chars().count();
-                            let chars_to_show = (total_chars as f32 * write_progress).ceil() as usize;
-                            let revealed_text: String = node.label.chars().take(chars_to_show).collect();
+                            let chars_to_show =
+                                (total_chars as f32 * write_progress).ceil() as usize;
+                            let revealed_text: String =
+                                node.label.chars().take(chars_to_show).collect();
 
                             (revealed_text, node.text_color)
                         }
@@ -475,6 +511,182 @@ impl FlowRenderer {
             ctx.emit(RenderPrimitive::Mesh(mesh));
         }
     }
+}
+
+fn project_content_in_node(
+    ctx: &mut ProjectionCtx,
+    content: &dyn super::node::FlowNodeContent,
+    node_center: Vec3,
+    target_size: Vec2,
+) {
+    let source_bounds = content.local_bounds();
+    let source_size = Vec2::new(
+        source_bounds.width().max(0.01),
+        source_bounds.height().max(0.01),
+    );
+    let scale = (target_size.x / source_size.x)
+        .min(target_size.y / source_size.y)
+        .max(0.001);
+    let source_center = source_bounds.center();
+    let target_center = node_center.truncate();
+
+    let mut subctx = ProjectionCtx::new(ctx.props.clone());
+    content.project(&mut subctx);
+    for primitive in subctx.primitives {
+        emit_transformed_primitive(ctx, primitive, source_center, target_center, scale);
+    }
+}
+
+fn emit_transformed_primitive(
+    ctx: &mut ProjectionCtx,
+    primitive: RenderPrimitive,
+    source_center: Vec2,
+    target_center: Vec2,
+    scale: f32,
+) {
+    match primitive {
+        RenderPrimitive::Mesh(mesh) => {
+            let transformed = match &mesh.data {
+                MeshData::Empty => std::sync::Arc::new(mesh.as_ref().clone()),
+                MeshData::Mesh(vertices) => std::sync::Arc::new(Mesh {
+                    data: MeshData::Mesh(
+                        vertices
+                            .iter()
+                            .map(|vertex| MeshVertex {
+                                position: transform_position(
+                                    vertex.position,
+                                    source_center,
+                                    target_center,
+                                    scale,
+                                ),
+                                color: vertex.color,
+                            })
+                            .collect(),
+                    ),
+                    indices: mesh.indices.clone(),
+                    texture: mesh.texture.clone(),
+                }),
+                MeshData::Textured(vertices) => std::sync::Arc::new(Mesh {
+                    data: MeshData::Textured(
+                        vertices
+                            .iter()
+                            .map(|vertex| TextVertex {
+                                position: transform_position(
+                                    vertex.position,
+                                    source_center,
+                                    target_center,
+                                    scale,
+                                ),
+                                uv: vertex.uv,
+                                color: vertex.color,
+                            })
+                            .collect(),
+                    ),
+                    indices: mesh.indices.clone(),
+                    texture: mesh.texture.clone(),
+                }),
+                MeshData::Text(vertices) => std::sync::Arc::new(Mesh {
+                    data: MeshData::Text(
+                        vertices
+                            .iter()
+                            .map(|vertex| TextVertex {
+                                position: transform_position(
+                                    vertex.position,
+                                    source_center,
+                                    target_center,
+                                    scale,
+                                ),
+                                uv: vertex.uv,
+                                color: vertex.color,
+                            })
+                            .collect(),
+                    ),
+                    indices: mesh.indices.clone(),
+                    texture: mesh.texture.clone(),
+                }),
+            };
+            ctx.emit(RenderPrimitive::Mesh(transformed));
+        }
+        RenderPrimitive::Line {
+            start,
+            end,
+            thickness,
+            color,
+            dash_length,
+            gap_length,
+            dash_offset,
+        } => {
+            ctx.emit(RenderPrimitive::Line {
+                start: transform_vec3(start, source_center, target_center, scale),
+                end: transform_vec3(end, source_center, target_center, scale),
+                thickness: thickness * scale,
+                color,
+                dash_length: dash_length * scale,
+                gap_length: gap_length * scale,
+                dash_offset: dash_offset * scale,
+            });
+        }
+        RenderPrimitive::Text {
+            content,
+            height,
+            color,
+            offset,
+        } => {
+            ctx.emit(RenderPrimitive::Text {
+                content,
+                height: height * scale,
+                color,
+                offset: transform_vec3(offset, source_center, target_center, scale),
+            });
+        }
+        RenderPrimitive::Latex {
+            source,
+            height,
+            color,
+            offset,
+        } => {
+            ctx.emit(RenderPrimitive::Latex {
+                source,
+                height: height * scale,
+                color,
+                offset: transform_vec3(offset, source_center, target_center, scale),
+            });
+        }
+        RenderPrimitive::Typst {
+            source,
+            height,
+            color,
+            offset,
+        } => {
+            ctx.emit(RenderPrimitive::Typst {
+                source,
+                height: height * scale,
+                color,
+                offset: transform_vec3(offset, source_center, target_center, scale),
+            });
+        }
+    }
+}
+
+fn transform_vec3(point: Vec3, source_center: Vec2, target_center: Vec2, scale: f32) -> Vec3 {
+    Vec3::new(
+        (point.x - source_center.x) * scale + target_center.x,
+        (point.y - source_center.y) * scale + target_center.y,
+        point.z * scale,
+    )
+}
+
+fn transform_position(
+    position: [f32; 3],
+    source_center: Vec2,
+    target_center: Vec2,
+    scale: f32,
+) -> [f32; 3] {
+    [
+        (position[0] - source_center.x) * scale + target_center.x,
+        (position[1] - source_center.y) * scale + target_center.y,
+        position[2] * scale,
+    ]
 }
 
 // Helper functions for rendering primitives

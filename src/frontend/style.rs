@@ -7,24 +7,28 @@ pub struct Style {
 }
 
 impl Style {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn with_fill(mut self, color: impl Into<ColorSource>) -> Self {
         self.fill = Some(color.into());
         self
     }
 
+    #[must_use]
     pub fn with_stroke(mut self, params: StrokeParams) -> Self {
         self.stroke = Some(params);
         self
     }
 
+    #[must_use]
     pub fn lerp(&self, other: &Self, t: f32) -> Self {
         let fill = match (&self.fill, &other.fill) {
             (Some(f1), Some(f2)) => Some(f1.lerp(f2, t)),
-            (None, Some(f)) => Some(f.clone()), // Snap for now
+            (None, Some(f)) => Some(f.clone()),
             (Some(f), None) => Some(f.clone()),
             (None, None) => None,
         };

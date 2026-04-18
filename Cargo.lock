@@ -2052,6 +2052,7 @@ dependencies = [
  "glam",
  "hecs",
  "image 0.24.9",
+ "indexmap",
  "lru",
  "lyon_tessellation",
  "parking_lot",

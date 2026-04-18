@@ -156,4 +156,4 @@ This page is the home for:
 - `Project` and `Bounded`
 - `SharedProps` and `DrawableProps`
 
-For time progression and animation lifecycle, see [Scene & Timeline](/docs/architecture/scene-timeline).
+For time progression and animation lifecycle, see [Scene & Timeline](./scene-timeline).

@@ -1,9 +1,9 @@
-// src/config/export_config.rs
-
 use anyhow::Result;
 use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use crate::utils::project::find_project_root;
 
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct ExportConfig {
@@ -42,6 +42,8 @@ fn default_text_px_per_world_unit() -> f32 {
 }
 
 impl ExportConfig {
+
+    #[must_use]
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
 
@@ -56,10 +58,7 @@ impl ExportConfig {
     }
 
     pub fn load_nearest_project_file(start_dir: impl AsRef<Path>) -> Result<Self> {
-        let Some(project_dir) = find_nearest_cargo_dir(start_dir.as_ref()) else {
-            return Ok(Self::default());
-        };
-
+        let project_dir = find_project_root(start_dir.as_ref());
         Self::load(project_dir.join("murali.toml"))
     }
 }
@@ -67,15 +66,4 @@ impl ExportConfig {
 #[derive(Debug, Deserialize)]
 struct FileConfig {
     pub export: Option<ExportConfig>,
-}
-
-fn find_nearest_cargo_dir(start_dir: &Path) -> Option<PathBuf> {
-    let mut current = Some(start_dir);
-    while let Some(dir) = current {
-        if dir.join("Cargo.toml").exists() {
-            return Some(dir.to_path_buf());
-        }
-        current = dir.parent();
-    }
-    None
 }

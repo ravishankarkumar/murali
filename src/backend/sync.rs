@@ -122,14 +122,13 @@ impl SyncBoundary {
 
         for primitive in primitives {
             let entity = match primitive {
-                RenderPrimitive::Mesh(mesh) => {
-                    upload_mesh(device, mesh.as_ref(), None).map(|mesh_instance| {
+                RenderPrimitive::Mesh(mesh) => upload_mesh(device, renderer, mesh.as_ref(), None)
+                    .map(|mesh_instance| {
                         world.spawn((
                             MeshComponent(Arc::new(mesh_instance)),
                             tattva.props().clone(),
                         ))
-                    })
-                }
+                    }),
                 RenderPrimitive::Line {
                     start,
                     end,
@@ -228,7 +227,7 @@ impl SyncBoundary {
         let layout = layout_label(&resources.font, content, height);
         let mesh = build_label_mesh(&layout, &resources.atlas, color);
         let mesh = translate_mesh(mesh.as_ref(), offset);
-        upload_mesh(device, &mesh, self.text_bind_group.clone())
+        upload_mesh(device, renderer, &mesh, self.text_bind_group.clone())
     }
 
     fn build_latex_instance(
@@ -271,7 +270,7 @@ impl SyncBoundary {
         let world_height = normalized_world_height(height, &raster);
         let mesh = build_textured_quad(raster.width, raster.height, world_height, color);
         let mesh = translate_mesh(mesh.as_ref(), offset);
-        upload_mesh(device, &mesh, Some(Arc::new(bind_group)))
+        upload_mesh(device, renderer, &mesh, Some(Arc::new(bind_group)))
     }
 
     fn build_typst_instance(
@@ -345,7 +344,7 @@ impl SyncBoundary {
             normalized_typst_world_height(height, raster.height, raster.normalized_height_px);
         let mesh = build_textured_quad(raster.width, raster.height, world_height, color);
         let mesh = translate_mesh(mesh.as_ref(), offset);
-        upload_mesh(device, &mesh, Some(Arc::new(bind_group)))
+        upload_mesh(device, renderer, &mesh, Some(Arc::new(bind_group)))
     }
 
     fn report_once(&mut self, key: String, message: String) {
@@ -357,6 +356,7 @@ impl SyncBoundary {
 
 fn upload_mesh(
     device: &wgpu::Device,
+    renderer: &Renderer,
     mesh: &crate::projection::Mesh,
     bind_group: Option<Arc<wgpu::BindGroup>>,
 ) -> Option<MeshInstance> {
@@ -372,6 +372,28 @@ fn upload_mesh(
                 mesh.indices.len() as u32,
                 bind_group,
                 MeshPipelineKind::Mesh,
+            ))
+        }
+        MeshData::Textured(vertices) => {
+            let texture = mesh.texture.as_ref()?;
+            let bind_group = if let Some(existing) = bind_group {
+                existing
+            } else {
+                Arc::new(renderer.create_text_bind_group_from_raster(
+                    &texture.rgba,
+                    texture.width,
+                    texture.height,
+                ))
+            };
+            let vertex_bytes = bytemuck::cast_slice(vertices);
+            let index_bytes = bytemuck::cast_slice(&mesh.indices);
+            Some(MeshInstance::new(
+                device,
+                vertex_bytes,
+                index_bytes,
+                mesh.indices.len() as u32,
+                Some(bind_group),
+                MeshPipelineKind::Textured,
             ))
         }
         MeshData::Text(vertices) => {
@@ -406,6 +428,24 @@ fn translate_mesh(mesh: &crate::projection::Mesh, offset: glam::Vec3) -> crate::
             crate::projection::Mesh {
                 data: MeshData::Mesh(translated),
                 indices: mesh.indices.clone(),
+                texture: mesh.texture.clone(),
+            }
+        }
+        MeshData::Textured(vertices) => {
+            let translated = vertices
+                .iter()
+                .map(|v| {
+                    let mut v = *v;
+                    v.position[0] += offset.x;
+                    v.position[1] += offset.y;
+                    v.position[2] += offset.z;
+                    v
+                })
+                .collect();
+            crate::projection::Mesh {
+                data: MeshData::Textured(translated),
+                indices: mesh.indices.clone(),
+                texture: mesh.texture.clone(),
             }
         }
         MeshData::Text(vertices) => {
@@ -422,6 +462,7 @@ fn translate_mesh(mesh: &crate::projection::Mesh, offset: glam::Vec3) -> crate::
             crate::projection::Mesh {
                 data: MeshData::Text(translated),
                 indices: mesh.indices.clone(),
+                texture: mesh.texture.clone(),
             }
         }
     }

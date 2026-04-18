@@ -23,6 +23,20 @@ let id = scene.add_tattva(shape, position);
 
 ### Accessing tattvas
 
+Prefer the intent helpers when you only need to move, show, hide, or restyle a tattva:
+
+```rust
+scene.hide(id);
+scene.show(id);
+scene.set_opacity(id, 0.5);
+scene.set_position_2d(id, glam::Vec2::new(1.0, 2.0));
+scene.set_position_3d(id, glam::Vec3::new(1.0, 2.0, 0.5));
+scene.set_scale(id, glam::Vec3::splat(1.25));
+scene.set_rotation(id, glam::Quat::from_rotation_z(0.4));
+```
+
+Reach for low-level tattva access when you need to mutate the underlying state object or a specialized internal API:
+
 ```rust
 // Untyped mutable access
 scene.get_tattva_any_mut(id)
@@ -55,7 +69,7 @@ scene.to_edge(id, Direction::Up, 0.35);
 ### Timelines
 
 ```rust
-scene.timelines.insert("main".to_string(), timeline);
+scene.set_timeline("main", timeline);
 ```
 
 You can have multiple timelines. They all run in parallel.
@@ -76,15 +90,33 @@ App::new()?
 
 ### Preview vs export
 
-By default, `run_app` checks CLI args to decide whether to preview or export. You can force a mode:
+By default, `run_app` exports video. Preview mode is entered when you explicitly opt into it, either in code or through the CLI.
+
+In practice, most examples just do:
 
 ```rust
-// Always open preview window
+App::new()?.with_scene(scene).run_app()
+```
+
+That means they export unless preview is explicitly requested. You can force a mode when needed:
+
+```rust
+// Explicitly open preview window
 App::new()?.with_scene(scene).with_preview().run_app()
 
 // Always export video
 App::new()?.with_scene(scene).with_video_export().run_app()
 ```
+
+From the CLI, `--preview` forces preview mode and `--export` forces export mode. Since export is the default, `--preview` is the flag you usually use when you want an interactive window.
+
+Preview mode is meant for checking animation feel while you work. It advances one animation frame at a time and tries not to run faster than the configured preview FPS.
+
+If your machine is faster than that FPS, Murali waits and keeps preview playback at the target pace. If your machine is slower, Murali does not skip ahead to catch up. Preview will slow down, but you still get to see each frame in order.
+
+This is intentionally different from games and streamed video. Those systems often drop or skip frames to stay locked to real time. Murali preview favors inspecting motion, easing, and visual changes frame by frame, so preserving every previewed frame is usually more useful than staying perfectly real-time under load.
+
+Export is different: it always renders the full frame sequence at the chosen FPS, so the final video stays deterministic even if preview was slower on your machine.
 
 ### Render options
 

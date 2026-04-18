@@ -1,9 +1,9 @@
 // src/frontend/collection/graph/vector_field.rs
 //! Vector field visualization similar to Manim's VectorField
 
-use glam::{Vec2, Vec3, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use glam::{Vec2, Vec3, Vec4};
 use std::sync::Arc;
 
 /// A vector field that displays arrows at grid points
@@ -95,7 +95,12 @@ impl VectorField {
     }
 
     /// Set arrow dimensions
-    pub fn with_arrow_style(mut self, shaft_thickness: f32, tip_length: f32, tip_width: f32) -> Self {
+    pub fn with_arrow_style(
+        mut self,
+        shaft_thickness: f32,
+        tip_length: f32,
+        tip_width: f32,
+    ) -> Self {
         self.shaft_thickness = shaft_thickness;
         self.tip_length = tip_length;
         self.tip_width = tip_width;

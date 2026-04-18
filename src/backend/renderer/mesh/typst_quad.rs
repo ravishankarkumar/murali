@@ -40,5 +40,6 @@ pub fn make_textured_quad_mesh_for_raster(width: f32, height: f32) -> Arc<Mesh> 
     Arc::new(Mesh {
         data: MeshData::Text(vertices),
         indices,
+        texture: None,
     })
 }

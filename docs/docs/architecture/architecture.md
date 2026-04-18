@@ -6,7 +6,7 @@ sidebar_position: 1
 
 This page describes the static shape of the Murali system: the major layers, what each layer owns, and how data is allowed to flow between them.
 
-If [Technical Overview](/docs/architecture/overview) is the onboarding page, this page is the structural map.
+If [Technical Overview](./overview) is the onboarding page, this page is the structural map.
 
 ## The Big Picture
 
@@ -179,10 +179,10 @@ Contributors can reason about the system layer by layer:
 
 From here, the architecture docs go deeper into the main boundaries:
 
-- [Scene & Timeline](/docs/architecture/scene-timeline) explains time progression and state mutation
-- [Tattva](/docs/architecture/tattva) explains the object model and shared props
-- [Dirty flags](/docs/architecture/dirty-flags) explains how changes are classified
-- [Projection](/docs/architecture/projection) explains `Project`, `ProjectionCtx`, and `RenderPrimitive`
-- [ECS](/docs/architecture/ecs) explains backend entity representation
-- [Renderer](/docs/architecture/renderer) explains pipelines and frame encoding
-- [End-to-end flow](/docs/architecture/end-to-end-flow) walks one example all the way from script to pixels
+- [Scene & Timeline](./scene-timeline) explains time progression and state mutation
+- [Tattva](./tattva) explains the object model and shared props
+- [Dirty flags](./dirty-flags) explains how changes are classified
+- [Projection](./projection) explains `Project`, `ProjectionCtx`, and `RenderPrimitive`
+- [ECS](./ecs) explains backend entity representation
+- [Renderer](./renderer) explains pipelines and frame encoding
+- [End-to-end flow](./end-to-end-flow) walks one example all the way from script to pixels

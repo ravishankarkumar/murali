@@ -2,14 +2,63 @@
 
 pub use crate::frontend::props::{DrawableProps, SharedProps};
 
-use glam::{Mat4, Vec2, Vec3, vec2, vec3};
+use glam::{Mat4, Quat, Vec2, Vec3, vec2, vec3};
 use std::collections::HashMap;
+use std::path::Path;
+use std::path::PathBuf;
 
 use crate::engine::camera::Camera;
 use crate::engine::timeline::Timeline;
 use crate::frontend::layout::{Anchor, Bounds, Direction, anchor_for_direction, opposite_anchor};
-use crate::frontend::{DirtyFlags, IntoTattva, TattvaId, tattva_trait::TattvaTrait};
 use crate::frontend::updater::UpdaterManager;
+use crate::frontend::{DirtyFlags, IntoTattva, TattvaId, tattva_trait::TattvaTrait};
+use crate::resource::texture::TextureImage;
+
+#[derive(Debug, Clone, Default)]
+pub struct ScreenshotCapture {
+    pub times: Vec<f32>,
+    pub names: Option<Vec<Option<PathBuf>>>,
+}
+
+impl ScreenshotCapture {
+    pub fn new<I>(times: I) -> Self
+    where
+        I: IntoIterator<Item = f32>,
+    {
+        let mut times: Vec<f32> = times.into_iter().collect();
+        times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        Self { times, names: None }
+    }
+
+    pub fn with_names<I, P>(mut self, names: I) -> Self
+    where
+        I: IntoIterator<Item = Option<P>>,
+        P: Into<PathBuf>,
+    {
+        self.names = Some(names.into_iter().map(|name| name.map(Into::into)).collect());
+        self
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GifCapture {
+    pub name: String,
+    pub times: Vec<f32>,
+}
+
+impl GifCapture {
+    pub fn new<I>(name: impl Into<String>, times: I) -> Self
+    where
+        I: IntoIterator<Item = f32>,
+    {
+        let mut times: Vec<f32> = times.into_iter().collect();
+        times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        Self {
+            name: name.into(),
+            times,
+        }
+    }
+}
 
 /// The Scene represents the authoritative Frontend state.
 pub struct Scene {
@@ -20,6 +69,8 @@ pub struct Scene {
     /// Time & Animation
     pub scene_time: f32,
     pub timelines: HashMap<String, Timeline>,
+    pub screenshot_captures: Vec<ScreenshotCapture>,
+    pub gif_captures: Vec<GifCapture>,
 
     /// Updaters - callbacks that run every frame
     pub updaters: UpdaterManager,
@@ -39,6 +90,8 @@ impl Scene {
             tattvas: HashMap::new(),
             scene_time: 0.0,
             timelines: HashMap::new(),
+            screenshot_captures: Vec::new(),
+            gif_captures: Vec::new(),
             updaters: UpdaterManager::new(),
             camera: Camera::default(),
             global_model: Mat4::IDENTITY,
@@ -71,6 +124,121 @@ impl Scene {
             props.position = position;
         }
         self.add(tattva)
+    }
+
+    pub fn add_vector_latex(
+        &mut self,
+        equation: crate::frontend::collection::math::equation::VectorLatexEquation,
+    ) -> crate::frontend::collection::math::equation::VectorEquationHandle {
+        equation.add_to_scene(self)
+    }
+
+    pub fn add_vector_typst(
+        &mut self,
+        equation: crate::frontend::collection::math::equation::VectorTypstEquation,
+    ) -> crate::frontend::collection::math::equation::VectorEquationHandle {
+        equation.add_to_scene(self)
+    }
+
+    pub fn add_vector_formula_latex(
+        &mut self,
+        equation: crate::frontend::collection::math::equation::VectorLatexEquation,
+    ) -> crate::frontend::collection::math::equation::VectorEquationHandle {
+        self.add_vector_latex(equation)
+    }
+
+    pub fn add_vector_formula_typst(
+        &mut self,
+        equation: crate::frontend::collection::math::equation::VectorTypstEquation,
+    ) -> crate::frontend::collection::math::equation::VectorEquationHandle {
+        self.add_vector_typst(equation)
+    }
+
+    /// Hides a tattva completely from rendering until another animation or mutation reveals it.
+    pub fn hide_tattva(&mut self, id: TattvaId) {
+        self.hide(id);
+    }
+
+    pub fn add_screenshot_capture(&mut self, capture: ScreenshotCapture) {
+        self.screenshot_captures.push(capture);
+    }
+
+    pub fn capture_screenshots<I>(&mut self, times: I)
+    where
+        I: IntoIterator<Item = f32>,
+    {
+        self.add_screenshot_capture(ScreenshotCapture::new(times));
+    }
+
+    pub fn capture_screenshots_named<I, P>(&mut self, names: I)
+    where
+        I: IntoIterator<Item = (f32, Option<P>)>,
+        P: Into<PathBuf>,
+    {
+        let entries: Vec<(f32, Option<PathBuf>)> = names
+            .into_iter()
+            .map(|(time, name)| (time, name.map(Into::into)))
+            .collect();
+        let times = entries.iter().map(|(time, _)| *time).collect::<Vec<_>>();
+        let names = entries
+            .into_iter()
+            .map(|(_, name)| name)
+            .collect::<Vec<_>>();
+        self.add_screenshot_capture(ScreenshotCapture::new(times).with_names(names));
+    }
+
+    pub fn add_gif_capture(&mut self, capture: GifCapture) {
+        self.gif_captures.push(capture);
+    }
+
+    pub fn capture_gif<I>(&mut self, name: impl Into<String>, times: I)
+    where
+        I: IntoIterator<Item = f32>,
+    {
+        self.add_gif_capture(GifCapture::new(name, times));
+    }
+
+    /// Installs or replaces a named timeline in the scene.
+    pub fn set_timeline(&mut self, name: impl Into<String>, timeline: Timeline) {
+        self.timelines.insert(name.into(), timeline);
+    }
+
+    /// Preferred authored API for the common single-timeline case.
+    pub fn play(&mut self, timeline: Timeline) {
+        self.set_timeline("main", timeline);
+    }
+
+    pub fn play_named(&mut self, name: impl Into<String>, timeline: Timeline) {
+        self.set_timeline(name, timeline);
+    }
+
+    pub fn add_textured_surface<F>(
+        &mut self,
+        u_range: (f32, f32),
+        v_range: (f32, f32),
+        f: F,
+        texture: TextureImage,
+        position: Vec3,
+    ) -> TattvaId
+    where
+        F: Fn(f32, f32) -> Vec3 + Send + Sync + 'static,
+    {
+        let surface =
+            crate::frontend::collection::graph::parametric_surface::ParametricSurface::new(
+                u_range, v_range, f,
+            )
+            .with_texture(texture);
+        self.add_tattva(surface, position)
+    }
+
+    pub fn add_textured_surface_with_path(
+        &mut self,
+        surface: crate::frontend::collection::graph::parametric_surface::ParametricSurface,
+        texture_path: impl AsRef<Path>,
+        position: Vec3,
+    ) -> anyhow::Result<TattvaId> {
+        let surface = surface.with_texture_path(texture_path)?;
+        Ok(self.add_tattva(surface, position))
     }
 
     /// Retrieves a Tattva for inspection or mutation.
@@ -129,12 +297,12 @@ impl Scene {
 
     /// Update all traced paths in the scene
     fn update_traced_paths(&mut self) {
-        use crate::frontend::collection::utility::TracedPath;
         use crate::frontend::Tattva;
+        use crate::frontend::collection::utility::TracedPath;
 
         // Collect IDs of traced paths and their tracked objects
         let mut traced_paths: Vec<(TattvaId, TattvaId)> = Vec::new();
-        
+
         for (id, tattva) in self.tattvas.iter() {
             // TracedPath is wrapped in Tattva<TracedPath>
             if let Some(wrapped) = tattva.as_any().downcast_ref::<Tattva<TracedPath>>() {
@@ -153,13 +321,14 @@ impl Scene {
 
                 // Get the traced path and record the point
                 if let Some(tattva) = self.tattvas.get_mut(&traced_path_id) {
-                    if let Some(wrapped) = tattva.as_any_mut().downcast_mut::<Tattva<TracedPath>>() {
+                    if let Some(wrapped) = tattva.as_any_mut().downcast_mut::<Tattva<TracedPath>>()
+                    {
                         // Compute the traced point position using the point function
                         let traced_point = (wrapped.state.point_fn)(obj_pos, obj_rot);
                         let old_count = wrapped.state.path_points.len();
                         wrapped.state.record_point(traced_point);
                         let new_count = wrapped.state.path_points.len();
-                        
+
                         // If a new point was added, mark the tattva as dirty
                         if new_count > old_count {
                             wrapped.mark_dirty(DirtyFlags::GEOMETRY);
@@ -193,10 +362,37 @@ impl Scene {
         self.world_bounds(id).map(|b| b.anchor(anchor))
     }
 
-    pub fn set_position(&mut self, id: TattvaId, position: Vec2) {
+    pub fn set_position_2d(&mut self, id: TattvaId, position: Vec2) {
         if let Some(tattva) = self.get_tattva_any_mut(id) {
             let mut props = DrawableProps::write(tattva.props());
             props.position = vec3(position.x, position.y, props.position.z);
+            drop(props);
+            tattva.mark_dirty(DirtyFlags::TRANSFORM);
+        }
+    }
+
+    pub fn set_position_3d(&mut self, id: TattvaId, position: Vec3) {
+        if let Some(tattva) = self.get_tattva_any_mut(id) {
+            let mut props = DrawableProps::write(tattva.props());
+            props.position = position;
+            drop(props);
+            tattva.mark_dirty(DirtyFlags::TRANSFORM);
+        }
+    }
+
+    pub fn set_scale(&mut self, id: TattvaId, scale: Vec3) {
+        if let Some(tattva) = self.get_tattva_any_mut(id) {
+            let mut props = DrawableProps::write(tattva.props());
+            props.scale = scale;
+            drop(props);
+            tattva.mark_dirty(DirtyFlags::TRANSFORM);
+        }
+    }
+
+    pub fn set_rotation(&mut self, id: TattvaId, rotation: Quat) {
+        if let Some(tattva) = self.get_tattva_any_mut(id) {
+            let mut props = DrawableProps::write(tattva.props());
+            props.rotation = rotation;
             drop(props);
             tattva.mark_dirty(DirtyFlags::TRANSFORM);
         }
@@ -235,7 +431,7 @@ impl Scene {
                 Anchor::Left | Anchor::Right => glam::vec2(current_pos.x + delta.x, current_pos.y),
                 _ => current_pos + delta,
             };
-            self.set_position(moving, new_pos);
+            self.set_position_2d(moving, new_pos);
         }
     }
 
@@ -265,7 +461,7 @@ impl Scene {
             Direction::Right => vec2(padding, 0.0),
         };
 
-        self.set_position(moving, target_point + offset - local_anchor);
+        self.set_position_2d(moving, target_point + offset - local_anchor);
     }
 
     pub fn to_edge(&mut self, id: TattvaId, direction: Direction, margin: f32) {
@@ -282,7 +478,7 @@ impl Scene {
             Direction::Left => vec2(margin, 0.0),
             Direction::Right => vec2(-margin, 0.0),
         };
-        self.set_position(
+        self.set_position_2d(
             id,
             edge_point + margin_offset - local_bounds.anchor(moving_anchor),
         );
@@ -301,6 +497,8 @@ impl Scene {
     pub fn clear(&mut self) {
         self.tattvas.clear();
         self.timelines.clear();
+        self.screenshot_captures.clear();
+        self.gif_captures.clear();
         self.updaters.clear();
         self.scene_time = 0.0;
         self.next_tattva_id = 1;

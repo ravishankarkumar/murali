@@ -1,15 +1,6 @@
-// src/config/mod.rs
-
-//! Central render configuration resolver.
-//!
-//! This module owns policy:
-//! - preview vs export
-//! - defaults
-//! - file overrides
-//!
-//! Other modules must only depend on RenderConfig.
-
 use anyhow::Result;
+use serde::Deserialize;
+use std::fs;
 use std::path::Path;
 
 pub(crate) mod export_config;
@@ -18,19 +9,39 @@ mod preview_config;
 use export_config::ExportConfig;
 use preview_config::PreviewConfig;
 
-// -----------------------------------------------------------------------------
-// Public, resolved config
-// -----------------------------------------------------------------------------
+use crate::frontend::theme::Theme;
+use crate::utils::project::find_project_root;
+
+#[derive(Debug, Deserialize)]
+struct MuraliConfig {
+    pub theme: Option<String>,
+    pub preview: Option<PreviewConfig>,
+    pub export: Option<ExportConfig>,
+}
+
+fn default_theme_name() -> String {
+    "dark".to_string()
+}
+
+fn load_murali_config(path: &Path) -> Result<MuraliConfig> {
+    if !path.exists() {
+        return Ok(MuraliConfig {
+            theme: None,
+            preview: None,
+            export: None,
+        });
+    }
+
+    let contents = fs::read_to_string(path)?;
+    let cfg: MuraliConfig = toml::from_str(&contents)?;
+    Ok(cfg)
+}
 
 #[derive(Debug, Clone)]
 pub struct RenderConfig {
     pub text_px_per_world_unit: f32,
     pub fps: u32,
 }
-
-// -----------------------------------------------------------------------------
-// Internal trait (enforces completeness)
-// -----------------------------------------------------------------------------
 
 trait ResolveRenderConfig {
     fn resolve(self) -> RenderConfig;
@@ -54,24 +65,38 @@ impl ResolveRenderConfig for ExportConfig {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Public constructors
-// -----------------------------------------------------------------------------
-
 impl RenderConfig {
-    /// Interactive preview configuration loaded from the nearest project
-    /// `murali.toml`, falling back to defaults when absent.
     pub fn preview() -> Result<Self> {
         let cwd = std::env::current_dir()?;
-        Ok(PreviewConfig::load_nearest_project_file(cwd)?.resolve())
+        let project_root = find_project_root(&cwd);
+        let murali_toml = project_root.join("murali.toml");
+
+        let cfg = load_murali_config(&murali_toml)?;
+
+        let preview_cfg = cfg.preview.unwrap_or_default();
+        let theme_name = cfg.theme.unwrap_or_else(default_theme_name);
+
+        let theme = Theme::load_by_name(&theme_name, &project_root);
+        Theme::init_global(theme);
+
+        Ok(preview_cfg.resolve())
     }
 
-    /// Export configuration (file-backed, deterministic).
     pub fn export<P: AsRef<Path>>(config_path: Option<P>) -> Result<Self> {
+        let cwd = std::env::current_dir()?;
+        let project_root = find_project_root(&cwd);
+        let murali_toml = project_root.join("murali.toml");
+
+        let cfg = load_murali_config(&murali_toml)?;
+        let theme_name = cfg.theme.unwrap_or_else(default_theme_name);
+
         let export_cfg = match config_path {
             Some(path) => ExportConfig::load(path)?,
-            None => ExportConfig::default(),
+            None => cfg.export.unwrap_or_default(),
         };
+
+        let theme = Theme::load_by_name(&theme_name, &project_root);
+        Theme::init_global(theme);
 
         Ok(export_cfg.resolve())
     }

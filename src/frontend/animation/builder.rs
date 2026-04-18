@@ -2,11 +2,11 @@ use crate::engine::timeline::Timeline;
 use crate::frontend::TattvaId;
 use crate::frontend::animation::{
     Animation, BeltEvolve, BeltPhaseBy, BeltPhaseTo, Create, Ease, EquationContinuity, FadeTo,
-    FollowAnchor, HorizonEvolve, HorizonPhaseBy, HorizonPhaseTo, MatchTransform, MatrixStep,
-    MorphGeometry, MorphObjects, MoveTo, NoiseEvolve, NoisePhaseBy, NoisePhaseTo,
-    PerlinFieldEvolve, PerlinFieldPhaseBy, PerlinFieldPhaseTo, PropagateSignal, RevealTo, RotateTo, ScaleTo,
-    TriggerCapture, WritePath, UnwritePath, WriteText, UnwriteText, RevealText, UnrevealText,
-    WriteTable, UnwriteTable, WriteSurface, UnwriteSurface, StepwiseSignal,
+    FollowAnchor, HorizonEvolve, HorizonPhaseBy, HorizonPhaseTo, IndicateText, MatchTransform,
+    MatrixStep, MorphGeometry, MorphObjects, MoveTo, NoiseEvolve, NoisePhaseBy, NoisePhaseTo,
+    PerlinFieldEvolve, PerlinFieldPhaseBy, PerlinFieldPhaseTo, PropagateSignal, RevealText,
+    RevealTo, RotateTo, ScaleTo, StepwiseSignal, UnrevealText, UnwritePath, UnwriteSurface,
+    UnwriteTable, UnwriteText, WritePath, WriteSurface, WriteTable, WriteText,
 };
 use crate::frontend::layout::Anchor;
 use glam::{Quat, Vec3, Vec4};
@@ -96,7 +96,6 @@ pub enum AnimKind {
     PerlinFieldEvolve {
         speed: Option<f32>,
     },
-    CaptureFrame,
     Propagate {
         to: f32,
     },
@@ -112,6 +111,7 @@ pub enum AnimKind {
     UnwriteText,
     RevealText,
     UnrevealText,
+    IndicateText,
     WriteTable,
     UnwriteTable,
     WriteSurface,
@@ -221,7 +221,8 @@ impl<'a> AnimationBuilder<'a> {
         self
     }
 
-    pub fn create(mut self) -> Self {
+    /// Animate a tattva from hidden to visible by fading its staged opacity in.
+    pub fn appear(mut self) -> Self {
         self.spec.kind = Some(AnimKind::Create);
         self
     }
@@ -291,11 +292,6 @@ impl<'a> AnimationBuilder<'a> {
 
     pub fn propagate(mut self) -> Self {
         self.spec.kind = Some(AnimKind::Propagate { to: 1.0 });
-        self
-    }
-
-    pub fn capture_frame(mut self) -> Self {
-        self.spec.kind = Some(AnimKind::CaptureFrame);
         self
     }
 
@@ -400,33 +396,44 @@ impl<'a> AnimationBuilder<'a> {
         self
     }
 
-    pub fn write(mut self) -> Self {
+    /// Draw a path-like tattva on progressively.
+    pub fn draw(mut self) -> Self {
         self.spec.kind = Some(AnimKind::WritePath);
         self
     }
 
-    pub fn unwrite(mut self) -> Self {
+    /// Reverse a draw-on animation for path-like tattvas.
+    pub fn undraw(mut self) -> Self {
         self.spec.kind = Some(AnimKind::UnwritePath);
         self
     }
 
-    pub fn write_text(mut self) -> Self {
+    /// Reveal text character by character while keeping its anchor stable.
+    pub fn typewrite_text(mut self) -> Self {
         self.spec.kind = Some(AnimKind::WriteText);
         self
     }
 
-    pub fn unwrite_text(mut self) -> Self {
+    /// Reverse a fixed-anchor typewriter animation.
+    pub fn untypewrite_text(mut self) -> Self {
         self.spec.kind = Some(AnimKind::UnwriteText);
         self
     }
 
+    /// Reveal text with the centered shifting/growing effect.
     pub fn reveal_text(mut self) -> Self {
         self.spec.kind = Some(AnimKind::RevealText);
         self
     }
 
-    pub fn unreveal_text(mut self) -> Self {
+    /// Hide text using the reverse of the centered reveal effect.
+    pub fn hide_text(mut self) -> Self {
         self.spec.kind = Some(AnimKind::UnrevealText);
+        self
+    }
+
+    pub fn indicate(mut self) -> Self {
+        self.spec.kind = Some(AnimKind::IndicateText);
         self
     }
 
@@ -538,7 +545,6 @@ impl<'a> AnimationBuilder<'a> {
                 follower_anchor,
                 offset,
             )),
-            Some(AnimKind::CaptureFrame) => Box::new(TriggerCapture::new(spec.target_id)),
             Some(AnimKind::NoisePhaseTo { to }) => {
                 Box::new(NoisePhaseTo::new(spec.target_id, to, ease))
             }
@@ -587,39 +593,18 @@ impl<'a> AnimationBuilder<'a> {
             Some(AnimKind::Signal { to }) => {
                 Box::new(StepwiseSignal::new(spec.target_id, to, ease))
             }
-            Some(AnimKind::Reveal { to }) => {
-                Box::new(RevealTo::new(spec.target_id, to, ease))
-            }
-            Some(AnimKind::WritePath) => {
-                Box::new(WritePath::new(spec.target_id, ease))
-            }
-            Some(AnimKind::UnwritePath) => {
-                Box::new(UnwritePath::new(spec.target_id, ease))
-            }
-            Some(AnimKind::WriteText) => {
-                Box::new(WriteText::new(spec.target_id, ease))
-            }
-            Some(AnimKind::UnwriteText) => {
-                Box::new(UnwriteText::new(spec.target_id, ease))
-            }
-            Some(AnimKind::RevealText) => {
-                Box::new(RevealText::new(spec.target_id, ease))
-            }
-            Some(AnimKind::UnrevealText) => {
-                Box::new(UnrevealText::new(spec.target_id, ease))
-            }
-            Some(AnimKind::WriteTable) => {
-                Box::new(WriteTable::new(spec.target_id, ease))
-            }
-            Some(AnimKind::UnwriteTable) => {
-                Box::new(UnwriteTable::new(spec.target_id, ease))
-            }
-            Some(AnimKind::WriteSurface) => {
-                Box::new(WriteSurface::new(spec.target_id, ease))
-            }
-            Some(AnimKind::UnwriteSurface) => {
-                Box::new(UnwriteSurface::new(spec.target_id, ease))
-            }
+            Some(AnimKind::Reveal { to }) => Box::new(RevealTo::new(spec.target_id, to, ease)),
+            Some(AnimKind::WritePath) => Box::new(WritePath::new(spec.target_id, ease)),
+            Some(AnimKind::UnwritePath) => Box::new(UnwritePath::new(spec.target_id, ease)),
+            Some(AnimKind::WriteText) => Box::new(WriteText::new(spec.target_id, ease)),
+            Some(AnimKind::UnwriteText) => Box::new(UnwriteText::new(spec.target_id, ease)),
+            Some(AnimKind::RevealText) => Box::new(RevealText::new(spec.target_id, ease)),
+            Some(AnimKind::UnrevealText) => Box::new(UnrevealText::new(spec.target_id, ease)),
+            Some(AnimKind::IndicateText) => Box::new(IndicateText::new(spec.target_id, ease)),
+            Some(AnimKind::WriteTable) => Box::new(WriteTable::new(spec.target_id, ease)),
+            Some(AnimKind::UnwriteTable) => Box::new(UnwriteTable::new(spec.target_id, ease)),
+            Some(AnimKind::WriteSurface) => Box::new(WriteSurface::new(spec.target_id, ease)),
+            Some(AnimKind::UnwriteSurface) => Box::new(UnwriteSurface::new(spec.target_id, ease)),
             None => panic!("Murali Error: AnimationBuilder requires a kind before .spawn()"),
         };
 

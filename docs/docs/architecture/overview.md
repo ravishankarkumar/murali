@@ -307,10 +307,9 @@ This keeps behavior more predictable and reduces the chance that "preview mode" 
 
 If this page gave you the high-level picture, the next useful pages are:
 
-- [Architecture](/docs/architecture/architecture)
-- [Scene & Timeline](/docs/architecture/scene-timeline)
-- [End-to-end flow](/docs/architecture/end-to-end-flow)
-- [Tattva](/docs/architecture/tattva)
-- [Dirty flags](/docs/architecture/dirty-flags)
+- [Scene & Timeline](scene-timeline)
+- [End-to-end flow](end-to-end-flow)
+- [Tattva](tattva)
+- [Dirty flags](dirty-flags)
 
 Those pages go one level deeper into how Murali maintains state, decides what changed, and turns authored objects into rendered output.

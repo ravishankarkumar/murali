@@ -1,0 +1,12 @@
+# murali built-in light theme
+# A warm off-white palette suited for classroom/educational animations.
+name = "murali-light"
+background   = "#F7F4ED"
+surface      = "#E0E5EA"
+surface_alt  = "#CED8E2"
+text_primary = "#232B35"
+text_muted   = "#596675"
+accent       = "#2382D6"
+accent_alt   = "#DB6647"
+positive     = "#3D9660"
+warning      = "#E5932D"

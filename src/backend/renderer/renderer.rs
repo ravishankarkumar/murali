@@ -691,6 +691,14 @@ impl Renderer {
                     props.opacity,
                 ));
             }
+            // Render opaque/shape-like mesh primitives before text primitives so
+            // label quads don't get overpainted by later background meshes when
+            // ECS iteration order changes.
+            list.sort_by_key(|(mesh, _, _, _)| match mesh.pipeline_kind {
+                MeshPipelineKind::Mesh => 0_u8,
+                MeshPipelineKind::Textured => 1_u8,
+                MeshPipelineKind::Text => 2_u8,
+            });
             list
         };
 
@@ -744,6 +752,7 @@ impl Renderer {
 
             let pipeline = match mesh.pipeline_kind {
                 MeshPipelineKind::Mesh => &self.mesh_pipeline,
+                MeshPipelineKind::Textured => &self.text_pipeline,
                 MeshPipelineKind::Text => &self.text_pipeline,
             };
             rpass.set_pipeline(pipeline);

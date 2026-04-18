@@ -1,6 +1,7 @@
 pub mod builder;
 pub mod camera_animation;
 pub mod camera_animation_builder;
+pub mod indicate;
 
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -8,7 +9,7 @@ use std::collections::HashMap;
 use crate::engine::scene::Scene;
 use crate::frontend::collection::ai::agentic_flow_chart::AgenticFlowChart;
 use crate::frontend::collection::ai::signal_flow::SignalFlow;
-use crate::frontend::collection::storytelling::stepwise::Stepwise;use crate::frontend::collection::math::equation::{
+use crate::frontend::collection::math::equation::{
     EquationLayout, EquationPart, EquationPartLayout,
 };
 use crate::frontend::collection::math::matrix::{Matrix, MatrixCellLayout};
@@ -23,7 +24,7 @@ use crate::frontend::collection::primitives::polygon::Polygon;
 use crate::frontend::collection::primitives::rectangle::Rectangle;
 use crate::frontend::collection::primitives::square::Square;
 use crate::frontend::collection::primitives::to_path::ToPath;
-use crate::frontend::collection::utility::screenshot_marker::ScreenshotMarker;
+use crate::frontend::collection::storytelling::stepwise::Stepwise;
 use crate::frontend::layout::{Anchor, Bounded, Bounds};
 use crate::frontend::props::DrawableProps;
 use crate::frontend::tattva_trait::TattvaTrait;
@@ -342,6 +343,53 @@ impl Animation for FadeTo {
     }
 }
 
+/// IndicateText animation: a short pulse for Label and LaTeX tattvas.
+pub struct IndicateText {
+    pub target_id: TattvaId,
+    pub ease: Ease,
+}
+
+impl IndicateText {
+    pub fn new(target_id: TattvaId, ease: Ease) -> Self {
+        Self { target_id, ease }
+    }
+
+    fn set_indicate_t(&self, scene: &mut Scene, t: f32) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
+            label.state.indicate_t = t.clamp(0.0, 1.0);
+            label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
+            latex.state.indicate_t = t.clamp(0.0, 1.0);
+            latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+        }
+    }
+}
+
+impl Animation for IndicateText {
+    fn on_start(&mut self, scene: &mut Scene) {
+        self.set_indicate_t(scene, 0.0);
+    }
+
+    fn apply_at(&mut self, scene: &mut Scene, t: f32) {
+        self.set_indicate_t(scene, self.ease.eval(t));
+    }
+
+    fn on_finish(&mut self, scene: &mut Scene) {
+        self.set_indicate_t(scene, 0.0);
+    }
+
+    fn reset(&mut self, scene: &mut Scene) {
+        self.set_indicate_t(scene, 0.0);
+    }
+}
+
 pub struct Create {
     pub target_id: TattvaId,
     pub ease: Ease,
@@ -362,7 +410,13 @@ impl Animation for Create {
     fn on_start(&mut self, scene: &mut Scene) {
         if let Some(tattva) = scene.get_tattva_any_mut(self.target_id) {
             let mut props = DrawableProps::write(tattva.props());
-            self.target_opacity = Some(props.opacity.max(0.001));
+            // If the target was pre-hidden for staging, treat create() as revealing it to
+            // normal visibility rather than preserving the staged zero opacity.
+            self.target_opacity = Some(if props.opacity > 0.001 {
+                props.opacity
+            } else {
+                1.0
+            });
             props.visible = true;
             props.opacity = 0.0;
             drop(props);
@@ -430,7 +484,7 @@ impl FollowAnchor {
             return;
         };
         let pos = target_point + self.offset.truncate() - local_bounds.anchor(self.follower_anchor);
-        scene.set_position(self.follower_id, pos);
+        scene.set_position_2d(self.follower_id, pos);
     }
 }
 
@@ -526,7 +580,12 @@ pub struct StepwiseSignal {
 
 impl StepwiseSignal {
     pub fn new(target_id: TattvaId, to: f32, ease: Ease) -> Self {
-        Self { target_id, ease, from: None, to: to.clamp(0.0, 1.0) }
+        Self {
+            target_id,
+            ease,
+            from: None,
+            to: to.clamp(0.0, 1.0),
+        }
     }
 }
 
@@ -561,7 +620,8 @@ impl Animation for StepwiseSignal {
     }
 }
 
-pub struct RevealTo {    pub target_id: TattvaId,
+pub struct RevealTo {
+    pub target_id: TattvaId,
     pub ease: Ease,
     from: Option<f32>,
     to: f32,
@@ -605,34 +665,6 @@ impl Animation for RevealTo {
         if let Some(flow) = scene.get_tattva_typed_mut::<AgenticFlowChart>(self.target_id) {
             flow.state.reveal_progress = self.from.unwrap_or(0.0);
             flow.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
-        }
-    }
-}
-
-pub struct TriggerCapture {
-    pub target_id: TattvaId,
-}
-
-impl TriggerCapture {
-    pub fn new(target_id: TattvaId) -> Self {
-        Self { target_id }
-    }
-}
-
-impl Animation for TriggerCapture {
-    fn on_start(&mut self, scene: &mut Scene) {
-        if let Some(marker) = scene.get_tattva_typed_mut::<ScreenshotMarker>(self.target_id) {
-            marker.state.arm();
-            marker.mark_dirty(DirtyFlags::STYLE | DirtyFlags::VISIBILITY);
-        }
-    }
-
-    fn apply_at(&mut self, _scene: &mut Scene, _t: f32) {}
-
-    fn reset(&mut self, scene: &mut Scene) {
-        if let Some(marker) = scene.get_tattva_typed_mut::<ScreenshotMarker>(self.target_id) {
-            marker.state.reset_capture();
-            marker.mark_dirty(DirtyFlags::STYLE | DirtyFlags::VISIBILITY);
         }
     }
 }
@@ -1841,6 +1873,21 @@ impl MorphGeometry {
         }
     }
 
+    fn morph_segment_budget(source: &Path, target: &Path) -> usize {
+        let existing = source.segments.len().max(target.segments.len());
+
+        // Geometry morphs look noticeably smoother when we interpolate between
+        // denser path representations instead of the primitive authoring counts.
+        // Closed shapes benefit the most because corners and arcs get more
+        // intermediate control points, reducing the "chunky" feel in motion.
+        let minimum = if source.closed || target.closed {
+            48
+        } else {
+            24
+        };
+        existing.max(minimum)
+    }
+
     fn try_get_path(scene: &Scene, id: TattvaId) -> Option<Path> {
         let tattva = scene.get_tattva_any(id)?;
         let any = tattva.as_any();
@@ -1891,10 +1938,11 @@ impl Animation for MorphGeometry {
             }
         };
 
-        // Align segments counts
-        let max_segments = source_path.segments.len().max(target_path.segments.len());
-        source_path.resample(max_segments);
-        target_path.resample(max_segments);
+        // Densify the path pair before interpolation so simultaneous morph +
+        // translation feels continuous instead of stepping through a sparse mesh.
+        let morph_segments = Self::morph_segment_budget(&source_path, &target_path);
+        source_path.resample(morph_segments);
+        target_path.resample(morph_segments);
 
         // Align starting points to minimize travel distance
         source_path = source_path.align_to(&target_path);
@@ -1978,7 +2026,12 @@ pub struct WritePath {
 
 impl WritePath {
     pub fn new(target_id: TattvaId, ease: Ease) -> Self {
-        Self { target_id, ease, shadow_id: None, original_visibility: None }
+        Self {
+            target_id,
+            ease,
+            shadow_id: None,
+            original_visibility: None,
+        }
     }
 
     /// Returns the active tattva ID to drive trim on (shadow if present, else target).
@@ -2038,7 +2091,7 @@ impl Animation for WritePath {
                 let mut props = DrawableProps::write(tattva.props());
                 self.original_visibility = Some(props.visible);
                 props.visible = true; // must be visible for trim animation to show
-                props.opacity = 1.0;  // Ensure it's not hidden via opacity
+                props.opacity = 1.0; // Ensure it's not hidden via opacity
                 drop(props);
                 tattva.mark_dirty(DirtyFlags::VISIBILITY | DirtyFlags::STYLE);
             }
@@ -2132,7 +2185,7 @@ impl Animation for WritePath {
             path.state.fill_opacity = 0.0;
             path.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
-        
+
         // Ensure the original object is hidden before the animation begins
         with_props_mut(
             scene,
@@ -2157,7 +2210,12 @@ pub struct UnwritePath {
 
 impl UnwritePath {
     pub fn new(target_id: TattvaId, ease: Ease) -> Self {
-        Self { target_id, ease, shadow_id: None, original_visibility: None }
+        Self {
+            target_id,
+            ease,
+            shadow_id: None,
+            original_visibility: None,
+        }
     }
 
     fn active_id(&self) -> TattvaId {
@@ -2240,7 +2298,7 @@ impl Animation for UnwritePath {
 
         // IMPORTANT: Clear original visibility so cleanup doesn't restore it to TRUE
         self.original_visibility = None;
-        
+
         // Ensure the target is hidden
         with_props_mut(
             scene,
@@ -2291,15 +2349,19 @@ impl WriteText {
 impl Animation for WriteText {
     fn on_start(&mut self, scene: &mut Scene) {
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 0.0;
             label.state.typewriter_mode = true;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 0.0;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2308,17 +2370,21 @@ impl Animation for WriteText {
 
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
         let eased_t = self.ease.eval(t);
-        
+
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = eased_t;
             label.state.typewriter_mode = true;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = eased_t;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2327,15 +2393,19 @@ impl Animation for WriteText {
 
     fn on_finish(&mut self, scene: &mut Scene) {
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 1.0;
             label.state.typewriter_mode = true;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 1.0;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2344,15 +2414,19 @@ impl Animation for WriteText {
 
     fn reset(&mut self, scene: &mut Scene) {
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 0.0;
             label.state.typewriter_mode = true;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 0.0;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2375,15 +2449,19 @@ impl UnwriteText {
 impl Animation for UnwriteText {
     fn on_start(&mut self, scene: &mut Scene) {
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 1.0;
             label.state.typewriter_mode = true;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 1.0;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2392,17 +2470,21 @@ impl Animation for UnwriteText {
 
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
         let eased_t = self.ease.eval(t);
-        
+
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 1.0 - eased_t;
             label.state.typewriter_mode = true;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 1.0 - eased_t;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2411,15 +2493,19 @@ impl Animation for UnwriteText {
 
     fn on_finish(&mut self, scene: &mut Scene) {
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 0.0;
             label.state.typewriter_mode = true;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 0.0;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2428,15 +2514,19 @@ impl Animation for UnwriteText {
 
     fn reset(&mut self, scene: &mut Scene) {
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 1.0;
             label.state.typewriter_mode = true;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 1.0;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2460,15 +2550,19 @@ impl RevealText {
 impl Animation for RevealText {
     fn on_start(&mut self, scene: &mut Scene) {
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 0.0;
             label.state.typewriter_mode = false;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 0.0;
             latex.state.typewriter_mode = false;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2477,17 +2571,21 @@ impl Animation for RevealText {
 
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
         let eased_t = self.ease.eval(t);
-        
+
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = eased_t;
             label.state.typewriter_mode = false;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = eased_t;
             latex.state.typewriter_mode = false;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2496,15 +2594,19 @@ impl Animation for RevealText {
 
     fn on_finish(&mut self, scene: &mut Scene) {
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 1.0;
             label.state.typewriter_mode = false;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 1.0;
             latex.state.typewriter_mode = false;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2513,15 +2615,19 @@ impl Animation for RevealText {
 
     fn reset(&mut self, scene: &mut Scene) {
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 0.0;
             label.state.typewriter_mode = false;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 0.0;
             latex.state.typewriter_mode = false;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2545,15 +2651,19 @@ impl UnrevealText {
 impl Animation for UnrevealText {
     fn on_start(&mut self, scene: &mut Scene) {
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 1.0;
             label.state.typewriter_mode = false;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 1.0;
             latex.state.typewriter_mode = false;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2562,17 +2672,21 @@ impl Animation for UnrevealText {
 
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
         let eased_t = self.ease.eval(t);
-        
+
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 1.0 - eased_t;
             label.state.typewriter_mode = false;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 1.0 - eased_t;
             latex.state.typewriter_mode = false;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2581,15 +2695,19 @@ impl Animation for UnrevealText {
 
     fn on_finish(&mut self, scene: &mut Scene) {
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 0.0;
             label.state.typewriter_mode = false;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 0.0;
             latex.state.typewriter_mode = false;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2598,15 +2716,19 @@ impl Animation for UnrevealText {
 
     fn reset(&mut self, scene: &mut Scene) {
         // Try Label first
-        if let Some(label) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id) {
+        if let Some(label) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::label::Label>(self.target_id)
+        {
             label.state.char_reveal = 1.0;
             label.state.typewriter_mode = false;
             label.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
             return;
         }
-        
+
         // Try LaTeX
-        if let Some(latex) = scene.get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id) {
+        if let Some(latex) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::latex::Latex>(self.target_id)
+        {
             latex.state.char_reveal = 1.0;
             latex.state.typewriter_mode = false;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
@@ -2624,38 +2746,85 @@ pub struct WriteTable {
 
 impl WriteTable {
     pub fn new(target_id: TattvaId, ease: Ease) -> Self {
-        Self { target_id, ease, from: None }
+        Self {
+            target_id,
+            ease,
+            from: None,
+        }
     }
 }
 
 impl Animation for WriteTable {
     fn on_start(&mut self, scene: &mut Scene) {
-        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
-            self.from = Some(tattva.state.write_progress);
-            tattva.state.write_progress = 0.0;
+        if let Some(tattva) =
+            scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id)
+        {
+            self.from = Some(tattva.state.write_progress());
+            tattva.state.set_write_progress(0.0);
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+            return;
+        }
+        if let Some(tattva) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::table::TableV1>(self.target_id)
+        {
+            self.from = Some(tattva.state.write_progress());
+            tattva.state.set_write_progress(0.0);
             tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
-        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
+        if let Some(tattva) =
+            scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id)
+        {
             let from = self.from.unwrap_or(0.0);
             let eased_t = self.ease.eval(t);
-            tattva.state.write_progress = from + (1.0 - from) * eased_t;
+            tattva
+                .state
+                .set_write_progress(from + (1.0 - from) * eased_t);
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+            return;
+        }
+        if let Some(tattva) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::table::TableV1>(self.target_id)
+        {
+            let from = self.from.unwrap_or(0.0);
+            let eased_t = self.ease.eval(t);
+            tattva
+                .state
+                .set_write_progress(from + (1.0 - from) * eased_t);
             tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 
     fn on_finish(&mut self, scene: &mut Scene) {
-        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
-            tattva.state.write_progress = 1.0;
+        if let Some(tattva) =
+            scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id)
+        {
+            tattva.state.set_write_progress(1.0);
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+            return;
+        }
+        if let Some(tattva) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::table::TableV1>(self.target_id)
+        {
+            tattva.state.set_write_progress(1.0);
             tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 
     fn reset(&mut self, scene: &mut Scene) {
-        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
-            tattva.state.write_progress = self.from.unwrap_or(0.0);
+        if let Some(tattva) =
+            scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id)
+        {
+            tattva.state.set_write_progress(self.from.unwrap_or(0.0));
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+            return;
+        }
+        if let Some(tattva) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::table::TableV1>(self.target_id)
+        {
+            tattva.state.set_write_progress(self.from.unwrap_or(0.0));
             tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
@@ -2670,31 +2839,65 @@ pub struct UnwriteTable {
 
 impl UnwriteTable {
     pub fn new(target_id: TattvaId, ease: Ease) -> Self {
-        Self { target_id, ease, from: None }
+        Self {
+            target_id,
+            ease,
+            from: None,
+        }
     }
 }
 
 impl Animation for UnwriteTable {
     fn on_start(&mut self, scene: &mut Scene) {
-        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
-            self.from = Some(tattva.state.write_progress);
-            tattva.state.write_progress = 1.0;
+        if let Some(tattva) =
+            scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id)
+        {
+            self.from = Some(tattva.state.write_progress());
+            tattva.state.set_write_progress(1.0);
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+            return;
+        }
+        if let Some(tattva) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::table::TableV1>(self.target_id)
+        {
+            self.from = Some(tattva.state.write_progress());
+            tattva.state.set_write_progress(1.0);
             tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 
     fn apply_at(&mut self, scene: &mut Scene, t: f32) {
-        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
+        if let Some(tattva) =
+            scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id)
+        {
             let from = self.from.unwrap_or(1.0);
             let eased_t = self.ease.eval(t);
-            tattva.state.write_progress = from - from * eased_t;
+            tattva.state.set_write_progress(from - from * eased_t);
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+            return;
+        }
+        if let Some(tattva) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::table::TableV1>(self.target_id)
+        {
+            let from = self.from.unwrap_or(1.0);
+            let eased_t = self.ease.eval(t);
+            tattva.state.set_write_progress(from - from * eased_t);
             tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
 
     fn reset(&mut self, scene: &mut Scene) {
-        if let Some(tattva) = scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id) {
-            tattva.state.write_progress = self.from.unwrap_or(1.0);
+        if let Some(tattva) =
+            scene.get_tattva_typed_mut::<crate::frontend::collection::table::Table>(self.target_id)
+        {
+            tattva.state.set_write_progress(self.from.unwrap_or(1.0));
+            tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
+            return;
+        }
+        if let Some(tattva) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::table::TableV1>(self.target_id)
+        {
+            tattva.state.set_write_progress(self.from.unwrap_or(1.0));
             tattva.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::BOUNDS | DirtyFlags::STYLE);
         }
     }
@@ -2708,7 +2911,11 @@ pub struct WriteSurface {
 
 impl WriteSurface {
     pub fn new(target_id: TattvaId, ease: Ease) -> Self {
-        Self { target_id, ease, from: None }
+        Self {
+            target_id,
+            ease,
+            from: None,
+        }
     }
 }
 
@@ -2754,7 +2961,11 @@ pub struct UnwriteSurface {
 
 impl UnwriteSurface {
     pub fn new(target_id: TattvaId, ease: Ease) -> Self {
-        Self { target_id, ease, from: None }
+        Self {
+            target_id,
+            ease,
+            from: None,
+        }
     }
 }
 

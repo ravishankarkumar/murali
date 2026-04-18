@@ -2,8 +2,11 @@ use glam::{Vec2, Vec3, Vec4, vec2};
 use std::sync::Arc;
 
 use crate::backend::renderer::vertex::mesh::MeshVertex;
+use crate::backend::renderer::vertex::text::TextVertex;
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Mesh, Project, ProjectionCtx, RenderPrimitive};
+use crate::resource::texture::TextureImage;
+use std::path::Path;
 
 /// How to render the parametric surface
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -17,7 +20,7 @@ pub enum SurfaceRenderMode {
 }
 
 /// A parametric 3D surface defined by f(u, v) -> Vec3
-/// 
+///
 /// Example: Sphere
 /// ```ignore
 /// let sphere = ParametricSurface::new(
@@ -43,6 +46,8 @@ pub struct ParametricSurface {
     pub render_mode: SurfaceRenderMode,
     /// Optional color function based on height/parameter
     pub color_fn: Option<Arc<dyn Fn(f32) -> Vec4 + Send + Sync>>,
+    /// Optional image texture mapped from the (u, v) parameter domain.
+    pub texture: Option<Arc<TextureImage>>,
 }
 
 impl ParametricSurface {
@@ -61,6 +66,7 @@ impl ParametricSurface {
             write_progress: 1.0,
             render_mode: SurfaceRenderMode::Solid,
             color_fn: None,
+            texture: None,
         }
     }
 
@@ -90,6 +96,17 @@ impl ParametricSurface {
         self
     }
 
+    pub fn with_texture(mut self, texture: TextureImage) -> Self {
+        self.texture = Some(Arc::new(texture));
+        self
+    }
+
+    pub fn with_texture_path(mut self, path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let texture = TextureImage::from_path(path.as_ref())?;
+        self.texture = Some(Arc::new(texture));
+        Ok(self)
+    }
+
     /// Generate mesh vertices and indices for the surface
     fn generate_mesh(&self) -> (Vec<MeshVertex>, Vec<u16>) {
         let mut vertices = Vec::new();
@@ -104,7 +121,8 @@ impl ParametricSurface {
 
         // Calculate how many rows to draw based on write_progress
         let total_rows = self.u_samples;
-        let rows_to_draw = ((self.write_progress * total_rows as f32).ceil() as usize).min(total_rows);
+        let rows_to_draw =
+            ((self.write_progress * total_rows as f32).ceil() as usize).min(total_rows);
 
         // Generate vertices for rows we're drawing
         for i in 0..rows_to_draw {
@@ -143,6 +161,63 @@ impl ParametricSurface {
         (vertices, indices)
     }
 
+    fn generate_textured_mesh(&self) -> (Vec<TextVertex>, Vec<u16>) {
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+
+        if self.write_progress <= 0.0 {
+            return (vertices, indices);
+        }
+
+        let u_step = (self.u_range.1 - self.u_range.0) / (self.u_samples - 1) as f32;
+        let v_step = (self.v_range.1 - self.v_range.0) / (self.v_samples - 1) as f32;
+        let total_rows = self.u_samples;
+        let rows_to_draw =
+            ((self.write_progress * total_rows as f32).ceil() as usize).min(total_rows);
+
+        for i in 0..rows_to_draw {
+            let u_progress = if self.u_samples > 1 {
+                i as f32 / (self.u_samples - 1) as f32
+            } else {
+                0.0
+            };
+            for j in 0..self.v_samples {
+                let v_progress = if self.v_samples > 1 {
+                    j as f32 / (self.v_samples - 1) as f32
+                } else {
+                    0.0
+                };
+                let u = self.u_range.0 + i as f32 * u_step;
+                let v = self.v_range.0 + j as f32 * v_step;
+                let pos = (self.f)(u, v);
+                vertices.push(TextVertex {
+                    position: [pos.x, pos.y, pos.z],
+                    uv: [v_progress, 1.0 - u_progress],
+                    color: [self.color.x, self.color.y, self.color.z, self.color.w],
+                });
+            }
+        }
+
+        for i in 0..(rows_to_draw.saturating_sub(1)) {
+            for j in 0..(self.v_samples - 1) {
+                let a = (i * self.v_samples + j) as u16;
+                let b = (i * self.v_samples + j + 1) as u16;
+                let c = ((i + 1) * self.v_samples + j) as u16;
+                let d = ((i + 1) * self.v_samples + j + 1) as u16;
+
+                indices.push(a);
+                indices.push(b);
+                indices.push(c);
+
+                indices.push(b);
+                indices.push(d);
+                indices.push(c);
+            }
+        }
+
+        (vertices, indices)
+    }
+
     /// Sample points on the surface for bounds calculation
     fn sample_points(&self) -> Vec<Vec3> {
         let mut pts = Vec::new();
@@ -170,7 +245,8 @@ impl ParametricSurface {
         let v_step = (self.v_range.1 - self.v_range.0) / (self.v_samples - 1) as f32;
 
         let total_rows = self.u_samples;
-        let rows_to_draw = ((self.write_progress * total_rows as f32).ceil() as usize).min(total_rows);
+        let rows_to_draw =
+            ((self.write_progress * total_rows as f32).ceil() as usize).min(total_rows);
 
         // Generate grid points
         let mut grid_points = Vec::new();
@@ -194,8 +270,9 @@ impl ParametricSurface {
 
         // Draw horizontal lines (u-direction) - drawn first
         let total_h_lines = grid_points.len();
-        let h_lines_to_draw = ((h_lines_progress * total_h_lines as f32).ceil() as usize).min(total_h_lines);
-        
+        let h_lines_to_draw =
+            ((h_lines_progress * total_h_lines as f32).ceil() as usize).min(total_h_lines);
+
         for row_idx in 0..h_lines_to_draw {
             let row = &grid_points[row_idx];
             for j in 0..row.len() - 1 {
@@ -217,8 +294,9 @@ impl ParametricSurface {
         // Draw vertical lines (v-direction) - drawn after horizontal
         if v_lines_progress > 0.0 {
             let total_v_lines = self.v_samples;
-            let v_lines_to_draw = ((v_lines_progress * total_v_lines as f32).ceil() as usize).min(total_v_lines);
-            
+            let v_lines_to_draw =
+                ((v_lines_progress * total_v_lines as f32).ceil() as usize).min(total_v_lines);
+
             for j in 0..v_lines_to_draw {
                 for i in 0..grid_points.len() - 1 {
                     let start = grid_points[i][j];
@@ -253,16 +331,26 @@ impl Project for ParametricSurface {
     fn project(&self, ctx: &mut ProjectionCtx) {
         match self.render_mode {
             SurfaceRenderMode::Solid => {
-                let (vertices, indices) = self.generate_mesh();
-                let mesh = Mesh::from_tessellation(vertices, indices);
+                let mesh = if let Some(texture) = &self.texture {
+                    let (vertices, indices) = self.generate_textured_mesh();
+                    Mesh::from_textured_vertices(vertices, indices, texture.clone())
+                } else {
+                    let (vertices, indices) = self.generate_mesh();
+                    Mesh::from_tessellation(vertices, indices)
+                };
                 ctx.emit(RenderPrimitive::Mesh(mesh));
             }
             SurfaceRenderMode::Wireframe => {
                 self.emit_wireframe(ctx);
             }
             SurfaceRenderMode::SolidWithWireframe => {
-                let (vertices, indices) = self.generate_mesh();
-                let mesh = Mesh::from_tessellation(vertices, indices);
+                let mesh = if let Some(texture) = &self.texture {
+                    let (vertices, indices) = self.generate_textured_mesh();
+                    Mesh::from_textured_vertices(vertices, indices, texture.clone())
+                } else {
+                    let (vertices, indices) = self.generate_mesh();
+                    Mesh::from_tessellation(vertices, indices)
+                };
                 ctx.emit(RenderPrimitive::Mesh(mesh));
                 self.emit_wireframe(ctx);
             }

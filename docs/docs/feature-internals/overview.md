@@ -22,7 +22,7 @@ Feature internals focus on:
 - extension points
 - limitations and tradeoffs
 
-These pages do **not** belong in the core [Architecture](/docs/architecture/overview) section because they are not engine-wide internals. They are higher-level systems built on top of the core architecture.
+These pages do **not** belong in the core [Architecture](../architecture/overview) section because they are not engine-wide internals. They are higher-level systems built on top of the core architecture.
 
 ## What Lives Here
 
@@ -34,8 +34,8 @@ This section is a good fit for features that:
 
 Current pages:
 
-- [Stepwise](/docs/feature-internals/stepwise)
-- [Neural Network Diagram](/docs/feature-internals/neural-network)
+- [Stepwise](./stepwise)
+- [Neural Network Diagram](./neural-network)
 
 As Murali grows, this section is also a good home for contributor deep dives on features like:
 

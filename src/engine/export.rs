@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
@@ -14,7 +15,7 @@ use crate::engine::Engine;
 use crate::engine::config::export_config::ExportConfig;
 use crate::engine::render::RenderOptions;
 use crate::engine::scene::Scene;
-use crate::frontend::collection::utility::screenshot_marker::ScreenshotMarker;
+use crate::frontend::theme::Theme;
 
 #[derive(Debug, Clone)]
 pub struct ExportSettings {
@@ -26,6 +27,7 @@ pub struct ExportSettings {
     pub basename: String,
     pub video_path: Option<PathBuf>,
     pub gif_path: Option<PathBuf>,
+    pub capture_gif_dir: Option<PathBuf>,
     pub clear_color: Vec4,
 }
 
@@ -40,6 +42,7 @@ impl Default for ExportSettings {
             basename: "frame".to_string(),
             video_path: Some(PathBuf::from("renders/output.mp4")),
             gif_path: None,
+            capture_gif_dir: None,
             clear_color: Vec4::new(0.05, 0.10, 0.15, 1.0),
         }
     }
@@ -47,10 +50,13 @@ impl Default for ExportSettings {
 
 impl ExportSettings {
     pub fn from_scene(scene: &Scene) -> Self {
-        Self {
-            duration_seconds: infer_duration(scene),
-            ..Self::default()
-        }
+        let mut settings = Self::default();
+        settings.duration_seconds = infer_duration(scene);
+
+        let bg = Theme::global().background;
+        settings.clear_color = bg;
+
+        settings
     }
 
     pub fn from_project_config(scene: &Scene, options: &RenderOptions) -> Result<Self> {
@@ -186,6 +192,7 @@ pub fn infer_duration(scene: &Scene) -> f32 {
 pub fn export_scene(scene: Scene, settings: &ExportSettings) -> Result<()> {
     fs::create_dir_all(&settings.output_dir)?;
     clear_existing_frame_outputs(settings)?;
+    let mut marker_gif_state = MarkerGifState::from_settings(settings, &scene)?;
 
     let mut engine = pollster::block_on(Engine::new_headless_with_scene(
         scene,
@@ -238,12 +245,13 @@ pub fn export_scene(scene: Scene, settings: &ExportSettings) -> Result<()> {
             );
         }
 
-        save_requested_screenshots(&image, &mut engine.scene, settings).with_context(|| {
-            format!(
-                "Failed to save requested screenshot at frame {}",
-                next_frame
-            )
-        })?;
+        save_requested_screenshots(&image, &engine.scene, settings, &mut marker_gif_state)
+            .with_context(|| {
+                format!(
+                    "Failed to save requested screenshot at frame {}",
+                    next_frame
+                )
+            })?;
 
         let save_start = Instant::now();
         save_png_fast(&image, &settings.frame_path(next_frame))
@@ -275,6 +283,8 @@ pub fn export_scene(scene: Scene, settings: &ExportSettings) -> Result<()> {
     if let Some(gif_path) = &settings.gif_path {
         assemble_gif(settings, gif_path)?;
     }
+
+    marker_gif_state.assemble_all(settings)?;
 
     Ok(())
 }
@@ -389,34 +399,211 @@ fn clear_existing_frame_outputs(settings: &ExportSettings) -> Result<()> {
 
 fn save_requested_screenshots(
     image: &image::RgbaImage,
-    scene: &mut Scene,
+    scene: &Scene,
     settings: &ExportSettings,
+    marker_gif_state: &mut MarkerGifState,
 ) -> Result<()> {
-    let marker_ids: Vec<_> = scene
-        .tattvas
-        .iter()
-        .filter_map(|(id, tattva)| {
-            tattva
-                .as_any()
-                .downcast_ref::<crate::frontend::Tattva<ScreenshotMarker>>()
-                .and_then(|marker| marker.state.should_capture().then_some(*id))
-        })
-        .collect();
+    marker_gif_state.capture_scene_specs(image, scene, settings)?;
 
-    for id in marker_ids {
-        let Some(marker) = scene.get_tattva_typed_mut::<ScreenshotMarker>(id) else {
-            continue;
+    Ok(())
+}
+
+#[derive(Debug, Default)]
+struct MarkerGifState {
+    output_dir: Option<PathBuf>,
+    frame_counts: HashMap<String, usize>,
+    screenshot_count: usize,
+    scene_screenshot_indices: Vec<usize>,
+    scene_gif_indices: Vec<usize>,
+}
+
+impl MarkerGifState {
+    fn from_settings(settings: &ExportSettings, scene: &Scene) -> Result<Self> {
+        for capture in &scene.screenshot_captures {
+            if let Some(names) = &capture.names {
+                if names.len() != capture.times.len() {
+                    return Err(anyhow::anyhow!(
+                        "ScreenshotCapture names length ({}) must match times length ({})",
+                        names.len(),
+                        capture.times.len()
+                    ));
+                }
+            }
+        }
+
+        let Some(output_dir) = settings.capture_gif_dir.clone() else {
+            return Ok(Self {
+                output_dir: None,
+                frame_counts: HashMap::new(),
+                screenshot_count: 0,
+                scene_screenshot_indices: vec![0; scene.screenshot_captures.len()],
+                scene_gif_indices: vec![0; scene.gif_captures.len()],
+            });
+        };
+        fs::create_dir_all(&output_dir)?;
+        let frames_root = marker_gif_frames_root(&output_dir);
+        if frames_root.exists() {
+            fs::remove_dir_all(&frames_root)?;
+        }
+        fs::create_dir_all(&frames_root)?;
+        Ok(Self {
+            output_dir: Some(output_dir),
+            frame_counts: HashMap::new(),
+            screenshot_count: 0,
+            scene_screenshot_indices: vec![0; scene.screenshot_captures.len()],
+            scene_gif_indices: vec![0; scene.gif_captures.len()],
+        })
+    }
+
+    fn capture_scene_specs(
+        &mut self,
+        image: &image::RgbaImage,
+        scene: &Scene,
+        settings: &ExportSettings,
+    ) -> Result<()> {
+        let current_time = scene.scene_time;
+
+        for (capture_idx, capture) in scene.screenshot_captures.iter().enumerate() {
+            while self.scene_screenshot_indices[capture_idx] < capture.times.len()
+                && current_time + 1e-4 >= capture.times[self.scene_screenshot_indices[capture_idx]]
+            {
+                let current_idx = self.scene_screenshot_indices[capture_idx];
+                let requested = capture
+                    .names
+                    .as_ref()
+                    .and_then(|names| names.get(current_idx))
+                    .and_then(|name| name.as_deref());
+                let path = self.resolve_screenshot_path(settings, requested);
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                save_png_fast(image, &path)?;
+                self.scene_screenshot_indices[capture_idx] += 1;
+            }
+        }
+
+        for (capture_idx, capture) in scene.gif_captures.iter().enumerate() {
+            while self.scene_gif_indices[capture_idx] < capture.times.len()
+                && current_time + 1e-4 >= capture.times[self.scene_gif_indices[capture_idx]]
+            {
+                self.capture_groups(image, settings, std::slice::from_ref(&capture.name))?;
+                self.scene_gif_indices[capture_idx] += 1;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn capture_groups(
+        &mut self,
+        image: &image::RgbaImage,
+        settings: &ExportSettings,
+        groups: &[String],
+    ) -> Result<()> {
+        let Some(output_dir) = self.output_dir.as_ref() else {
+            return Ok(());
         };
 
-        let path = resolve_screenshot_path(settings, &marker.state.output_path);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+        for group in groups {
+            let group_key = sanitize_stem(group);
+            let next_index = self.frame_counts.entry(group_key.clone()).or_insert(0);
+            let frame_path = marker_gif_frames_root(output_dir)
+                .join(&group_key)
+                .join(format!("{group_key}_{:05}.png", *next_index));
+            if let Some(parent) = frame_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            save_png_fast(image, &frame_path)?;
+            *next_index += 1;
         }
-        save_png_fast(image, &path)?;
-        marker.state.mark_captured();
+
+        let _ = settings;
+        Ok(())
+    }
+
+    fn assemble_all(&self, settings: &ExportSettings) -> Result<()> {
+        let Some(output_dir) = self.output_dir.as_ref() else {
+            return Ok(());
+        };
+        if self.frame_counts.is_empty() {
+            return Ok(());
+        }
+        if !ffmpeg_available() {
+            return Err(anyhow::anyhow!(
+                "ffmpeg not found in PATH; marker GIF frames were exported to {}",
+                marker_gif_frames_root(output_dir).display()
+            ));
+        }
+
+        for (group, frame_count) in &self.frame_counts {
+            if *frame_count == 0 {
+                continue;
+            }
+            let gif_path = output_dir.join(format!("{group}.gif"));
+            assemble_marker_gif(settings, output_dir, group, &gif_path)?;
+        }
+        Ok(())
+    }
+
+    fn resolve_screenshot_path(
+        &mut self,
+        settings: &ExportSettings,
+        requested: Option<&Path>,
+    ) -> PathBuf {
+        match requested {
+            Some(path) => resolve_screenshot_path(settings, path),
+            None => {
+                let path = settings
+                    .output_dir
+                    .join("captures")
+                    .join(format!("capture_{:05}.png", self.screenshot_count));
+                self.screenshot_count += 1;
+                path
+            }
+        }
+    }
+}
+
+fn assemble_marker_gif(
+    settings: &ExportSettings,
+    output_dir: &Path,
+    group: &str,
+    gif_path: &Path,
+) -> Result<()> {
+    if let Some(parent) = gif_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let pattern = marker_gif_frames_root(output_dir)
+        .join(group)
+        .join(format!("{group}_%05d.png"));
+    let filter = format!(
+        "fps={},scale={}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
+        settings.fps, settings.width
+    );
+
+    let status = Command::new("ffmpeg")
+        .arg("-y")
+        .arg("-i")
+        .arg(pattern)
+        .arg("-vf")
+        .arg(filter)
+        .arg(gif_path)
+        .status()
+        .context("Failed to spawn ffmpeg for marker GIF assembly")?;
+
+    if !status.success() {
+        return Err(anyhow::anyhow!(
+            "ffmpeg exited with status {status}; marker GIF frames remain in {}",
+            marker_gif_frames_root(output_dir).display()
+        ));
     }
 
     Ok(())
+}
+
+fn marker_gif_frames_root(output_dir: &Path) -> PathBuf {
+    output_dir.join(".frames")
 }
 
 fn resolve_screenshot_path(settings: &ExportSettings, requested: &Path) -> PathBuf {

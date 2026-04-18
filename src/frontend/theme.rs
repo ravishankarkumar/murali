@@ -1,47 +1,174 @@
-use glam::Vec4;
+//! Runtime theme support.
+//!
+//! ## Loading order for [`Theme::load_by_name`]
+//! 1. `./themes/{name}.toml` — user's custom project themes directory.
+//! 2. Built-in `"dark"` / `"light"` defaults embedded in the binary.
+//! 3. Fallback: built-in dark theme.
+//!
+//! ## Global state
+//! A single [`Theme`] is stored in a [`std::sync::OnceLock`] populated at
+//! startup by [`Theme::init_global`]. After that, any code can call
+//! [`Theme::global`] to read the active theme without any extra plumbing.
 
-#[derive(Debug, Clone)]
+use std::{path::Path, sync::OnceLock};
+
+use glam::Vec4;
+use serde::Deserialize;
+
+use crate::colors::from_hex;
+
+// ---------------------------------------------------------------------------
+// Serde helper: deserialise a Vec4 field from a hex string
+// ---------------------------------------------------------------------------
+
+fn deserialize_hex_vec4<'de, D>(deserializer: D) -> Result<Vec4, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    from_hex(&s).map_err(serde::de::Error::custom)
+}
+
+// ---------------------------------------------------------------------------
+// Theme struct
+// ---------------------------------------------------------------------------
+
+/// A complete visual theme used by all Murali mobjects.
+#[derive(Debug, Clone, Deserialize)]
 pub struct Theme {
-    pub name: &'static str,
+    #[serde(default)]
+    pub name: String,
+
+    #[serde(deserialize_with = "deserialize_hex_vec4")]
     pub background: Vec4,
+
+    #[serde(deserialize_with = "deserialize_hex_vec4")]
     pub surface: Vec4,
+
+    #[serde(deserialize_with = "deserialize_hex_vec4")]
     pub surface_alt: Vec4,
+
+    #[serde(deserialize_with = "deserialize_hex_vec4")]
     pub text_primary: Vec4,
+
+    #[serde(deserialize_with = "deserialize_hex_vec4")]
     pub text_muted: Vec4,
+
+    #[serde(deserialize_with = "deserialize_hex_vec4")]
     pub accent: Vec4,
+
+    #[serde(deserialize_with = "deserialize_hex_vec4")]
     pub accent_alt: Vec4,
+
+    #[serde(deserialize_with = "deserialize_hex_vec4")]
     pub positive: Vec4,
+
+    #[serde(deserialize_with = "deserialize_hex_vec4")]
     pub warning: Vec4,
 }
 
+// ---------------------------------------------------------------------------
+// Global singleton
+// ---------------------------------------------------------------------------
+
+static GLOBAL_THEME: OnceLock<Theme> = OnceLock::new();
+
 impl Theme {
-    pub fn ai_under_the_hood() -> Self {
-        Self {
-            name: "ai-under-the-hood",
-            background: Vec4::new(0.04, 0.07, 0.11, 1.0),
-            surface: Vec4::new(0.11, 0.18, 0.27, 1.0),
-            surface_alt: Vec4::new(0.17, 0.25, 0.36, 1.0),
-            text_primary: Vec4::new(0.95, 0.97, 0.99, 1.0),
-            text_muted: Vec4::new(0.74, 0.81, 0.89, 1.0),
-            accent: Vec4::new(0.34, 0.76, 0.96, 1.0),
-            accent_alt: Vec4::new(0.67, 0.56, 0.98, 1.0),
-            positive: Vec4::new(0.31, 0.82, 0.58, 1.0),
-            warning: Vec4::new(0.98, 0.72, 0.26, 1.0),
-        }
+    /// Populate the global theme. Must be called once at startup (e.g. from
+    /// [`crate::engine::config`] during `RenderConfig` construction).
+    ///
+    /// Subsequent calls are silently ignored — the first write wins.
+    pub fn init_global(theme: Theme) {
+        let _ = GLOBAL_THEME.set(theme);
     }
 
-    pub fn classroom_light() -> Self {
-        Self {
-            name: "classroom-light",
-            background: Vec4::new(0.97, 0.96, 0.93, 1.0),
-            surface: Vec4::new(0.88, 0.90, 0.92, 1.0),
-            surface_alt: Vec4::new(0.81, 0.85, 0.89, 1.0),
-            text_primary: Vec4::new(0.14, 0.17, 0.21, 1.0),
-            text_muted: Vec4::new(0.35, 0.40, 0.46, 1.0),
-            accent: Vec4::new(0.14, 0.51, 0.84, 1.0),
-            accent_alt: Vec4::new(0.86, 0.40, 0.28, 1.0),
-            positive: Vec4::new(0.24, 0.59, 0.38, 1.0),
-            warning: Vec4::new(0.90, 0.58, 0.18, 1.0),
+    pub fn global() -> &'static Theme {
+        GLOBAL_THEME.get_or_init(|| {
+            // Try loading from project config
+            let cwd = std::env::current_dir().unwrap_or_else(|_| ".".into());
+            let project_root = crate::utils::project::find_project_root(&cwd);
+            let murali_toml = project_root.join("murali.toml");
+
+            if murali_toml.exists() {
+                if let Ok(contents) = std::fs::read_to_string(&murali_toml) {
+                    if let Ok(table) = contents.parse::<toml::Table>() {
+                        if let Some(theme_name) = table.get("theme").and_then(|v| v.as_str()) {
+                            return Theme::load_by_name(theme_name, &project_root);
+                        }
+                    }
+                }
+            }
+
+            // Fallback to built-in dark
+            toml::from_str(include_str!("../defaults/dark.toml"))
+                .expect("built-in dark.toml must be valid")
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Theme discovery & loading
+// ---------------------------------------------------------------------------
+
+impl Theme {
+    /// Resolve a theme by name, following the lookup chain:
+    ///
+    /// 1. `{project_root}/themes/{name}.toml` — user-defined theme.
+    /// 2. Built-in `"dark"` or `"light"` (aliases accepted).
+    /// 3. Built-in dark as final fallback.
+    pub fn load_by_name(name: &str, project_root: &Path) -> Self {
+        // 1. User project themes directory
+        let custom = project_root.join("themes").join(format!("{name}.toml"));
+
+        if custom.exists() {
+            if let Ok(contents) = std::fs::read_to_string(&custom) {
+                match toml::from_str::<Theme>(&contents) {
+                    Ok(t) => return t,
+                    Err(e) => {
+                        eprintln!(
+                            "[murali] Warning: failed to parse theme '{name}': {e}. Falling back to built-in."
+                        );
+                    }
+                }
+            }
         }
+
+        // 2. Built-in defaults
+        Self::builtin(name)
+    }
+
+    /// Load a built-in theme by name (`"dark"` or `"light"`).
+    /// Falls through to dark on unknown names.
+    pub fn builtin(name: &str) -> Self {
+        match name.to_lowercase().replace('_', "-").as_str() {
+            "light" | "murali-light" | "classroom-light" => {
+                toml::from_str(include_str!("../defaults/light.toml"))
+                    .expect("built-in light.toml must be valid")
+            }
+            _ => toml::from_str(include_str!("../defaults/dark.toml"))
+                .expect("built-in dark.toml must be valid"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Backwards-compatible constructors (kept for existing user code)
+// ---------------------------------------------------------------------------
+
+impl Theme {
+    /// Dark blue theme used in AI-focused animations.
+    ///
+    /// Prefer configuring via `murali.toml` (`theme = "dark"`) for new
+    /// projects. This constructor is retained for backwards compatibility.
+    pub fn ai_under_the_hood() -> Self {
+        Self::builtin("dark")
+    }
+
+    /// Warm off-white theme for classroom / educational animations.
+    ///
+    /// Prefer configuring via `murali.toml` (`theme = "light"`) for new
+    /// projects. This constructor is retained for backwards compatibility.
+    pub fn classroom_light() -> Self {
+        Self::builtin("light")
     }
 }

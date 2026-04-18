@@ -6,12 +6,30 @@ sidebar_position: 4
 
 Graph tattvas live under `murali::frontend::collection::graph`.
 
+Use this family when the scene is primarily about curves, fields, surfaces, or geometric data. If you are teaching calculus, vector fields, geometry, or 3D surfaces, this is usually the right section to start from.
+
+If you need text, labels, or formulas around the graph, pair this page with [Text](./text.md), [Math](./math.md), [Camera](../camera.md), and [Examples](../examples/index.md).
+
+## Quick Decision Guide
+
+| Need | Use | Why |
+|---|---|---|
+| Plot `y = f(x)` | `FunctionGraph` | Best for ordinary 2D function plots |
+| Plot a 2D curve `t -> Vec2` | `ParametricCurve` | Use when x and y both depend on a parameter |
+| Plot a 3D curve `t -> Vec3` | `ParametricCurve3D` | Best for spirals, trajectories, and 3D paths |
+| Plot a cloud of points | `ScatterPlot` | Best for samples, embeddings, or discrete data |
+| Show arrows of a field | `VectorField` | Best for local direction/magnitude |
+| Show traced flow through a field | `StreamLines` | Best for flow structure over time |
+| Show a 3D surface `(u, v) -> Vec3` | `ParametricSurface` | Best for spheres, waves, and geometry surfaces |
+
 ## FunctionGraph
 
 Plots a Rust function `f32 -> f32` over an x range as a polyline.
 
 ```rust
 use murali::frontend::collection::graph::function_graph::FunctionGraph;
+use murali::colors::*;
+use murali::positions::*;
 
 fn sine(x: f32) -> f32 { x.sin() }
 
@@ -23,6 +41,8 @@ scene.add_tattva(
 ```
 
 `with_samples(n)` controls the number of line segments. More samples = smoother curve, more primitives.
+
+Use `FunctionGraph` when the natural explanation is “here is `y` as a function of `x`.” If you find yourself deriving both coordinates from one parameter, move to `ParametricCurve`.
 
 ## ScatterPlot
 
@@ -57,6 +77,31 @@ scene.add_tattva(
 );
 ```
 
+Use `ParametricCurve` when:
+
+- the curve loops or doubles back in x
+- both x and y are naturally parameterized
+- you are drawing geometric paths rather than “function graphs”
+
+## ParametricCurve3D
+
+A 3D parametric curve `t -> Vec3`.
+
+```rust
+use murali::frontend::collection::graph::parametric_curve3d::ParametricCurve3D;
+use std::f32::consts::TAU;
+
+scene.add_tattva(
+    ParametricCurve3D::new((0.0, 3.0 * TAU), |t| {
+        Vec3::new(t.cos(), t.sin(), 0.15 * t)
+    })
+    .with_samples(256),
+    Vec3::ZERO,
+);
+```
+
+This is a good fit for helices, orbital paths, trajectories, and “camera needs to matter” scenes.
+
 ## ParametricSurface
 
 A 3D surface defined by `(u, v) -> Vec3`. Renders as a wireframe mesh.
@@ -72,12 +117,31 @@ scene.add_tattva(
         |u, v| Vec3::new(u.sin() * v.cos(), u.sin() * v.sin(), u.cos()),
     )
     .with_samples(40, 40)
-    .with_color(Vec4::new(0.44, 0.84, 0.71, 1.0)),
+    .with_color(TEAL_C),
     Vec3::ZERO,
 );
 ```
 
 `with_samples(u_steps, v_steps)` controls mesh resolution.
+
+Use `ParametricSurface` when the scene is fundamentally 3D. If the concept can still be taught with a 2D curve or field, prefer that first because it is easier to frame and annotate.
+
+You can also keep surface construction separate from texture loading and let `Scene` do the path-based loading:
+
+```rust
+let globe = ParametricSurface::new(
+    (0.0, PI),
+    (0.0, 2.0 * PI),
+    |u, v| Vec3::new(u.sin() * v.cos(), u.cos(), u.sin() * v.sin()),
+)
+.with_samples(48, 72);
+
+scene.add_textured_surface_with_path(
+    globe,
+    "src/resource/assets/earthmap1k.jpg",
+    Vec3::ZERO,
+)?;
+```
 
 ## VectorField
 
@@ -92,7 +156,7 @@ scene.add_tattva(
         8, 6,
         |p| glam::vec2(-p.y, p.x), // rotation field
     )
-    .with_color(Vec4::new(0.5, 0.7, 1.0, 0.8))
+    .with_color(Vec4::new(BLUE_B.x, BLUE_B.y, BLUE_B.z, 0.8))
     .with_length_scale(0.4),
     Vec3::ZERO,
 );
@@ -106,6 +170,8 @@ Color vectors by magnitude:
     Vec4::new(t, 0.5, 1.0 - t, 0.8)
 })
 ```
+
+Use `VectorField` when you want viewers to read local direction and magnitude at many points.
 
 ## StreamLines
 
@@ -137,3 +203,51 @@ line_start_points(Vec2::new(-3.0, 0.0), Vec2::new(3.0, 0.0), 10)
 // Points in a circle
 circle_start_points(Vec2::ZERO, 2.0, 12)
 ```
+
+Use `StreamLines` when you want viewers to read global flow structure instead of per-sample arrows.
+
+In many teaching scenes, `VectorField` and `StreamLines` work well together:
+
+- `VectorField` explains what happens locally
+- `StreamLines` explains the overall flow
+
+## 2D Graph Vs 3D Surface
+
+Prefer 2D first when:
+
+- the idea is fundamentally a function or planar curve
+- labels and narration matter more than immersion
+- the extra camera complexity does not teach anything
+
+Move to 3D when:
+
+- the geometry really lives in 3D
+- depth or topology is part of the idea
+- camera motion helps understanding instead of just looking impressive
+
+## Sampling And Resolution
+
+- increase `with_samples(...)` for smoother curves
+- increase surface sample counts for cleaner wireframes and textures
+- keep counts moderate while authoring, then raise them for final export if needed
+- overly dense sampling makes preview slower without always improving clarity
+
+## Best Animation Pairings
+
+- `draw()` for graphs, curves, and many line-based surfaces
+- `appear()` for scatter plots or instant comparison scenes
+- `fade_to(...)` for de-emphasizing supporting layers
+- camera animation for `ParametricCurve3D` and `ParametricSurface`
+
+## Gotchas
+
+- if a 3D graph feels confusing, the camera is often the problem rather than the graph
+- dense fields and surfaces can become visually noisy very quickly
+- if a plot needs many labels and equations, simplify the graph before adding more annotation
+
+## Related Docs
+
+- [Camera](../camera.md)
+- [Animations](../animations.md)
+- [Examples](../examples/index.md)
+- [Math](./math.md)

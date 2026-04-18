@@ -1,10 +1,15 @@
 use glam::{Vec2, Vec3, vec3};
 
-use super::types::{NodeLayout, FlowChartDirection, FlowNodePlacement};
 use super::node::FlowNode;
+use super::types::{FlowChartDirection, FlowNodePlacement, NodeLayout};
 
 /// Calculate the resolved size for a node (either custom or default)
-pub(super) fn resolved_node_size(node: &FlowNode, default_size: Vec2, text_height: f32, text_padding: Vec2) -> Vec2 {
+pub(super) fn resolved_node_size(
+    node: &FlowNode,
+    default_size: Vec2,
+    text_height: f32,
+    text_padding: Vec2,
+) -> Vec2 {
     if let Some(size) = node.size {
         return size;
     }
@@ -43,10 +48,7 @@ pub(super) fn calculate_node_layouts(
         .map(|node| resolved_node_size(node, default_size, text_height, text_padding))
         .collect();
 
-    let has_custom_placements = nodes
-        .iter()
-        .skip(1)
-        .any(|node| node.placement.is_some());
+    let has_custom_placements = nodes.iter().skip(1).any(|node| node.placement.is_some());
 
     if has_custom_placements {
         return calculate_custom_placement_layouts(nodes, &sizes, direction, node_gap);
@@ -75,7 +77,7 @@ fn calculate_custom_placement_layouts(
             FlowChartDirection::Horizontal => FlowNodePlacement::RightOfPrevious,
             FlowChartDirection::Vertical => FlowNodePlacement::BelowPrevious,
         });
-        
+
         let center = match placement {
             FlowNodePlacement::RightOfPrevious => vec3(
                 previous.center.x + previous.size.x * 0.5 + node_gap + size.x * 0.5,
@@ -108,7 +110,7 @@ fn calculate_custom_placement_layouts(
         layout.center.x -= center.x;
         layout.center.y -= center.y;
     }
-    
+
     layouts
 }
 
@@ -129,7 +131,7 @@ fn calculate_linear_layouts(
 
     let mut cursor = -total_primary * 0.5;
     let mut layouts = Vec::with_capacity(sizes.len());
-    
+
     for &size in sizes {
         let center = match direction {
             FlowChartDirection::Horizontal => {

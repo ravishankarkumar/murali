@@ -78,4 +78,4 @@ This page is the home for:
 - the major backend components
 - how entities are created and destroyed
 
-For what gets stored before ECS materialization, see [Projection](/docs/architecture/projection). For how the renderer draws those entities, see [Renderer](/docs/architecture/renderer).
+For what gets stored before ECS materialization, see [Projection](./projection). For how the renderer draws those entities, see [Renderer](./renderer).

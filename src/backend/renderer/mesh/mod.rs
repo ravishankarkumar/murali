@@ -9,6 +9,7 @@ use wgpu::util::DeviceExt;
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MeshPipelineKind {
     Mesh,
+    Textured,
     Text,
 }
 

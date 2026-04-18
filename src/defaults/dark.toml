@@ -1,0 +1,12 @@
+# murali built-in dark theme
+# Based on a deep-blue dark palette suited for technical animations.
+name = "murali-dark"
+background = "#0A121C"
+surface    = "#1C2E45"
+surface_alt = "#2B405C"
+text_primary = "#F2F7FC"
+text_muted   = "#BCCEE2"
+accent      = "#56C1F4"
+accent_alt  = "#AA8EF9"
+positive    = "#4FD193"
+warning     = "#F9B742"

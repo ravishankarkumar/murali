@@ -22,7 +22,7 @@ timeline
     .move_to(Vec3::new(3.0, 0.0, 0.0))
     .spawn();
 
-scene.timelines.insert("main".to_string(), timeline);
+scene.set_timeline("main", timeline);
 ```
 
 You can have multiple named timelines in a scene.
@@ -70,12 +70,12 @@ use glam::Quat;
 .rotate_to(Quat::from_rotation_z(std::f32::consts::PI))
 ```
 
-### create
+### appear
 
-Reveals a tattva with a stroke draw-on effect.
+Reveals a tattva by animating its staged opacity from hidden to visible.
 
 ```rust
-.create()
+.appear()
 ```
 
 ### morph_from
@@ -93,15 +93,28 @@ timeline
     .spawn();
 ```
 
-The source tattva should be hidden initially:
+Hide the target initially so it can appear through the morph cleanly:
 
 ```rust
-if let Some(t) = scene.get_tattva_any_mut(circle_id) {
-    let mut props = t.props().write();
-    props.visible = false;
-    props.opacity = 0.0;
-}
+scene.hide_tattva(circle_id);
 ```
+
+### morph_matching_staged
+
+Morphs one group of tattvas into another while automatically staging the target group.
+
+```rust
+timeline.morph_matching_staged(
+    source_ids,
+    target_ids,
+    &mut scene,
+    1.0,
+    3.0,
+    Ease::InOutCubic,
+);
+```
+
+Use raw `morph_matching(...)` only when you need manual control over target visibility/state.
 
 ### match_transform
 

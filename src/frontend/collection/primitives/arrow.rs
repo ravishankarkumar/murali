@@ -1,9 +1,9 @@
 // src/frontend/collection/primitives/arrow.rs
 //! Arrow primitive with shaft and triangular tip
 
-use glam::{Vec2, Vec3, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use glam::{Vec2, Vec3, Vec4};
 
 /// An arrow with a shaft (line) and a triangular tip
 pub struct Arrow {
@@ -23,7 +23,7 @@ pub struct Arrow {
 
 impl Arrow {
     /// Create a new arrow
-    /// 
+    ///
     /// # Arguments
     /// * `start` - Starting point of the arrow
     /// * `end` - End point (tip of the arrowhead)

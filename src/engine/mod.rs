@@ -16,6 +16,8 @@ use crate::engine::scene::Scene;
 use std::sync::Arc;
 use winit::window::Window;
 
+use glam::Vec4;
+
 /// The Engine is the top-level owner of all systems.
 pub struct Engine {
     pub scene: Scene,
@@ -32,6 +34,15 @@ impl Engine {
             backend,
             sync_boundary: SyncBoundary::new(),
         }
+    }
+
+    pub fn set_clear_color(&mut self, color: Vec4) {
+        self.backend.renderer.clear_color = wgpu::Color {
+            r: color.x as f64,
+            g: color.y as f64,
+            b: color.z as f64,
+            a: color.w as f64,
+        };
     }
 
     /// The Heartbeat: This moves time forward and syncs the layers.

@@ -2,9 +2,9 @@
 //! Streamline visualization for vector fields
 //! Shows flow paths that are tangent to the vector field at every point
 
-use glam::{Vec2, Vec3, Vec4};
 use crate::frontend::layout::{Bounded, Bounds};
 use crate::projection::{Project, ProjectionCtx, RenderPrimitive};
+use glam::{Vec2, Vec3, Vec4};
 use std::sync::Arc;
 
 /// Streamlines show the paths that particles would follow in a vector field

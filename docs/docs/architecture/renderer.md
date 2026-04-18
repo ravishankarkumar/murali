@@ -89,4 +89,4 @@ This page is the home for:
 - headless render-to-image behavior
 - device and surface management
 
-For how data reaches the renderer, see [ECS](/docs/architecture/ecs) and [End-to-end flow](/docs/architecture/end-to-end-flow).
+For how data reaches the renderer, see [ECS](./ecs) and [End-to-end flow](./end-to-end-flow).

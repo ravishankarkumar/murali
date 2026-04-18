@@ -146,4 +146,4 @@ This page is the home for:
 - the role of `RenderPrimitive`
 - why projection is a separate CPU-side stage
 
-For what happens next, see [ECS](/docs/architecture/ecs) and [Renderer](/docs/architecture/renderer).
+For what happens next, see [ECS](./ecs) and [Renderer](./renderer).
