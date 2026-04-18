@@ -17,7 +17,7 @@ fn main() -> anyhow::Result<()> {
         Label::new("Table Showcase - Animated", 0.4).with_color(WHITE),
         Vec3::ZERO,
     );
-    scene.to_edge(title_id, Direction::Up, 0.35);
+    scene.to_edge(title_id, Direction::Up, 1.0);
 
     let left_table = Table::new(vec![
         vec!["Alice", "28", "NYC"],

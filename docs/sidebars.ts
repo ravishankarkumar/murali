@@ -46,7 +46,7 @@ const sidebars: SidebarsConfig = {
         'examples/three_d',
         'examples/graphs_and_fields',
         'examples/ai_and_storytelling',
-        'examples/branding_and_export',
+        // 'examples/branding_and_export',
         'examples/dynamics'
       ],
     },

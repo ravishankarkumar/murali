@@ -55,7 +55,7 @@ fn main() -> anyhow::Result<()> {
         Vec3::ZERO,
     );
     let title_id = scene.tattvas.keys().copied().max().unwrap();
-    scene.to_edge(title_id, Direction::Up, 0.3);
+    scene.to_edge(title_id, Direction::Up, 0.6);
 
     scene.add_tattva(
         Label::new(

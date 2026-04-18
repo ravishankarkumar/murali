@@ -641,3 +641,40 @@
     font-size: clamp(2.4rem, 8vw, 3.5rem);
   }
 }
+
+
+
+.videoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.videoCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.videoFrame {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  overflow: hidden;
+  border-radius: 20px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+}
+
+.videoFrame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+@media (max-width: 996px) {
+  .videoGrid {
+    grid-template-columns: 1fr;
+  }
+}

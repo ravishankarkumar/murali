@@ -77,6 +77,25 @@ const resources: Card[] = [
   },
 ];
 
+type VideoShowcase = {
+  title: string;
+  description: string;
+  embedUrl: string;
+};
+
+const showcaseVideos: VideoShowcase[] = [
+  {
+    title: 'Payful shapes animation',
+    description: 'A polished animation showing large no of shapes doing movement',
+    embedUrl: 'https://www.youtube.com/embed/rzQZHta2PQM',
+  },
+  {
+    title: 'Tattva move animation, alongwith camera smooth movement',
+    description: 'We show a Tattva moving, and then also the camera following that Tattva, while it keeps rotating',
+    embedUrl: 'https://www.youtube.com/embed/W8WQQbSo70Y',
+  },
+];
+
 const constructs = ['Scene', 'Timeline', 'Tattvas', 'Renderer'];
 
 function SurfaceCard({title, description, to, href, label}: Card) {
@@ -173,6 +192,39 @@ function SectionIntro({
   );
 }
 
+function VideoSection() {
+  return (
+    <section className={clsx(styles.section, styles.sectionPlain)}>
+      <div className="container">
+        <SectionIntro
+          eyebrow="Showcase"
+          title="See Murali in action"
+          body="A few short examples of the kinds of visuals you can build with Murali."
+        />
+        <div className={styles.videoGrid}>
+          {showcaseVideos.map((video) => (
+            <div key={video.title} className={styles.videoCard}>
+              <div className={styles.videoFrame}>
+                <iframe
+                  src={video.embedUrl}
+                  title={video.title}
+                  loading="lazy"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+              <Heading as="h3" className={styles.featureTitle}>
+                {video.title}
+              </Heading>
+              <p className={styles.featureBody}>{video.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Home(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
 
@@ -199,6 +251,8 @@ export default function Home(): ReactNode {
             </div>
           </div>
         </section>
+
+        <VideoSection />
 
         <section className={clsx(styles.section, styles.sectionPlain)}>
           <div className="container">
