@@ -27,7 +27,16 @@ Typst does not require a separate system install in the default setup.
 
 ## Add Murali To A Project
 
-Murali is currently consumed from GitHub:
+Install Murali from crates.io:
+
+```toml
+[dependencies]
+murali = "0.1.4"
+anyhow = "1"
+glam = "0.29"
+```
+
+If you specifically want the latest unreleased changes, you can still depend on GitHub instead:
 
 ```toml
 [dependencies]
@@ -96,7 +105,7 @@ Once your dependency is added, the fastest next step is:
 
 1. read [Your First Scene](./first-scene.md)
 2. create `examples/my_scene.rs`
-3. run it in preview mode:
+3. run it in preview mode from your own project:
 
 ```bash
 cargo run --example my_scene --release -- --preview

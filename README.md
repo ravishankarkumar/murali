@@ -24,8 +24,8 @@ Murali is a Rust-based animation engine for semantic graphics and mathematical s
 - `src/projection/` contains backend-neutral render primitives and meshes
 - `src/backend/` contains the sync boundary, ECS cache, and renderer
 - `src/engine/` contains scene ownership, app lifecycle, timeline stepping, export, and config
-- `examples/` contains runnable examples and feature showcases
 - `docs/` contains the longer-form documentation site
+- `murali-examples/` lives in a dedicated companion repository for runnable example code and showcases
 
 ## Getting Started
 
@@ -35,20 +35,26 @@ Requirements:
 - A working graphics environment for preview
 - `ffmpeg` if you want video export
 
-Run an example in preview mode:
+Install from crates.io:
 
-```bash
-cargo run --example primitives_showcase
+```toml
+[dependencies]
+murali = "0.1.4"
+anyhow = "1"
+glam = "0.29"
 ```
 
-Some useful examples:
+Browse runnable examples:
 
 ```bash
-cargo run --example animated_motion
-cargo run --example axes_and_labels
-cargo run --example agentic_flow_chart
-cargo run --example export_aiu_attention
+git clone https://github.com/ravishankarkumar/murali-examples
 ```
+
+Some useful places to start:
+
+- [Documentation](https://muraliengine.com/docs/intro)
+- [Example code repository](https://github.com/ravishankarkumar/murali-examples)
+- [YouTube showcase](https://www.youtube.com/@muraliengine)
 
 ## Preview And Export Config
 

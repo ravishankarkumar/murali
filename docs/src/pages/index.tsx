@@ -287,7 +287,7 @@ export default function Home(): ReactNode {
               <SectionIntro
                 eyebrow="Explore"
                 title="Documentation, internals, examples, and showcase videos"
-                body="Murali includes storytelling primitives, architecture notes, runnable example code, and showcase videos so you can move from concept to scene quickly."
+                body="Murali includes storytelling primitives, architecture notes, a companion examples repository, and showcase videos so you can move from concept to scene quickly."
               />
               <div className={styles.note}>
                 <p className={styles.noteTitle}>Suggested reading order</p>

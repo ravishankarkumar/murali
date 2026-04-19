@@ -16,7 +16,10 @@ The most important thing to know is that preview and export are different modes.
 Preview is for authoring:
 
 ```rust
-App::new().with_preview().run(scene)?;
+App::new()?
+    .with_scene(scene)
+    .with_preview()
+    .run_app()?;
 ```
 
 or from the CLI:
@@ -28,7 +31,9 @@ cargo run --example animated_motion -- --preview
 Export is the default behavior if you do not opt into preview:
 
 ```rust
-App::new().run(scene)?;
+App::new()?
+    .with_scene(scene)
+    .run_app()?;
 ```
 
 or:
@@ -44,10 +49,11 @@ Use preview when you are iterating on timing, layout, or camera choices. Use exp
 `App` exposes a few high-level helpers:
 
 ```rust
-App::new()
+App::new()?
+    .with_scene(scene)
     .with_video_export()
     .with_frames_export(true)
-    .run(scene)?;
+    .run_app()?;
 ```
 
 What these mean:
@@ -73,9 +79,10 @@ let options = RenderOptions {
     output: Some("render_output/demo.mp4".to_string()),
 };
 
-App::new()
+App::new()?
+    .with_scene(scene)
     .with_render_options(options)
-    .run(scene)?;
+    .run_app()?;
 ```
 
 Use this path when you mainly care about:

@@ -41,6 +41,6 @@ sidebar_position: 7
 
 ### Phase 6 — Polish
 - `murali doctor` environment diagnostics
-- Color themes and palettes
 - Murali logo animation
-- Crates.io release
+- broader examples/docs polish
+- stabilization for wider public announcement
