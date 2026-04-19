@@ -16,4 +16,4 @@ pub mod tattva;
 pub mod timeline;
 
 pub use layout::{StepwiseDirection, StepwiseLayout};
-pub use tattva::Stepwise;
+pub use tattva::{Stepwise, StepwiseStyle};

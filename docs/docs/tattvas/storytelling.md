@@ -12,24 +12,24 @@ Storytelling tattvas live under `murali::frontend::collection::storytelling`. Th
 
 It is a tattva: it implements `Project` and `Bounded`, so it's added to the scene like any other shape.
 
-### Building a model
+### Building a Stepwise flow
 
-Use the `stepwise` script builder to define nodes and connections:
+Use `Stepwise::from_script(...)` to define nodes and connections through the script DSL:
 
 ```rust
 use murali::frontend::collection::storytelling::stepwise::{
     Stepwise, StepwiseLayout,
-    script::stepwise,
 };
 
-let model = stepwise(|s| {
+let flow = Stepwise::from_script(|s| {
     let a = s.step("Input Layer");
     let b = s.step("Processing");
     let c = s.step("Output");
 
     s.connect(a, b);
     s.connect(b, c);
-});
+})
+.with_layout(StepwiseLayout::horizontal(2.0));
 ```
 
 Each call to `s.step()` returns an index. `s.connect(from, to)` registers a directed edge between two steps.
@@ -37,11 +37,7 @@ Each call to `s.step()` returns an index. `s.connect(from, to)` registers a dire
 ### Adding to the scene
 
 ```rust
-let id = scene.add_tattva(
-    Stepwise::new(model)
-        .with_layout(StepwiseLayout::horizontal(2.0)),
-    Vec3::ZERO,
-);
+let id = scene.add_tattva(flow, Vec3::ZERO);
 ```
 
 `StepwiseLayout::horizontal(spacing)` places nodes left-to-right with the given gap between them. `StepwiseLayout::vertical(spacing)` places them top-to-bottom.
@@ -81,7 +77,7 @@ timeline.animate(id)
 By default the sequence follows the order nodes were connected. You can override it explicitly, including cycles:
 
 ```rust
-let model = stepwise(|s| {
+let flow = Stepwise::from_script(|s| {
     let a = s.step("A");
     let b = s.step("B");
     let c = s.step("C");
@@ -99,9 +95,12 @@ let model = stepwise(|s| {
 Connections can go backwards. Use `.route()` to describe the path shape:
 
 ```rust
-use murali::frontend::collection::storytelling::stepwise::model::Direction;
+use murali::frontend::collection::storytelling::stepwise::{
+    model::Direction,
+    Stepwise,
+};
 
-let model = stepwise(|s| {
+let flow = Stepwise::from_script(|s| {
     let a = s.step("Start");
     let b = s.step("Middle");
     let c = s.step("End");

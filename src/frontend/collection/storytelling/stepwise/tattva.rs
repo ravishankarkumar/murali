@@ -12,27 +12,52 @@ use crate::projection::{Project, ProjectionCtx};
 
 use super::layout::{StepwiseDirection, StepwiseLayout};
 use super::model::{Direction, StepwiseModel};
+use super::script::ScriptBuilder;
 use super::state::{StepState, TransitionState};
 use super::timeline::TimelineEngine;
 
-// ── visual constants ─────────────────────────────────────────────────────────
-
-const NODE_SIZE: f32 = 1.2;
-const STROKE_THICK: f32 = 0.04;
-const LABEL_HEIGHT: f32 = 0.3;
-const SIGNAL_RADIUS: f32 = 0.1;
-const EDGE_THICKNESS: f32 = 0.04;
-
-const FILL_ACTIVE: Vec4 = Vec4::new(0.12, 0.18, 0.30, 1.0); // dark blue fill
-const FILL_COMPLETED: Vec4 = Vec4::new(0.18, 0.22, 0.28, 1.0); // muted completed
-const STROKE_ACTIVE: Vec4 = Vec4::new(0.35, 0.70, 1.00, 1.0); // bright blue outline
-const STROKE_COMPLETED: Vec4 = Vec4::new(0.40, 0.50, 0.60, 1.0); // muted outline
-const COLOR_LABEL: Vec4 = Vec4::new(0.95, 0.97, 1.00, 1.0);
-const FILL_SIGNAL: Vec4 = Vec4::new(1.0, 0.82, 0.25, 1.0);
-const FILL_EDGE: Vec4 = Vec4::new(0.35, 0.45, 0.60, 1.0);
-const COLOR_DEBUG: Vec4 = Vec4::new(1.0, 1.0, 0.5, 1.0);
-
 // ── Stepwise tattva ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct StepwiseStyle {
+    pub node_height: f32,
+    pub stroke_thickness: f32,
+    pub label_height: f32,
+    pub signal_radius: f32,
+    pub edge_thickness: f32,
+    pub pulse_scale: f32,
+    pub corner_radius: f32,
+    pub fill_active: Vec4,
+    pub fill_completed: Vec4,
+    pub stroke_active: Vec4,
+    pub stroke_completed: Vec4,
+    pub label_color: Vec4,
+    pub signal_color: Vec4,
+    pub edge_color: Vec4,
+    pub debug_color: Vec4,
+}
+
+impl Default for StepwiseStyle {
+    fn default() -> Self {
+        Self {
+            node_height: 1.2,
+            stroke_thickness: 0.04,
+            label_height: 0.3,
+            signal_radius: 0.1,
+            edge_thickness: 0.04,
+            pulse_scale: 0.15,
+            corner_radius: 0.15,
+            fill_active: Vec4::new(0.12, 0.18, 0.30, 1.0),
+            fill_completed: Vec4::new(0.18, 0.22, 0.28, 1.0),
+            stroke_active: Vec4::new(0.35, 0.70, 1.00, 1.0),
+            stroke_completed: Vec4::new(0.40, 0.50, 0.60, 1.0),
+            label_color: Vec4::new(0.95, 0.97, 1.00, 1.0),
+            signal_color: Vec4::new(1.0, 0.82, 0.25, 1.0),
+            edge_color: Vec4::new(0.35, 0.45, 0.60, 1.0),
+            debug_color: Vec4::new(1.0, 1.0, 0.5, 1.0),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Stepwise {
@@ -40,6 +65,7 @@ pub struct Stepwise {
     pub progress: f32,
     pub signal_progress: f32,
     pub layout: StepwiseLayout,
+    pub style: StepwiseStyle,
     pub debug: bool,
 }
 
@@ -50,8 +76,15 @@ impl Stepwise {
             progress: 0.0,
             signal_progress: 0.0,
             layout: StepwiseLayout::default(),
+            style: StepwiseStyle::default(),
             debug: false,
         }
+    }
+
+    pub fn from_script<F: FnOnce(&mut ScriptBuilder)>(f: F) -> Self {
+        let mut builder = ScriptBuilder::new();
+        f(&mut builder);
+        Self::new(builder.build())
     }
 
     pub fn with_progress(mut self, p: f32) -> Self {
@@ -59,13 +92,26 @@ impl Stepwise {
         self
     }
 
+    pub fn with_reveal_progress(self, p: f32) -> Self {
+        self.with_progress(p)
+    }
+
     pub fn with_signal_progress(mut self, p: f32) -> Self {
         self.signal_progress = p.clamp(0.0, 1.0);
         self
     }
 
+    pub fn with_journey_progress(self, p: f32) -> Self {
+        self.with_signal_progress(p)
+    }
+
     pub fn with_layout(mut self, layout: StepwiseLayout) -> Self {
         self.layout = layout;
+        self
+    }
+
+    pub fn with_style(mut self, style: StepwiseStyle) -> Self {
+        self.style = style;
         self
     }
 
@@ -150,11 +196,11 @@ impl Stepwise {
 
 // ── internal rendering helpers using primitives ─────────────────────────────────
 
-fn node_size_for(label: &str) -> glam::Vec2 {
-    let layout = crate::resource::text::layout::measure_label(label, LABEL_HEIGHT);
-    let min_width = NODE_SIZE;
+fn node_size_for(label: &str, style: &StepwiseStyle) -> glam::Vec2 {
+    let layout = crate::resource::text::layout::measure_label(label, style.label_height);
+    let min_width = style.node_height;
     let width = (layout.width + 0.6).max(min_width);
-    glam::vec2(width, NODE_SIZE) // Keep height consistent at basic node size
+    glam::vec2(width, style.node_height)
 }
 
 fn rounded_rect_path(size: glam::Vec2, radius: f32, color: glam::Vec4) -> Path {
@@ -183,6 +229,7 @@ fn rounded_rect_path(size: glam::Vec2, radius: f32, color: glam::Vec4) -> Path {
 
 fn render_node_path(
     ctx: &mut ProjectionCtx,
+    stepwise_style: &StepwiseStyle,
     size: glam::Vec2,
     trim: f32,
     fill_alpha: f32,
@@ -191,13 +238,13 @@ fn render_node_path(
 ) {
     let mut style = Style::new();
     style.stroke = Some(StrokeParams {
-        thickness: STROKE_THICK,
+        thickness: stepwise_style.stroke_thickness,
         color: stroke_color,
         ..Default::default()
     });
     style.fill = Some(ColorSource::Solid(fill_color));
 
-    let mut path = rounded_rect_path(size, 0.15, fill_color);
+    let mut path = rounded_rect_path(size, stepwise_style.corner_radius, fill_color);
     path.style = style;
 
     path.trim_end = trim;
@@ -208,15 +255,16 @@ fn render_node_path(
 
 fn render_default_node(
     ctx: &mut ProjectionCtx,
+    style: &StepwiseStyle,
     pos: Vec3,
     state: &StepState,
     label: &str,
     scale: f32,
     is_visited: bool,
 ) {
-    let size = node_size_for(label) * scale;
+    let size = node_size_for(label, style) * scale;
     ctx.with_offset(pos, |ctx| {
-        let (stroke, fill) = (STROKE_ACTIVE, FILL_ACTIVE);
+        let (stroke, fill) = (style.stroke_active, style.fill_active);
 
         match state {
             StepState::Pending => {}
@@ -225,16 +273,16 @@ fn render_default_node(
                 let outline_t = (t * 2.0).clamp(0.0, 1.0);
                 let fill_t = ((t - 0.5) * 2.0).clamp(0.0, 1.0);
 
-                render_node_path(ctx, size, outline_t, fill_t, stroke, fill);
+                render_node_path(ctx, style, size, outline_t, fill_t, stroke, fill);
 
                 if fill_t > 0.001 {
                     ctx.with_offset(Vec3::new(0.0, 0.0, 0.1), |ctx| {
-                        Label::new(label, LABEL_HEIGHT * scale)
+                        Label::new(label, style.label_height * scale)
                             .with_color(Vec4::new(
-                                COLOR_LABEL.x,
-                                COLOR_LABEL.y,
-                                COLOR_LABEL.z,
-                                COLOR_LABEL.w * fill_t,
+                                style.label_color.x,
+                                style.label_color.y,
+                                style.label_color.z,
+                                style.label_color.w * fill_t,
                             ))
                             .with_char_reveal(fill_t)
                             .project(ctx);
@@ -243,21 +291,21 @@ fn render_default_node(
             }
             StepState::Completed => {
                 let s_color = if is_visited {
-                    STROKE_ACTIVE
+                    style.stroke_active
                 } else {
-                    STROKE_COMPLETED
+                    style.stroke_completed
                 };
                 let f_color = if is_visited {
-                    FILL_ACTIVE
+                    style.fill_active
                 } else {
-                    FILL_COMPLETED
+                    style.fill_completed
                 };
 
-                render_node_path(ctx, size, 1.0, 1.0, s_color, f_color);
+                render_node_path(ctx, style, size, 1.0, 1.0, s_color, f_color);
 
                 ctx.with_offset(Vec3::new(0.0, 0.0, 0.1), |ctx| {
-                    Label::new(label, LABEL_HEIGHT * scale)
-                        .with_color(COLOR_LABEL) // full opacity — always visible
+                    Label::new(label, style.label_height * scale)
+                        .with_color(style.label_color)
                         .project(ctx);
                 });
             }
@@ -267,15 +315,16 @@ fn render_default_node(
 
 fn render_background(
     ctx: &mut ProjectionCtx,
+    style: &StepwiseStyle,
     pos: Vec3,
     state: &StepState,
     label: &str,
     scale: f32,
     is_visited: bool,
 ) {
-    let size = node_size_for(label) * scale;
+    let size = node_size_for(label, style) * scale;
     ctx.with_offset(pos, |ctx| {
-        let (stroke, fill) = (STROKE_ACTIVE, FILL_ACTIVE);
+        let (stroke, fill) = (style.stroke_active, style.fill_active);
 
         match state {
             StepState::Pending => {}
@@ -283,20 +332,20 @@ fn render_background(
                 let t = Ease::InOutSmooth.eval(*t);
                 let outline_t = (t * 2.0).clamp(0.0, 1.0);
                 let fill_t = ((t - 0.5) * 2.0).clamp(0.0, 1.0);
-                render_node_path(ctx, size, outline_t, fill_t, stroke, fill);
+                render_node_path(ctx, style, size, outline_t, fill_t, stroke, fill);
             }
             StepState::Completed => {
                 let s_color = if is_visited {
-                    STROKE_ACTIVE
+                    style.stroke_active
                 } else {
-                    STROKE_COMPLETED
+                    style.stroke_completed
                 };
                 let f_color = if is_visited {
-                    FILL_ACTIVE
+                    style.fill_active
                 } else {
-                    FILL_COMPLETED
+                    style.fill_completed
                 };
-                render_node_path(ctx, size, 1.0, 1.0, s_color, f_color);
+                render_node_path(ctx, style, size, 1.0, 1.0, s_color, f_color);
             }
         }
     });
@@ -307,6 +356,7 @@ fn render_background(
 impl Project for Stepwise {
     fn project(&self, ctx: &mut ProjectionCtx) {
         let state = TimelineEngine::compute(&self.model, self.progress);
+        let style = &self.style;
 
         // 1. Precalculate node sizes and positions based on actual labels
         let mut node_sizes = Vec::with_capacity(self.model.steps.len());
@@ -316,7 +366,7 @@ impl Project for Stepwise {
         let gap = self.layout.spacing; // Repurpose spacing as "Gap"
 
         for (i, step) in self.model.steps.iter().enumerate() {
-            let size = node_size_for(&step.label);
+            let size = node_size_for(&step.label, style);
             node_sizes.push(size);
 
             if i == 0 {
@@ -355,8 +405,8 @@ impl Project for Stepwise {
                 TransitionState::Hidden => {}
                 TransitionState::Drawing { t } => {
                     let mut path = Path::new()
-                        .with_thickness(EDGE_THICKNESS)
-                        .with_color(FILL_EDGE);
+                        .with_thickness(style.edge_thickness)
+                        .with_color(style.edge_color);
 
                     if let Some(route) = &transition.route {
                         let points = self.calculate_route_points(
@@ -380,12 +430,19 @@ impl Project for Stepwise {
                 TransitionState::Completed => {
                     let is_signaled = self.is_transition_signaled(i);
                     let color = if is_signaled {
-                        STROKE_ACTIVE
+                        style.stroke_active
                     } else {
-                        Vec4::new(FILL_EDGE.x, FILL_EDGE.y, FILL_EDGE.z, FILL_EDGE.w * 0.6)
+                        Vec4::new(
+                            style.edge_color.x,
+                            style.edge_color.y,
+                            style.edge_color.z,
+                            style.edge_color.w * 0.6,
+                        )
                     };
 
-                    let mut path = Path::new().with_thickness(EDGE_THICKNESS).with_color(color);
+                    let mut path = Path::new()
+                        .with_thickness(style.edge_thickness)
+                        .with_color(color);
 
                     if let Some(route) = &transition.route {
                         let points = self.calculate_route_points(
@@ -414,11 +471,12 @@ impl Project for Stepwise {
 
             // Determine signal-based indication for this node
             let (signal_intensity, is_visited) = self.node_signal_state(i);
-            let scale_mod = 1.0 + 0.15 * signal_intensity; // 15% pulse
+            let scale_mod = 1.0 + style.pulse_scale * signal_intensity;
 
             ctx.with_offset(pos, |ctx| match &step.content {
                 None => render_default_node(
                     ctx,
+                    style,
                     Vec3::ZERO,
                     step_state,
                     &step.label,
@@ -429,6 +487,7 @@ impl Project for Stepwise {
                     if !content.draws_own_background() {
                         render_background(
                             ctx,
+                            style,
                             Vec3::ZERO,
                             step_state,
                             &step.label,
@@ -508,9 +567,9 @@ impl Project for Stepwise {
 
                     ctx.with_offset(Vec3::new(p.x, p.y, 0.2), |ctx| {
                         crate::frontend::collection::primitives::circle::Circle::new(
-                            SIGNAL_RADIUS,
+                            style.signal_radius,
                             20,
-                            FILL_SIGNAL,
+                            style.signal_color,
                         )
                         .project(ctx);
                     });
@@ -531,7 +590,9 @@ impl Project for Stepwise {
                     StepState::Pending => format!("[ ] {}", step.label),
                 };
                 ctx.with_offset(Vec3::new(x, base_y + i as f32 * step_y, 0.5), |ctx| {
-                    Label::new(text, 0.25).with_color(COLOR_DEBUG).project(ctx);
+                    Label::new(text, 0.25)
+                        .with_color(style.debug_color)
+                        .project(ctx);
                 });
             }
         }
@@ -791,7 +852,7 @@ impl Bounded for Stepwise {
         if n == 0 {
             return Bounds::from_center_size(glam::Vec2::ZERO, glam::vec2(0.01, 0.01));
         }
-        let pad = NODE_SIZE * 0.5 + SIGNAL_RADIUS;
+        let pad = self.style.node_height * 0.5 + self.style.signal_radius;
         let last = self.layout.position_for(n - 1);
         match self.layout.direction {
             StepwiseDirection::Horizontal => Bounds::new(

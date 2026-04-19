@@ -1,14 +1,10 @@
 use crate::frontend::collection::storytelling::stepwise::model::{
     Direction, Step, StepContent, StepwiseModel, Transition,
 };
+use std::sync::Arc;
 
 pub fn stepwise<F: FnOnce(&mut ScriptBuilder)>(f: F) -> StepwiseModel {
-    let mut builder = ScriptBuilder {
-        steps: Vec::new(),
-        explicit_connections: Vec::new(),
-        has_explicit_connections: false,
-        explicit_sequence: None,
-    };
+    let mut builder = ScriptBuilder::new();
     f(&mut builder);
     builder.build()
 }
@@ -39,6 +35,15 @@ pub struct ScriptBuilder {
 }
 
 impl ScriptBuilder {
+    pub fn new() -> Self {
+        Self {
+            steps: Vec::new(),
+            explicit_connections: Vec::new(),
+            has_explicit_connections: false,
+            explicit_sequence: None,
+        }
+    }
+
     /// Adds a basic labeled node to the storytelling model.
     /// Returns the stable index of the step for use in `connect` or `with_sequence`.
     pub fn step(&mut self, label: &str) -> usize {
@@ -51,11 +56,15 @@ impl ScriptBuilder {
     }
 
     /// Adds a node with custom projected content.
-    pub fn step_with_content(&mut self, label: &str, content: Box<dyn StepContent>) -> usize {
+    pub fn step_with_content(
+        &mut self,
+        label: &str,
+        content: impl Into<Arc<dyn StepContent>>,
+    ) -> usize {
         let idx = self.steps.len();
         self.steps.push(Step {
             label: label.to_string(),
-            content: Some(content),
+            content: Some(content.into()),
         });
         idx
     }
@@ -94,7 +103,7 @@ impl ScriptBuilder {
         self
     }
 
-    fn build(self) -> StepwiseModel {
+    pub fn build(self) -> StepwiseModel {
         let n = self.steps.len();
 
         let sequence = if let Some(seq) = self.explicit_sequence {

@@ -1,7 +1,7 @@
 // src/frontend/collection/storytelling/stepwise/model.rs
 use super::state::StepState;
 use crate::projection::{Project, ProjectionCtx};
-use glam::Vec3;
+use std::sync::Arc;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Direction {
@@ -11,9 +11,10 @@ pub enum Direction {
     Right,
 }
 
+#[derive(Clone)]
 pub struct Step {
     pub label: String,
-    pub content: Option<Box<dyn StepContent>>,
+    pub content: Option<Arc<dyn StepContent>>,
 }
 
 impl std::fmt::Debug for Step {
@@ -22,15 +23,6 @@ impl std::fmt::Debug for Step {
             .field("label", &self.label)
             .field("content", &self.content.as_ref().map(|_| "<StepContent>"))
             .finish()
-    }
-}
-
-impl Clone for Step {
-    fn clone(&self) -> Self {
-        Self {
-            label: self.label.clone(),
-            content: None,
-        }
     }
 }
 
@@ -82,6 +74,12 @@ pub struct TattvaContent<T: Project + Send + Sync> {
 impl<T: Project + Send + Sync> TattvaContent<T> {
     pub fn new(inner: T) -> Self {
         Self { inner }
+    }
+}
+
+impl<T: Project + Send + Sync + 'static> From<TattvaContent<T>> for Arc<dyn StepContent> {
+    fn from(value: TattvaContent<T>) -> Self {
+        Arc::new(value)
     }
 }
 
