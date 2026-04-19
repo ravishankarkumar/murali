@@ -14,19 +14,21 @@ Murali uses a right-handed world-space coordinate system with the origin at the 
 
 ## Aspect ratio
 
-The default viewport is 16:9. At the default camera distance (`z = 10.0`), the visible world space is roughly:
+Murali uses a canonical 16:9 coordinate system. The default visible world space is:
 
-- X: `-7.1` to `7.1`
-- Y: `-4.0` to `4.0`
+- X: `-8` to `8`
+- Y: `-4.5` to `4.5`
 
-All sizes (font sizes, shape radii, line thickness) are in these world units.
+This is exact and symmetric — not derived or approximate. `x = 4` is exactly one quarter of the screen width. `x = 8` is the right edge.
+
+All sizes (font sizes, shape radii, line thickness) are in these world units. The camera is the single source of truth for these bounds — layout helpers like `to_edge` derive from it automatically.
 
 ## Camera
 
-The camera defaults to an orbit controller centered at the origin. For 2D scenes, set the camera position on the Z axis:
+The camera uses orthographic projection by default. Moving the camera position does **not** change what's visible — only `set_view_width` does. For 2D scenes the Z position is irrelevant to the visible area:
 
 ```rust
-scene.camera_mut().position = Vec3::new(0.0, 0.0, 10.0);
+scene.camera_mut().position = Vec3::new(0.0, 0.0, 10.0); // Z doesn't affect ortho bounds
 ```
 
 For 3D scenes, you can orbit freely in the preview window.

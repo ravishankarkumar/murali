@@ -1,0 +1,143 @@
+---
+sidebar_position: 1
+---
+
+# Examples
+
+Murali ships with a strong examples folder, but raw file names are not the best way to learn the library. This page groups examples by intent so you can quickly find the right starting point.
+
+If you are new to Murali, read [First Scene](../first-scene.md), [Which API Should I Use?](../which-api-should-i-use.md), and [Animations](../animations.md) first. Then come back here when you want a concrete pattern to copy.
+
+## Quick Start Picks
+
+If you only want a few examples to begin with:
+
+- `examples/basics/animated_motion.rs` - minimal scene + motion
+- `examples/animation/semantic_animation_showcase.rs` - the main animation vocabulary
+- `examples/text_and_math/latex_showcase.rs` - formula rendering
+- `examples/graphs_and_fields/vector_field_showcase.rs` - field-style scenes
+- `examples/three_d/parametric_surface_showcase.rs` - basic 3D surface workflow
+- `examples/branding_and_export/screenshot_markers.rs` - export-time captures
+
+## By Intent
+
+### Learn the basics
+
+- `examples/basics/animated_motion.rs`
+  What to notice: scene setup, timeline authoring, simple motion
+- `examples/basics/shapes.rs`
+  What to notice: primitive tattvas and authored placement
+- `examples/basics/layout_playground.rs`
+  What to notice: layout helpers like `next_to`, `align_to`, and composition patterns
+- `examples/basics/styling_showcase.rs`
+  What to notice: colors, stroke/fill choices, and presentation polish
+
+### Understand animation verbs
+
+- `examples/animation/semantic_animation_showcase.rs`
+  What to notice: high-level verbs like `appear`, `draw`, and fades
+- `examples/animation/text_reveal_effects_showcase.rs`
+  What to notice: `reveal_text`, `typewrite_text`, and text-specific staging
+- `examples/animation/write_effect_showcase.rs`
+  What to notice: path/table writing effects
+- `examples/animation/unwrite_showcase.rs`
+  What to notice: reverse/retract patterns
+- `examples/animation/morph_and_move.rs`
+  What to notice: morphing while keeping scene choreography readable
+
+### Work with text and formulas
+
+- `examples/text_and_math/axes_and_labels.rs`
+  What to notice: lightweight `Label` usage in explanatory scenes
+- `examples/text_and_math/latex_showcase.rs`
+  What to notice: standard LaTeX rendering flow
+- `examples/text_and_math/typst_showcase.rs`
+  What to notice: Typst-based typesetting and modern math/text authoring
+- `examples/text_and_math/formula_morph_showcase.rs`
+  What to notice: vector formula morphs and continuity-oriented math animation
+- `examples/text_and_math/matrix_showcase.rs`
+  What to notice: matrix styling, highlighting, and mathematical layout
+- `examples/text_and_math/table_showcase.rs`
+  What to notice: table configuration and reveal/write patterns
+
+### Build graphs, fields, and STEM visuals
+
+- `examples/graphs_and_fields/graph_on_axes.rs`
+  What to notice: function graphs in a teaching-style scene
+- `examples/graphs_and_fields/vector_field_showcase.rs`
+  What to notice: `VectorField` styling and density choices
+- `examples/graphs_and_fields/vector_field_and_streamlines.rs`
+  What to notice: when to combine arrows with flow traces
+- `examples/graphs_and_fields/stream_lines_showcase.rs`
+  What to notice: streamline integration settings and bounds
+- `examples/graphs_and_fields/graph_draw_3d_camera.rs`
+  What to notice: graph content combined with camera motion
+
+### Tell stories and explain AI systems
+
+- `examples/ai_and_storytelling/stepwise.rs`
+  What to notice: staged reveal structure
+- `examples/ai_and_storytelling/stepwise_script_api.rs`
+  What to notice: authored storytelling flow
+- `examples/ai_and_storytelling/neural_network_v2.rs`
+  What to notice: composite AI diagrams
+- `examples/ai_and_storytelling/agentic_flow_chart.rs`
+  What to notice: flow chart structure and reveal choreography
+- `examples/ai_and_storytelling/ai_teaching_showcase.rs`
+  What to notice: combining text, diagrams, and teaching-style pacing
+
+### Use updaters and dynamic systems
+
+- `examples/dynamics/force_field_with_updaters.rs`
+  What to notice: updater-driven behavior rather than fixed scheduling
+- `examples/dynamics/projectile_with_updaters.rs`
+  What to notice: dependent motion and simulation-style authoring
+- `examples/dynamics/traced_path_rolling_circle.rs`
+  What to notice: `TracedPath` and continuously evolving geometry
+- `examples/dynamics/particle_belt.rs`
+  What to notice: higher-density procedural visuals
+
+### Work in 3D
+
+- `examples/three_d/parametric_surface_showcase.rs`
+  What to notice: baseline surface authoring
+- `examples/three_d/parametric_surface_animated.rs`
+  What to notice: animated 3D surfaces
+- `examples/three_d/parametric_surface_wireframe_showcase.rs`
+  What to notice: wireframe-first exploration scenes
+- `examples/three_d/textured_surface_showcase.rs`
+  What to notice: path-based texture loading with surfaces
+
+### Export for assets, posts, and captures
+
+- `examples/branding_and_export/blog_showcase.rs`
+  What to notice: export settings for polished deliverables
+- `examples/branding_and_export/export_aiu_attention.rs`
+  What to notice: custom `ExportSettings`
+- `examples/branding_and_export/screenshot_markers.rs`
+  What to notice: screenshot and GIF capture schedules authored in the scene
+- `examples/branding_and_export/murali_logo.rs`
+  What to notice: branding-quality composition and export output
+
+## Choosing An Example
+
+Use this rough mapping when you are not sure where to start:
+
+- learning scene structure: start in `examples/basics`
+- learning animation vocabulary: start in `examples/animation`
+- learning text, equations, or tables: start in `examples/text_and_math`
+- learning graphs, fields, or STEM visuals: start in `examples/graphs_and_fields`
+- learning story-first or AI-first scenes: start in `examples/ai_and_storytelling`
+- learning updater-driven motion: start in `examples/dynamics`
+- learning camera and surfaces: start in `examples/three_d`
+- learning asset generation and captures: start in `examples/branding_and_export`
+
+## Related Docs
+
+- [Animations](../animations.md)
+- [Timelines](../timelines.md)
+- [Scene and App](../scene-and-app.md)
+- [Text](../tattvas/text.md)
+- [Graphs](../tattvas/graphs.md)
+- [Math](../tattvas/math.md)
+- [Export and Capture](../export-and-capture.md)

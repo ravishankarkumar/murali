@@ -36,18 +36,11 @@ const config: Config = {
         docs: {
           sidebarPath: './sidebars.ts',
           editUrl: 'https://github.com/ravishankarkumar/murali/tree/main/docs/',
-          lastVersion: '0.0.2',
+          lastVersion: '0.1.0',
           versions: {
             current: {
               label: 'Next 🚧',
               path: 'next',
-            },
-            '0.0.2': {
-              label: '0.0.2',
-              path: '',
-            },
-            '0.0.1': {
-              label: '0.0.1',
             },
           },
         },
