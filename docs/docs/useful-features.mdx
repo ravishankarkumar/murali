@@ -75,7 +75,71 @@ scene.capture_gif("circle_focus", [2.2, 2.7]);
 
 ## PNG export
 
-... Document pending ...
+Murali can export PNGs even when you do not want a final MP4 or GIF.
+
+There are two useful PNG workflows:
+
+* **full frame export** — write the whole animation as a PNG sequence
+* **timestamped screenshots** — capture selected authored moments as standalone PNGs
+
+### Frame-by-frame PNG export
+
+During export, Murali can always write PNG frames to the output directory.
+
+This is useful when you want:
+
+* a frame sequence for post-processing
+* deterministic image output without relying on `ffmpeg`
+* assets for another video editing or compositing pipeline
+
+Typical output looks like:
+
+* `render_output/frames/frame_00000.png`
+* `render_output/frames/frame_00001.png`
+* `render_output/frames/frame_00002.png`
+
+If `ffmpeg` is missing, Murali still keeps these PNG frames and tells you where they were written.
+
+### Transparent PNG backgrounds
+
+If you want transparent PNG output, set the export clear color alpha to `0.0`:
+
+```rust
+use glam::Vec4;
+use murali::engine::export::ExportSettings;
+
+let settings = ExportSettings {
+    clear_color: Vec4::new(0.0, 0.0, 0.0, 0.0),
+    ..Default::default()
+};
+```
+
+This works well for brand marks, logos, overlays, and other assets that need to sit on top of another background later.
+
+PNG keeps the alpha channel. MP4 does not preserve transparent backgrounds in this export path.
+
+### Authored PNG screenshots
+
+If you only want a few specific PNGs, prefer scene-level screenshot capture:
+
+```rust
+scene.capture_screenshots([0.5, 1.0, 2.0]);
+
+scene.capture_screenshots_named([
+    (0.5, Some("captures/intro.png")),
+    (1.0, None::<&str>),
+    (2.0, Some("captures/final.png")),
+]);
+```
+
+This is the best fit for:
+
+* blog images
+* documentation assets
+* social thumbnails
+* milestone frames from a longer animation
+
+For more detail on export configuration, see [Export and Capture](./export-and-capture).
 
 ## 💡 Why this matters
 

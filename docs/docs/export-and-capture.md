@@ -125,6 +125,31 @@ Reach for `ExportSettings` when you want to control:
 - capture GIF directory
 - clear color
 
+### Transparent PNG backgrounds
+
+Murali can export PNG frames and screenshots with a transparent background.
+
+Set the export clear color alpha to `0.0`:
+
+```rust
+use glam::Vec4;
+use murali::engine::export::ExportSettings;
+
+let settings = ExportSettings {
+    clear_color: Vec4::new(0.0, 0.0, 0.0, 0.0),
+    ..Default::default()
+};
+```
+
+This is especially useful for:
+
+- logos
+- overlays
+- slide assets
+- compositing in video editors or design tools
+
+PNG preserves this transparency. MP4 export does not preserve transparent backgrounds in this pipeline, and GIF transparency is more limited.
+
 ## Screenshots At Authored Times
 
 If you want screenshots from specific authored moments, schedule them on the `Scene`:

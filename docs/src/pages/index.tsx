@@ -27,7 +27,7 @@ const pathways: Card[] = [
   {
     title: 'Learn tattvas',
     description: 'Shapes, text, layout, and storytelling building blocks.',
-    to: '/docs/next/tattvas/',
+    to: '/docs/tattvas/',
     label: 'Core API',
   },
   {
@@ -39,7 +39,7 @@ const pathways: Card[] = [
   {
     title: 'Study the engine',
     description: 'Architecture, projection, renderer internals, and ECS flow.',
-    to: '/docs/next/architecture/overview/',
+    to: '/docs/architecture/overview/',
     label: 'Internals',
   },
 ];
@@ -80,12 +80,12 @@ const resources: Card[] = [
   {
     title: 'Storytelling primitives',
     description: 'Stepwise diagrams, agentic flows, and visual explanation components.',
-    to: '/docs/next/tattvas/storytelling/',
+    to: '/docs/tattvas/storytelling/',
   },
   {
     title: 'Feature internals',
     description: 'Implementation notes for major systems such as Stepwise and neural diagrams.',
-    to: '/docs/next/feature-internals/overview/',
+    to: '/docs/feature-internals/overview/',
   },
 ];
 

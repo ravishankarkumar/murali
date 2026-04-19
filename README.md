@@ -39,7 +39,7 @@ Install from crates.io:
 
 ```toml
 [dependencies]
-murali = "0.1.4"
+murali = "0.1.5"
 anyhow = "1"
 glam = "0.29"
 ```
