@@ -1,4 +1,4 @@
-import type {ReactNode} from 'react';
+import type { ReactNode } from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import useBaseUrl from '@docusaurus/useBaseUrl';
@@ -60,6 +60,23 @@ const highlights: Card[] = [
 ];
 
 const resources: Card[] = [
+  // {
+  //   title: 'Canonical examples',
+  //   description: 'Runnable examples for reference-quality scene code.',
+  //   href: 'https://github.com/ravishankarkumar/murali/blob/main/examples/README.md',
+  // },
+  {
+    title: 'Example code snippets',
+    description: 'Runnable Murali examples in a dedicated GitHub repository.',
+    href: 'https://github.com/ravishankarkumar/murali-examples',
+    label: 'Examples',
+  },
+  {
+    title: 'YouTube showcase',
+    description: 'Watch Murali showcase videos and visual demos on the official channel.',
+    href: 'https://www.youtube.com/@muraliengine',
+    label: 'Videos',
+  },
   {
     title: 'Storytelling primitives',
     description: 'Stepwise diagrams, agentic flows, and visual explanation components.',
@@ -69,11 +86,6 @@ const resources: Card[] = [
     title: 'Feature internals',
     description: 'Implementation notes for major systems such as Stepwise and neural diagrams.',
     to: '/docs/next/feature-internals/overview/',
-  },
-  {
-    title: 'Canonical examples',
-    description: 'Runnable examples for reference-quality scene code.',
-    href: 'https://github.com/ravishankarkumar/murali/blob/main/examples/README.md',
   },
 ];
 
@@ -98,7 +110,7 @@ const showcaseVideos: VideoShowcase[] = [
 
 const constructs = ['Scene', 'Timeline', 'Tattvas', 'Renderer'];
 
-function SurfaceCard({title, description, to, href, label}: Card) {
+function SurfaceCard({ title, description, to, href, label }: Card) {
   const content = (
     <>
       {label ? <span className={styles.cardLabel}>{label}</span> : null}
@@ -226,7 +238,7 @@ function VideoSection() {
 }
 
 export default function Home(): ReactNode {
-  const {siteConfig} = useDocusaurusContext();
+  const { siteConfig } = useDocusaurusContext();
 
   return (
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
@@ -274,8 +286,8 @@ export default function Home(): ReactNode {
             <div className={styles.split}>
               <SectionIntro
                 eyebrow="Explore"
-                title="Documentation, internals, and reference examples"
-                body="Murali includes storytelling primitives, architecture notes, and runnable examples so you can move from concept to scene quickly."
+                title="Documentation, internals, examples, and showcase videos"
+                body="Murali includes storytelling primitives, architecture notes, runnable example code, and showcase videos so you can move from concept to scene quickly."
               />
               <div className={styles.note}>
                 <p className={styles.noteTitle}>Suggested reading order</p>
@@ -283,7 +295,7 @@ export default function Home(): ReactNode {
                   <li>Introduction</li>
                   <li>Tattvas</li>
                   <li>Animations</li>
-                  <li>Scene and App</li>
+                  <li>Scenes and App</li>
                   <li>Architecture overview</li>
                 </ol>
               </div>

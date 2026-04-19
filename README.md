@@ -2,7 +2,14 @@
 
 Murali is a Rust-based animation engine for semantic graphics and mathematical scenes. It is built around deterministic timelines, a frontend scene model, CPU-side projection, and a GPU-backed runtime.
 
-For full documentation and showcases, visit [muraliengine.com](https://muraliengine.com)
+## Documentation and cookbook
+
+- Project overview: [Project Overview](https://muraliengine.com)
+- Scene and app docs: [Scene and App](https://muraliengine.com/docs/scene-and-app)
+- Internal architecture: [Architecture Overview](https://muraliengine.com/docs/architecture/overview)
+- Youtube showcase [Murali Youtube Channel](https://www.youtube.com/@muraliengine)
+- Example code snippet [github repo](https://github.com/ravishankarkumar/murali-examples)
+
 
 ## Goals
 
@@ -60,12 +67,6 @@ height = 1080
 ```
 
 A sample file is included at [murali.toml.example](./murali.toml.example).
-
-## Documentation
-
-- Project overview: [Project Overview](https://muraliengine.com)
-- Scene and app docs: [Scene and App](https://muraliengine.com/docs/scene-and-app)
-- Internal architecture: [Architecture Overview](https://muraliengine.com/docs/architecture/overview)
 
 
 ## Examples
