@@ -48,15 +48,15 @@ fn main() -> anyhow::Result<()> {
         println!("Exporting to GIF...");
         let settings = ExportSettings {
             duration_seconds: 2.0,
-            output_dir: "renders/blog_showcase_frames".into(),
+            output_dir: "render_output/blog_showcase_frames".into(),
             basename: "blog_showcase".to_string(),
-            gif_path: Some("renders/blog_showcase.gif".into()),
+            gif_path: Some("render_output/blog_showcase.gif".into()),
             video_path: None,
             clear_color: theme.background,
             ..ExportSettings::default()
         };
         export_scene(scene, &settings)?;
-        println!("Export complete: renders/blog_showcase.gif");
+        println!("Export complete: render_output/blog_showcase.gif");
     } else {
         App::new()?.with_scene(scene).run_app()?;
     }

@@ -1,5 +1,5 @@
 /target
-/renders
+/render_output
 
 # Docusaurus
 docs/node_modules
@@ -9,3 +9,5 @@ murali.toml
 
 .windsurf
 .vscode
+
+**/.DS_Store

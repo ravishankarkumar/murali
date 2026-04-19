@@ -70,7 +70,7 @@ let options = RenderOptions {
     frames: Some(true),
     fps: Some(60),
     resolution: Some((1920, 1080)),
-    output: Some("renders/demo.mp4".to_string()),
+    output: Some("render_output/demo.mp4".to_string()),
 };
 
 App::new()
@@ -98,11 +98,11 @@ let settings = ExportSettings {
     height: 1080,
     fps: 60,
     duration_seconds: 6.0,
-    output_dir: "renders/frames".into(),
+    output_dir: "render_output/frames".into(),
     basename: "demo".to_string(),
-    video_path: Some("renders/demo.mp4".into()),
-    gif_path: Some("renders/demo.gif".into()),
-    capture_gif_dir: Some("renders/capture_gifs".into()),
+    video_path: Some("render_output/demo.mp4".into()),
+    gif_path: Some("render_output/demo.gif".into()),
+    capture_gif_dir: Some("render_output/capture_gifs".into()),
     clear_color: Vec4::new(0.05, 0.10, 0.15, 1.0),
 };
 

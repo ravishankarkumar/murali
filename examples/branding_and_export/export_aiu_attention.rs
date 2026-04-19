@@ -43,9 +43,9 @@ fn main() -> anyhow::Result<()> {
     let theme = Theme::ai_under_the_hood();
     let settings = ExportSettings {
         duration_seconds: 1.0,
-        output_dir: "renders/aiu_attention_frames".into(),
+        output_dir: "render_output/aiu_attention_frames".into(),
         basename: "aiu_attention".to_string(),
-        video_path: Some("renders/aiu_attention.mp4".into()),
+        video_path: Some("render_output/aiu_attention.mp4".into()),
         clear_color: theme.background,
         ..ExportSettings::default()
     };

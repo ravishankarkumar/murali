@@ -68,7 +68,7 @@ fn main() -> anyhow::Result<()> {
     // Export to video
     let settings = ExportSettings {
         duration_seconds: 1.0,
-        gif_path: Some("renders/styling_showcase.gif".into()),
+        gif_path: Some("render_output/styling_showcase.gif".into()),
         ..Default::default()
     };
     export_scene(scene, &settings)?;

@@ -1,7 +1,26 @@
 [package]
 name = "murali"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
+rust-version = "1.85"
+description = "A Rust animation engine for programmatic, timeline-driven visuals."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ravishankarkumar/murali"
+homepage = "https://muraliengine.com"
+documentation = "https://muraliengine.com"
+readme = "README.md"
+keywords = ["animation", "graphics", "rendering", "wgpu"]
+categories = ["graphics", "rendering"]
+
+exclude = [
+  "docs/**",
+  "examples/**",
+  "scripts/**",
+  "optimization/**",
+  ".github/**",
+  "render_output/**",
+  "Cargo.toml.orig"
+]
 
 [features]
 default = ["typst_embedded"]
@@ -20,7 +39,7 @@ tokio = { version = "1", features = [
   "rt",
   "macros",
   "full",
-] } # you already use tokio in examples
+] }
 typst = { version = "0.13.1", optional = true } # version may vary; required for embedded Typst
 typst-as-lib = { version = "0.13", optional = true, features = ["typst-kit-fonts", "typst-kit-embed-fonts"] } # optional helper; pick actual maintained wrapper
 typst-svg = { version = "0.13.1", optional = true } # if available; otherwise use typst APIs
@@ -46,301 +65,3 @@ hecs = "0.9"
 
 [dev-dependencies]
 proptest = "1"
-
-# BEGIN GENERATED EXAMPLES
-[[example]]
-name = "agentic_flow_chart"
-path = "examples/ai_and_storytelling/agentic_flow_chart.rs"
-
-[[example]]
-name = "agentic_flow_with_neural_node"
-path = "examples/ai_and_storytelling/agentic_flow_with_neural_node.rs"
-
-[[example]]
-name = "agentic_flow_write_animation"
-path = "examples/ai_and_storytelling/agentic_flow_write_animation.rs"
-
-[[example]]
-name = "agentic_reveal_showcase"
-path = "examples/ai_and_storytelling/agentic_reveal_showcase.rs"
-
-[[example]]
-name = "ai_teaching_showcase"
-path = "examples/ai_and_storytelling/ai_teaching_showcase.rs"
-
-[[example]]
-name = "neural_network_v2"
-path = "examples/ai_and_storytelling/neural_network_v2.rs"
-
-[[example]]
-name = "neural_signal_flow"
-path = "examples/ai_and_storytelling/neural_signal_flow.rs"
-
-[[example]]
-name = "stepwise"
-path = "examples/ai_and_storytelling/stepwise.rs"
-
-[[example]]
-name = "stepwise_backpath"
-path = "examples/ai_and_storytelling/stepwise_backpath.rs"
-
-[[example]]
-name = "stepwise_neural_node"
-path = "examples/ai_and_storytelling/stepwise_neural_node.rs"
-
-[[example]]
-name = "stepwise_script_api"
-path = "examples/ai_and_storytelling/stepwise_script_api.rs"
-
-[[example]]
-name = "animation_parity"
-path = "examples/animation/animation_parity.rs"
-
-[[example]]
-name = "morph_and_move"
-path = "examples/animation/morph_and_move.rs"
-
-[[example]]
-name = "morph_showcase"
-path = "examples/animation/morph_showcase.rs"
-
-[[example]]
-name = "semantic_animation_showcase"
-path = "examples/animation/semantic_animation_showcase.rs"
-
-[[example]]
-name = "text_indicate_showcase"
-path = "examples/animation/text_indicate_showcase.rs"
-
-[[example]]
-name = "text_reveal_effects_showcase"
-path = "examples/animation/text_reveal_effects_showcase.rs"
-
-[[example]]
-name = "text_write_effect_showcase"
-path = "examples/animation/text_write_effect_showcase.rs"
-
-[[example]]
-name = "unwrite_showcase"
-path = "examples/animation/unwrite_showcase.rs"
-
-[[example]]
-name = "write_effect_showcase"
-path = "examples/animation/write_effect_showcase.rs"
-
-[[example]]
-name = "animated_motion"
-path = "examples/basics/animated_motion.rs"
-
-[[example]]
-name = "arrow_showcase"
-path = "examples/basics/arrow_showcase.rs"
-
-[[example]]
-name = "bezier_showcase"
-path = "examples/basics/bezier_showcase.rs"
-
-[[example]]
-name = "layout_playground"
-path = "examples/basics/layout_playground.rs"
-
-[[example]]
-name = "primitives_showcase"
-path = "examples/basics/primitives_showcase.rs"
-
-[[example]]
-name = "shapes"
-path = "examples/basics/shapes.rs"
-
-[[example]]
-name = "shapes_extended"
-path = "examples/basics/shapes_extended.rs"
-
-[[example]]
-name = "styling_showcase"
-path = "examples/basics/styling_showcase.rs"
-
-[[example]]
-name = "aiu_attention_template"
-path = "examples/branding_and_export/aiu_attention_template.rs"
-
-[[example]]
-name = "blog_showcase"
-path = "examples/branding_and_export/blog_showcase.rs"
-
-[[example]]
-name = "export_aiu_attention"
-path = "examples/branding_and_export/export_aiu_attention.rs"
-
-[[example]]
-name = "murali_flute_feather_logo"
-path = "examples/branding_and_export/murali_flute_feather_logo.rs"
-
-[[example]]
-name = "murali_flute_logo"
-path = "examples/branding_and_export/murali_flute_logo.rs"
-
-[[example]]
-name = "murali_logo"
-path = "examples/branding_and_export/murali_logo.rs"
-
-[[example]]
-name = "screenshot_markers"
-path = "examples/branding_and_export/screenshot_markers.rs"
-
-[[example]]
-name = "force_field_multiple_charges"
-path = "examples/dynamics/force_field_multiple_charges.rs"
-
-[[example]]
-name = "force_field_with_updaters"
-path = "examples/dynamics/force_field_with_updaters.rs"
-
-[[example]]
-name = "particle_belt"
-path = "examples/dynamics/particle_belt.rs"
-
-[[example]]
-name = "particle_nebula_showcase"
-path = "examples/dynamics/particle_nebula_showcase.rs"
-
-[[example]]
-name = "projectile_with_updaters"
-path = "examples/dynamics/projectile_with_updaters.rs"
-
-[[example]]
-name = "swaying_points"
-path = "examples/dynamics/swaying_points.rs"
-
-[[example]]
-name = "traced_path_rolling_circle"
-path = "examples/dynamics/traced_path_rolling_circle.rs"
-
-[[example]]
-name = "graph_draw_3d_camera"
-path = "examples/graphs_and_fields/graph_draw_3d_camera.rs"
-
-[[example]]
-name = "graph_on_axes"
-path = "examples/graphs_and_fields/graph_on_axes.rs"
-
-[[example]]
-name = "map_projection_morph"
-path = "examples/graphs_and_fields/map_projection_morph.rs"
-
-[[example]]
-name = "noisy_circle"
-path = "examples/graphs_and_fields/noisy_circle.rs"
-
-[[example]]
-name = "perlin_noise_horizon"
-path = "examples/graphs_and_fields/perlin_noise_horizon.rs"
-
-[[example]]
-name = "stream_lines_showcase"
-path = "examples/graphs_and_fields/stream_lines_showcase.rs"
-
-[[example]]
-name = "vector_field_and_streamlines"
-path = "examples/graphs_and_fields/vector_field_and_streamlines.rs"
-
-[[example]]
-name = "vector_field_showcase"
-path = "examples/graphs_and_fields/vector_field_showcase.rs"
-
-[[example]]
-name = "axes_and_labels"
-path = "examples/text_and_math/axes_and_labels.rs"
-
-[[example]]
-name = "formula_morph_showcase"
-path = "examples/text_and_math/formula_morph_showcase.rs"
-
-[[example]]
-name = "formula_shape_formula_morph"
-path = "examples/text_and_math/formula_shape_formula_morph.rs"
-
-[[example]]
-name = "fourier_formula_trace"
-path = "examples/text_and_math/fourier_formula_trace.rs"
-
-[[example]]
-name = "fourier_simple_trace"
-path = "examples/text_and_math/fourier_simple_trace.rs"
-
-[[example]]
-name = "latex_matrix_multiplication_morph"
-path = "examples/text_and_math/latex_matrix_multiplication_morph.rs"
-
-[[example]]
-name = "latex_matrix_showcase"
-path = "examples/text_and_math/latex_matrix_showcase.rs"
-
-[[example]]
-name = "latex_showcase"
-path = "examples/text_and_math/latex_showcase.rs"
-
-[[example]]
-name = "latex_to_latex_morph"
-path = "examples/text_and_math/latex_to_latex_morph.rs"
-
-[[example]]
-name = "matrix_showcase"
-path = "examples/text_and_math/matrix_showcase.rs"
-
-[[example]]
-name = "stem_showcase"
-path = "examples/text_and_math/stem_showcase.rs"
-
-[[example]]
-name = "table_showcase"
-path = "examples/text_and_math/table_showcase.rs"
-
-[[example]]
-name = "table_simple"
-path = "examples/text_and_math/table_simple.rs"
-
-[[example]]
-name = "typst_showcase"
-path = "examples/text_and_math/typst_showcase.rs"
-
-[[example]]
-name = "typst_to_latex_morph"
-path = "examples/text_and_math/typst_to_latex_morph.rs"
-
-[[example]]
-name = "typst_to_typst_morph"
-path = "examples/text_and_math/typst_to_typst_morph.rs"
-
-[[example]]
-name = "manim_sector_fill_demo"
-path = "examples/three_d/manim_sector_fill_demo.rs"
-
-[[example]]
-name = "parametric_surface_advanced"
-path = "examples/three_d/parametric_surface_advanced.rs"
-
-[[example]]
-name = "parametric_surface_animated"
-path = "examples/three_d/parametric_surface_animated.rs"
-
-[[example]]
-name = "parametric_surface_showcase"
-path = "examples/three_d/parametric_surface_showcase.rs"
-
-[[example]]
-name = "parametric_surface_wireframe"
-path = "examples/three_d/parametric_surface_wireframe.rs"
-
-[[example]]
-name = "parametric_surface_wireframe_animated"
-path = "examples/three_d/parametric_surface_wireframe_animated.rs"
-
-[[example]]
-name = "parametric_surface_wireframe_showcase"
-path = "examples/three_d/parametric_surface_wireframe_showcase.rs"
-
-[[example]]
-name = "textured_surface_showcase"
-path = "examples/three_d/textured_surface_showcase.rs"
-# END GENERATED EXAMPLES

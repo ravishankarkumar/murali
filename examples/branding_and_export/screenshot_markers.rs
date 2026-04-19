@@ -80,11 +80,11 @@ fn main() -> anyhow::Result<()> {
     if args.iter().any(|arg| arg == "--export") {
         let settings = ExportSettings {
             duration_seconds: 2.8,
-            output_dir: "renders/screenshot_marker_frames".into(),
+            output_dir: "render_output/screenshot_marker_frames".into(),
             basename: "screenshot_markers".to_string(),
             video_path: None,
             gif_path: None,
-            capture_gif_dir: Some("renders/screenshot_marker_gifs".into()),
+            capture_gif_dir: Some("render_output/screenshot_marker_gifs".into()),
             ..ExportSettings::default()
         };
         return export_scene(build_scene(), &settings);

@@ -42,7 +42,7 @@ fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
 
     if args.iter().any(|arg| arg == "--export") {
-        let export_dir = "renders/logo_exports";
+        let export_dir = "render_output/logo_exports";
         let light_settings = ExportSettings {
             duration_seconds: 0.1,
             output_dir: export_dir.into(),

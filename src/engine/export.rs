@@ -38,9 +38,9 @@ impl Default for ExportSettings {
             height: 1080,
             fps: 60,
             duration_seconds: 1.0,
-            output_dir: PathBuf::from("renders/frames"),
+            output_dir: PathBuf::from("render_output/frames"),
             basename: "frame".to_string(),
-            video_path: Some(PathBuf::from("renders/output.mp4")),
+            video_path: Some(PathBuf::from("render_output/output.mp4")),
             gif_path: None,
             capture_gif_dir: None,
             clear_color: Vec4::new(0.05, 0.10, 0.15, 1.0),
@@ -105,7 +105,7 @@ impl ExportSettings {
 
         settings.gif_path = cfg.gif_path;
         if !options.frames_enabled() {
-            settings.output_dir = PathBuf::from("renders/frames");
+            settings.output_dir = PathBuf::from("render_output/frames");
         }
 
         Ok(settings)
@@ -126,7 +126,7 @@ impl ExportSettings {
 }
 
 fn resolve_video_output_path(path: Option<PathBuf>) -> Option<PathBuf> {
-    let path = path.unwrap_or_else(|| PathBuf::from("renders/output.mp4"));
+    let path = path.unwrap_or_else(|| PathBuf::from("render_output/output.mp4"));
     if looks_like_directory_path(&path) {
         let stem = infer_default_export_stem();
         return Some(path.join(format!("{stem}.mp4")));
