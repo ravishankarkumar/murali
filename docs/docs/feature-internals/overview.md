@@ -39,7 +39,7 @@ Current pages:
 
 As Murali grows, this section is also a good home for contributor deep dives on features like:
 
-- agentic flow chart
+- agentic flow chart, if it is revisited in a future iteration
 - transformer block diagrams
 - advanced storytelling tattvas
 - AI teaching templates

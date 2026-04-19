@@ -79,7 +79,7 @@ const resources: Card[] = [
   },
   {
     title: 'Storytelling primitives',
-    description: 'Stepwise diagrams, agentic flows, and visual explanation components.',
+    description: 'Stepwise diagrams and visual explanation components, with Stepwise as the recommended path for new storytelling work.',
     to: '/docs/tattvas/storytelling/',
   },
   {

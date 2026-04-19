@@ -16,7 +16,7 @@ This family is for higher-level teaching visuals and model diagrams rather than 
 - `TokenSequence` - ordered token visualization
 - `TransformerBlockDiagram` - transformer-style block composition
 - `DecisionBoundaryPlot` - classifier-style 2D decision region plot
-- `AgenticFlowChart` - routed flow-chart style diagrams
+- `AgenticFlowChart` - routed flow-chart style diagrams (available, but not currently being actively evolved; prefer `Stepwise` for new storytelling-oriented flows)
 
 ## Examples
 
