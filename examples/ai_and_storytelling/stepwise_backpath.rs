@@ -42,9 +42,9 @@ fn main() -> anyhow::Result<()> {
 
     let sw = Stepwise::new(model)
         .with_layout(StepwiseLayout::horizontal(2.0))
-        .with_debug(true);
+        .with_debug(false);
 
-    let sw_id = scene.add_tattva(sw, 2.0 * LEFT);
+    let sw_id = scene.add_tattva(sw, 3.0 * LEFT);
 
     let mut timeline = Timeline::new();
 
@@ -68,10 +68,10 @@ fn main() -> anyhow::Result<()> {
 
     scene.set_timeline("main", timeline);
 
-    scene.camera_mut().position = Vec3::new(0.0, -1.0, 10.0);
+    scene.camera_mut().position = Vec3::new(0.0, 0.0, 10.0);
 
     let current_width = scene.camera_mut().view_width();
-    scene.camera_mut().set_view_width(current_width * 2.5);
+    scene.camera_mut().set_view_width(current_width * 2.0);
 
     App::new()?.with_scene(scene).run_app()
 }

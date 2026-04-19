@@ -16,6 +16,7 @@ use crate::engine::config::export_config::ExportConfig;
 use crate::engine::render::RenderOptions;
 use crate::engine::scene::Scene;
 use crate::frontend::theme::Theme;
+use crate::utils::project::find_project_root;
 
 #[derive(Debug, Clone)]
 pub struct ExportSettings {
@@ -61,7 +62,8 @@ impl ExportSettings {
 
     pub fn from_project_config(scene: &Scene, options: &RenderOptions) -> Result<Self> {
         let cwd = std::env::current_dir()?;
-        let cfg = ExportConfig::load_nearest_project_file(cwd)?;
+        let project_root = find_project_root(&cwd);
+        let cfg = ExportConfig::load(project_root.join("murali.toml"))?;
 
         let mut settings = Self::from_scene(scene);
         settings.width = options
@@ -77,7 +79,7 @@ impl ExportSettings {
         settings.fps = options.fps.or(cfg.fps).unwrap_or(settings.fps);
         settings.duration_seconds = cfg.duration_seconds.unwrap_or(settings.duration_seconds);
         if let Some(output_dir) = cfg.output_dir {
-            settings.output_dir = output_dir;
+            settings.output_dir = resolve_project_relative_path(&project_root, output_dir);
         }
         if let Some(basename) = cfg.basename {
             settings.basename = basename;
@@ -93,19 +95,23 @@ impl ExportSettings {
 
         settings.video_path = if options.video_enabled() {
             resolve_video_output_path(
+                &project_root,
                 options
                     .output
                     .as_ref()
                     .map(PathBuf::from)
-                    .or(cfg.video_path),
+                    .or_else(|| cfg.video_path.map(|path| resolve_project_relative_path(&project_root, path))),
             )
         } else {
             None
         };
 
-        settings.gif_path = cfg.gif_path;
+        settings.gif_path = cfg
+            .gif_path
+            .map(|path| resolve_project_relative_path(&project_root, path));
         if !options.frames_enabled() {
-            settings.output_dir = PathBuf::from("render_output/frames");
+            settings.output_dir =
+                resolve_project_relative_path(&project_root, PathBuf::from("render_output/frames"));
         }
 
         Ok(settings)
@@ -125,14 +131,14 @@ impl ExportSettings {
     }
 }
 
-fn resolve_video_output_path(path: Option<PathBuf>) -> Option<PathBuf> {
+fn resolve_video_output_path(project_root: &Path, path: Option<PathBuf>) -> Option<PathBuf> {
     let path = path.unwrap_or_else(|| PathBuf::from("render_output/output.mp4"));
     if looks_like_directory_path(&path) {
         let stem = infer_default_export_stem();
-        return Some(path.join(format!("{stem}.mp4")));
+        return Some(resolve_project_relative_path(project_root, path).join(format!("{stem}.mp4")));
     }
 
-    Some(path)
+    Some(resolve_project_relative_path(project_root, path))
 }
 
 fn looks_like_directory_path(path: &Path) -> bool {
@@ -177,6 +183,45 @@ fn sanitize_stem(stem: &str) -> String {
         "murali_output".to_string()
     } else {
         sanitized
+    }
+}
+
+fn resolve_project_relative_path(project_root: &Path, path: PathBuf) -> PathBuf {
+    if path.is_absolute() {
+        path
+    } else {
+        project_root.join(path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{resolve_project_relative_path, resolve_video_output_path};
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn project_relative_paths_are_rebased_to_project_root() {
+        let project_root = Path::new("/tmp/murali-project");
+        let resolved =
+            resolve_project_relative_path(project_root, PathBuf::from("render_output/out.mp4"));
+        assert_eq!(resolved, project_root.join("render_output/out.mp4"));
+    }
+
+    #[test]
+    fn absolute_paths_are_preserved() {
+        let project_root = Path::new("/tmp/murali-project");
+        let absolute = PathBuf::from("/var/tmp/out.mp4");
+        let resolved = resolve_project_relative_path(project_root, absolute.clone());
+        assert_eq!(resolved, absolute);
+    }
+
+    #[test]
+    fn video_directory_paths_are_rebased_before_stem_is_added() {
+        let project_root = Path::new("/tmp/murali-project");
+        let resolved = resolve_video_output_path(project_root, Some(PathBuf::from("exports")))
+            .expect("video output path should exist");
+        assert!(resolved.starts_with(project_root.join("exports")));
+        assert_eq!(resolved.extension().and_then(|ext| ext.to_str()), Some("mp4"));
     }
 }
 

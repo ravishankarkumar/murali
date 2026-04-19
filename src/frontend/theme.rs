@@ -121,32 +121,57 @@ impl Theme {
         let custom = project_root.join("themes").join(format!("{name}.toml"));
 
         if custom.exists() {
-            if let Ok(contents) = std::fs::read_to_string(&custom) {
-                match toml::from_str::<Theme>(&contents) {
+            match std::fs::read_to_string(&custom) {
+                Ok(contents) => match toml::from_str::<Theme>(&contents) {
                     Ok(t) => return t,
                     Err(e) => {
                         eprintln!(
-                            "[murali] Warning: failed to parse theme '{name}': {e}. Falling back to built-in."
+                            "[murali] Warning: failed to parse theme '{name}' at '{}': {e}. Falling back to built-in dark theme.",
+                            custom.display()
                         );
                     }
+                },
+                Err(e) => {
+                    eprintln!(
+                        "[murali] Warning: failed to read theme '{name}' at '{}': {e}. Falling back to built-in dark theme.",
+                        custom.display()
+                    );
                 }
             }
         }
 
         // 2. Built-in defaults
-        Self::builtin(name)
+        match Self::builtin_named(name) {
+            Some(theme) => theme,
+            None => {
+                eprintln!(
+                    "[murali] Warning: unknown theme '{name}'. Falling back to built-in dark theme."
+                );
+                Self::builtin("dark")
+            }
+        }
     }
 
     /// Load a built-in theme by name (`"dark"` or `"light"`).
     /// Falls through to dark on unknown names.
     pub fn builtin(name: &str) -> Self {
+        Self::builtin_named(name).unwrap_or_else(|| {
+            toml::from_str(include_str!("../defaults/dark.toml"))
+                .expect("built-in dark.toml must be valid")
+        })
+    }
+
+    fn builtin_named(name: &str) -> Option<Self> {
         match name.to_lowercase().replace('_', "-").as_str() {
-            "light" | "murali-light" | "classroom-light" => {
+            "light" | "murali-light" | "classroom-light" => Some(
                 toml::from_str(include_str!("../defaults/light.toml"))
-                    .expect("built-in light.toml must be valid")
-            }
-            _ => toml::from_str(include_str!("../defaults/dark.toml"))
-                .expect("built-in dark.toml must be valid"),
+                    .expect("built-in light.toml must be valid"),
+            ),
+            "dark" | "murali-dark" | "ai-under-the-hood" => Some(
+                toml::from_str(include_str!("../defaults/dark.toml"))
+                    .expect("built-in dark.toml must be valid"),
+            ),
+            _ => None,
         }
     }
 }
@@ -170,5 +195,24 @@ impl Theme {
     /// projects. This constructor is retained for backwards compatibility.
     pub fn classroom_light() -> Self {
         Self::builtin("light")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Theme;
+    use std::path::Path;
+
+    #[test]
+    fn builtin_named_recognizes_dark_aliases() {
+        let theme = Theme::builtin_named("ai-under-the-hood")
+            .expect("dark alias should resolve to a built-in theme");
+        assert_eq!(theme.name, "murali-dark");
+    }
+
+    #[test]
+    fn unknown_theme_falls_back_to_dark() {
+        let theme = Theme::load_by_name("definitely-not-a-real-theme", Path::new("/tmp"));
+        assert_eq!(theme.name, "murali-dark");
     }
 }
