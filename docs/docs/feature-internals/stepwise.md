@@ -25,6 +25,9 @@ It is still a normal Murali tattva:
 
 So its complexity is not in special engine treatment. Its complexity is in how much internal structure it manages inside one tattva.
 
+From an authored API point of view, the preferred entrypoint is now `Stepwise::from_script(...)`.
+That keeps the script DSL as the single authoring path while making Stepwise feel more like other Murali tattvas.
+
 ## Internal Pieces
 
 The Stepwise implementation is split into a few focused modules:
@@ -56,6 +59,8 @@ This defines the authored structure:
 The `StepContent` trait is the main extensibility hook. It lets a step host custom projected content instead of only default node text.
 
 `TattvaContent<T>` is the adapter that wraps any existing `Project` implementor as step content. That is a key design choice because it lets Stepwise embed other Murali tattvas without requiring those tattvas to know anything about Stepwise.
+
+Custom step content is stored with shared ownership, so cloning a `StepwiseModel` no longer drops embedded content. That makes the authored model safer to reuse and pass around than the earlier implementation.
 
 ### `layout.rs`
 
@@ -103,10 +108,13 @@ This contains the actual `Stepwise` tattva and its `Project` / `Bounded` impleme
 It is responsible for:
 
 - storing runtime progress values
+- storing runtime style values
 - computing `StepwiseState`
 - projecting node and edge visuals
 - projecting signal flow visuals
 - rendering default node appearance when custom content is absent
+
+It also contains `StepwiseStyle`, which gathers the visual defaults that used to live as hardcoded constants directly inside the tattva implementation.
 
 ## State Model
 
@@ -116,6 +124,7 @@ The core runtime fields on `Stepwise` are:
 - `progress`
 - `signal_progress`
 - `layout`
+- `style`
 - `debug`
 
 The most important split is between `progress` and `signal_progress`.
@@ -140,6 +149,8 @@ It drives the signal dot along the fully or partially built route. This is a goo
 - "conceptual signal is flowing through it"
 
 That makes Stepwise more expressive than a single monolithic progress value would be.
+
+For readability, the tattva also exposes `with_reveal_progress(...)` and `with_journey_progress(...)` as clearer aliases over the original progress setters.
 
 ## Reveal Computation
 
@@ -194,6 +205,7 @@ The main extension points today are:
 - `StepContent` for custom node rendering
 - `TattvaContent<T>` for adapting existing tattvas
 - layout direction and spacing through `StepwiseLayout`
+- visual customization through `StepwiseStyle`
 - animation builders that target Stepwise-specific progress values
 
 If you want to extend Stepwise without redesigning it, these are usually the safest places to do that.
