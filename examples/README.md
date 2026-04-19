@@ -1,5 +1,7 @@
 See [STYLE_GUIDE.md](./STYLE_GUIDE.md) for the canonical Murali example structure and preferred authored style.
 
+The examples set is currently being consolidated. See [CONSOLIDATION_PLAN.md](./CONSOLIDATION_PLAN.md) for the keep / merge / retire plan that guides this cleanup.
+
 All examples are now grouped by intent, but the run commands stay the same:
 
 ```bash
@@ -56,6 +58,84 @@ AI teaching primitives in one scene.
 
 `cargo run --example screenshot_markers`
 Scene-level screenshot and GIF capture schedules driven by arrays of times.
+
+## Canonical Examples
+
+These are the examples we want to treat as the primary public learning path while the broader set is being compressed.
+
+`cargo run --example primitives_showcase`
+Foundational Murali primitives and rendering smoke test.
+
+`cargo run --example layout_playground`
+Scene composition, anchors, stacks, and layout thinking.
+
+`cargo run --example animation_parity`
+Core motion, visibility, follow hooks, and camera animation.
+
+`cargo run --example semantic_animation_showcase`
+Higher-level animation semantics such as morphing, transform matching, and continuity.
+
+`cargo run --example stem_showcase`
+Core text, math, graphing, and STEM-oriented authoring.
+
+`cargo run --example vector_field_and_streamlines`
+The recommended graph-and-field entrypoint while vector-field examples are consolidated.
+
+`cargo run --example particle_nebula_showcase`
+The recommended dynamics showcase.
+
+`cargo run --example textured_surface_showcase`
+The recommended 3D entrypoint.
+
+`cargo run --example stepwise_showcase`
+The recommended storytelling entrypoint for new work.
+
+`cargo run --example screenshot_markers`
+The recommended export/capture example.
+
+## Advanced Examples
+
+These remain valuable, but are not the first examples we should send new users to.
+
+`cargo run --example styling_showcase`
+Fills, strokes, dashes, and gradients.
+
+`cargo run --example arrow_showcase`
+Arrow variations and directional composition.
+
+`cargo run --example map_projection_morph`
+A richer long-form graphing and projection scene.
+
+`cargo run --example formula_shape_formula_morph --features typst_embedded`
+An advanced morph pipeline spanning formulas and shapes.
+
+`cargo run --example fourier_formula_trace`
+Fourier reconstruction of a sampled formula outline.
+
+`cargo run --example swaying_points`
+Dense updater-driven motion with many reacting points.
+
+`cargo run --example traced_path_rolling_circle`
+Cycloid-style traced-path example.
+
+`cargo run --example blog_showcase`
+Blog-ready composition example.
+
+`cargo run --example murali_logo`
+Branding/logo composition example.
+
+## Legacy / Experimental
+
+These examples remain in the repo for now, but they are not part of the preferred path.
+
+`cargo run --example agentic_flow_chart`
+Legacy `AgenticFlowChart` example. The feature remains available, but new storytelling work should prefer `stepwise_showcase`.
+
+`cargo run --example agentic_flow_with_neural_node`
+Advanced legacy agentic-flow example with embedded neural content.
+
+`cargo run --example manim_sector_fill_demo`
+Parity-style rendering demo kept mainly for comparison and regression value.
 
 ## Basics
 
