@@ -8,7 +8,8 @@ Murali is a Rust-based animation engine for semantic graphics and mathematical s
 - Scene and app docs: [Scene and App](https://muraliengine.com/docs/scene-and-app)
 - Internal architecture: [Architecture Overview](https://muraliengine.com/docs/architecture/overview)
 - Youtube showcase [Murali Youtube Channel](https://www.youtube.com/@muraliengine)
-- Example code snippet [github repo](https://github.com/ravishankarkumar/murali-examples)
+- Reference examples in this repo: [examples/README.md](./examples/README.md)
+- Creative showcase repo: [murali-examples](https://github.com/ravishankarkumar/murali-examples)
 
 
 ## Goals
@@ -25,7 +26,8 @@ Murali is a Rust-based animation engine for semantic graphics and mathematical s
 - `src/backend/` contains the sync boundary, ECS cache, and renderer
 - `src/engine/` contains scene ownership, app lifecycle, timeline stepping, export, and config
 - `docs/` contains the longer-form documentation site
-- `murali-examples/` lives in a dedicated companion repository for runnable example code and showcases
+- `examples/` contains the reference runnable examples for the crate
+- `murali-examples/` lives in a dedicated companion repository for more creative showcases
 
 ## Getting Started
 
@@ -39,22 +41,33 @@ Install from crates.io:
 
 ```toml
 [dependencies]
-murali = "0.1.5"
+murali = "0.1.6"
 anyhow = "1"
 glam = "0.29"
 ```
 
-Browse runnable examples:
+Browse runnable examples from the GitHub repository:
 
 ```bash
-git clone https://github.com/ravishankarkumar/murali-examples
+git clone https://github.com/ravishankarkumar/murali
+cd murali
+cargo run --example hello_shapes
 ```
+
+The published crate excludes `examples/**`, so reference examples are available from the repository rather than from the crates.io package alone.
 
 Some useful places to start:
 
 - [Documentation](https://muraliengine.com/docs/intro)
-- [Example code repository](https://github.com/ravishankarkumar/murali-examples)
+- [Reference examples catalog](./examples/README.md)
+- [Creative showcase repository](https://github.com/ravishankarkumar/murali-examples)
 - [YouTube showcase](https://www.youtube.com/@muraliengine)
+
+## Who It's For
+
+Murali is for people who want authored, programmatic control over mathematical, AI, and explainer-style visuals in Rust.
+
+If you like the kind of mathematical storytelling associated with Manim and want a Rust-native workflow, Murali is built in that spirit.
 
 ## Preview And Export Config
 

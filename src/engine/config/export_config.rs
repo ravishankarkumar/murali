@@ -3,6 +3,7 @@ use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::engine::export::PngCompressionMode;
 use crate::utils::project::find_project_root;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -13,11 +14,12 @@ pub(crate) struct ExportConfig {
     pub height: Option<u32>,
     pub fps: Option<u32>,
     pub duration_seconds: Option<f32>,
-    pub output_dir: Option<PathBuf>,
-    pub basename: Option<String>,
-    pub video_path: Option<PathBuf>,
-    pub gif_path: Option<PathBuf>,
+    #[serde(alias = "output_dir")]
+    pub artifact_dir: Option<PathBuf>,
+    pub video_enabled: Option<bool>,
+    pub preserve_frame_exports: Option<bool>,
     pub clear_color: Option<[f32; 4]>,
+    pub png_compression: Option<PngCompressionMode>,
 }
 
 impl Default for ExportConfig {
@@ -28,11 +30,11 @@ impl Default for ExportConfig {
             height: None,
             fps: None,
             duration_seconds: None,
-            output_dir: None,
-            basename: None,
-            video_path: None,
-            gif_path: None,
+            artifact_dir: None,
+            video_enabled: None,
+            preserve_frame_exports: None,
             clear_color: None,
+            png_compression: None,
         }
     }
 }
@@ -42,7 +44,6 @@ fn default_text_px_per_world_unit() -> f32 {
 }
 
 impl ExportConfig {
-
     #[must_use]
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();

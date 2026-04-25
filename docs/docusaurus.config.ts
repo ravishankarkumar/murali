@@ -36,7 +36,7 @@ const config: Config = {
         docs: {
           sidebarPath: './sidebars.ts',
           editUrl: 'https://github.com/ravishankarkumar/murali/tree/main/docs/',
-          lastVersion: '0.1.5',
+          lastVersion: '0.1.6',
           versions: {
             current: {
               label: 'Next 🚧',
@@ -110,6 +110,7 @@ const config: Config = {
           items: [
             {label: 'Blog', to: '/blog'},
             {label: 'Design Guidelines', to: '/design-guidelines'},
+            {label: 'Kavriq', href: 'https://kavriq.com/'},
             {label: 'GitHub', href: 'https://github.com/ravishankarkumar/murali'},
           ],
         },

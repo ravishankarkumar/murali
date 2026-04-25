@@ -42,6 +42,8 @@ impl Project for Typst {
             height: self.world_height,
             color: self.color,
             offset: glam::Vec3::ZERO,
+            normalize: true,
+            tint: true,
         });
     }
 }

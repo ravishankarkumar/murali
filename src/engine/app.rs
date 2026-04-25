@@ -36,6 +36,7 @@ pub struct App {
     camera_controller: ActiveCameraController,
     is_left_mouse_down: bool,
     last_cursor_position: Option<(f64, f64)>,
+    debug_mode: bool,
 }
 
 impl App {
@@ -54,11 +55,14 @@ impl App {
             camera_controller: ActiveCameraController::Orbit(OrbitCameraController::new(10.0)),
             is_left_mouse_down: false,
             last_cursor_position: None,
+            debug_mode: false,
         })
     }
 
     pub fn run_app(mut self) -> Result<()> {
         let args: Vec<String> = std::env::args().collect();
+        self.debug_mode = args.iter().any(|arg| arg == "--debug");
+
         if should_preview(&args, &self.render_options) {
             print_camera_help();
             let event_loop = EventLoop::new()?;
@@ -68,10 +72,14 @@ impl App {
         }
 
         let scene = self.pending_scene.take().unwrap_or_else(Scene::new);
-        let settings = match self.explicit_export_settings.take() {
+        let mut settings = match self.explicit_export_settings.take() {
             Some(settings) => settings,
             None => ExportSettings::from_project_config(&scene, &self.render_options)?,
         };
+        if args.iter().any(|arg| arg == "--no-video") {
+            settings.video_enabled = false;
+            settings.preserve_frame_exports = false;
+        }
         export_scene(scene, &settings)
     }
 
@@ -162,6 +170,17 @@ impl<'a> ApplicationHandler for App {
                 // Drive the engine
                 engine.update(self.preview_dt);
                 self.preview_frame_count += 1;
+
+                if self.debug_mode {
+                    use std::io::{Write, stdout};
+                    print!(
+                        "\r[DEBUG] Frame: {:>5} | Time: {:>7.3}s | DT: {:>6.2}ms",
+                        self.preview_frame_count,
+                        engine.scene.scene_time,
+                        self.preview_dt * 1000.0
+                    );
+                    let _ = stdout().flush();
+                }
 
                 if let Err(e) = engine.render() {
                     eprintln!("Render error: {:?}", e);

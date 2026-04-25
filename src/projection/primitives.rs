@@ -50,6 +50,8 @@ pub enum RenderPrimitive {
         color: Vec4,
         /// Bottom-left or center anchor position in 3D space.
         offset: Vec3,
+        /// Rotation in radians around Z-axis (for vertical text).
+        rotation: f32,
     },
 
     /// A LaTeX mathematical formula.
@@ -74,12 +76,18 @@ pub enum RenderPrimitive {
     Typst {
         /// Typst source content.
         source: String,
-        /// Vertical scale factor.
+        /// Vertical scale factor (font height or total height depending on normalize).
         height: f32,
-        /// Text color.
+        /// Text color (acts as tint if tint is true).
         color: Vec4,
         /// World position anchor.
         offset: Vec3,
+        /// If true, the height is normalized to match typographic height.
+        /// If false, height is proportional to the Typst font scale.
+        normalize: bool,
+        /// If true, RGB is forced to 255 so the frontend color can tint the glyphs.
+        /// If false, original SVG colors (syntax highlighting) are preserved.
+        tint: bool,
     },
 }
 
@@ -110,11 +118,13 @@ impl RenderPrimitive {
                 height,
                 color,
                 offset: old_offset,
+                rotation,
             } => RenderPrimitive::Text {
                 content,
                 height,
                 color,
                 offset: old_offset + offset,
+                rotation,
             },
             RenderPrimitive::Latex {
                 source,
@@ -132,11 +142,15 @@ impl RenderPrimitive {
                 height,
                 color,
                 offset: old_offset,
+                normalize,
+                tint,
             } => RenderPrimitive::Typst {
                 source,
                 height,
                 color,
                 offset: old_offset + offset,
+                normalize,
+                tint,
             },
         }
     }
@@ -170,11 +184,13 @@ impl RenderPrimitive {
                 height,
                 color,
                 offset,
+                rotation,
             } => RenderPrimitive::Text {
                 content,
                 height,
                 color: f(color),
                 offset,
+                rotation,
             },
             RenderPrimitive::Latex {
                 source,
@@ -192,11 +208,15 @@ impl RenderPrimitive {
                 height,
                 color,
                 offset,
+                normalize,
+                tint,
             } => RenderPrimitive::Typst {
                 source,
                 height,
                 color: f(color),
                 offset,
+                normalize,
+                tint,
             },
         }
     }
@@ -227,11 +247,13 @@ impl RenderPrimitive {
                 height,
                 color,
                 offset,
+                rotation,
             } => RenderPrimitive::Text {
                 content,
                 height: height * scale,
                 color,
                 offset: offset * scale,
+                rotation,
             },
             RenderPrimitive::Latex {
                 source,
@@ -249,11 +271,15 @@ impl RenderPrimitive {
                 height,
                 color,
                 offset,
+                normalize,
+                tint,
             } => RenderPrimitive::Typst {
                 source,
                 height: height * scale,
                 color,
                 offset: offset * scale,
+                normalize,
+                tint,
             },
         }
     }

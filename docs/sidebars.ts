@@ -40,13 +40,12 @@ const sidebars: SidebarsConfig = {
       link: {type: 'doc', id: 'examples/index'},
       items: [
         'examples/showcase',
+        'examples/reference-videos',
         'examples/basics',
         'examples/text_and_math',
         'examples/animation',
         'examples/three_d',
         'examples/graphs_and_fields',
-        'examples/ai_and_storytelling',
-        // 'examples/branding_and_export',
         'examples/dynamics'
       ],
     },

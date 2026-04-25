@@ -80,9 +80,7 @@ pub fn from_hex(s: &str) -> Result<Vec4, String> {
             parse_pair(4)?,
             parse_pair(6)?,
         )),
-        n => Err(format!(
-            "expected 6 or 8 hex digits, got {n} in '{s}'"
-        )),
+        n => Err(format!("expected 6 or 8 hex digits, got {n} in '{s}'")),
     }
 }
 
@@ -240,19 +238,13 @@ pub const PURE_BLUE: Vec4 = hex(0x0000FF);
 /// Uses Euclidean distance in RGB space (ignoring alpha for comparison).
 pub fn closest_palette_color(color: Vec4) -> Vec4 {
     let palette = [
-        WHITE, BLACK,
-        GRAY_A, GRAY_B, GRAY_C, GRAY_D, GRAY_E,
-        BLUE_A, BLUE_B, BLUE_C, BLUE_D, BLUE_E,
-        TEAL_A, TEAL_B, TEAL_C, TEAL_D, TEAL_E,
-        GREEN_A, GREEN_B, GREEN_C, GREEN_D, GREEN_E,
-        YELLOW_A, YELLOW_B, YELLOW_C, YELLOW_D, YELLOW_E,
-        GOLD_A, GOLD_B, GOLD_C, GOLD_D, GOLD_E,
-        ORANGE_A, ORANGE_B, ORANGE_C, ORANGE_D, ORANGE_E,
-        RED_A, RED_B, RED_C, RED_D, RED_E,
-        MAROON_A, MAROON_B, MAROON_C, MAROON_D, MAROON_E,
-        PURPLE_A, PURPLE_B, PURPLE_C, PURPLE_D, PURPLE_E,
-        PINK_A, PINK_B, PINK_C, PINK_D, PINK_E,
-        PURE_RED, PURE_GREEN, PURE_BLUE,
+        WHITE, BLACK, GRAY_A, GRAY_B, GRAY_C, GRAY_D, GRAY_E, BLUE_A, BLUE_B, BLUE_C, BLUE_D,
+        BLUE_E, TEAL_A, TEAL_B, TEAL_C, TEAL_D, TEAL_E, GREEN_A, GREEN_B, GREEN_C, GREEN_D,
+        GREEN_E, YELLOW_A, YELLOW_B, YELLOW_C, YELLOW_D, YELLOW_E, GOLD_A, GOLD_B, GOLD_C, GOLD_D,
+        GOLD_E, ORANGE_A, ORANGE_B, ORANGE_C, ORANGE_D, ORANGE_E, RED_A, RED_B, RED_C, RED_D,
+        RED_E, MAROON_A, MAROON_B, MAROON_C, MAROON_D, MAROON_E, PURPLE_A, PURPLE_B, PURPLE_C,
+        PURPLE_D, PURPLE_E, PINK_A, PINK_B, PINK_C, PINK_D, PINK_E, PURE_RED, PURE_GREEN,
+        PURE_BLUE,
     ];
 
     let mut closest = palette[0];

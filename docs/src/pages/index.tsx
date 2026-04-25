@@ -153,6 +153,11 @@ function HomepageHeader() {
             Murali is a Rust-powered engine for mathematical animation, teaching visuals, and
             timeline-driven scene construction.
           </p>
+          <p className={styles.heroNote}>
+            Developed in part for{' '}
+            <Link href="https://kavriq.com/">Kavriq</Link>, where production use will continue to
+            help shape the path forward for Murali.
+          </p>
           <div className={styles.constructRow} aria-label="Murali building blocks">
             {constructs.map((item) => (
               <span key={item} className={styles.constructChip}>

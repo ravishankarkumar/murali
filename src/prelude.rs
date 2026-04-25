@@ -22,5 +22,5 @@ pub use crate::frontend::collection::primitives::square::Square;
 pub use crate::frontend::layout::{Bounded, Bounds};
 pub use crate::frontend::style::{ColorSource, StrokeParams, Style};
 pub use crate::frontend::{IntoTattva, Tattva};
-pub use crate::positions::{DOWN, LEFT, ORIGIN, RIGHT, UP, CAMERA_DEFAULT_POS};
+pub use crate::positions::{CAMERA_DEFAULT_POS, DOWN, LEFT, ORIGIN, RIGHT, UP};
 pub use glam::{Vec2, Vec3, Vec4, vec2, vec3};

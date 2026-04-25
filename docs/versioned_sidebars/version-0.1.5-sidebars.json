@@ -49,7 +49,6 @@
         "examples/animation",
         "examples/three_d",
         "examples/graphs_and_fields",
-        "examples/ai_and_storytelling",
         "examples/dynamics"
       ]
     },

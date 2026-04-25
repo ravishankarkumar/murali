@@ -138,6 +138,7 @@ impl Project for EquationLayout {
                 height: part.height,
                 color,
                 offset: part.center,
+                rotation: 0.0,
             });
         }
     }

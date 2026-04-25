@@ -25,7 +25,7 @@ App::new()?
 or from the CLI:
 
 ```bash
-cargo run --example animated_motion -- --preview
+cargo run --example basics_showcase -- --preview
 ```
 
 Export is the default behavior if you do not opt into preview:
@@ -39,7 +39,7 @@ App::new()?
 or:
 
 ```bash
-cargo run --example animated_motion -- --export
+cargo run --example basics_showcase -- --export
 ```
 
 Use preview when you are iterating on timing, layout, or camera choices. Use export when you want reproducible assets.

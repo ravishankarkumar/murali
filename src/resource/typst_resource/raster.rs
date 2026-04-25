@@ -19,14 +19,24 @@ pub struct TypstRasterized {
     pub width: u32,
     pub height: u32,
     pub normalized_height_px: f32,
+    pub natural_height_pts: f32,
 }
 
-pub fn rasterize_svg_to_rgba(svg: &str, scale: f32) -> Result<TypstRasterized> {
+pub fn rasterize_svg_to_rgba(
+    svg: &str,
+    scale: f32,
+    max_texture_size: u32,
+    tint: bool,
+) -> Result<TypstRasterized> {
     let opt = usvg::Options::default();
     let tree = resvg::usvg::Tree::from_str(svg, &opt)?;
 
     let svg_size = tree.size();
-    let render_scale = (scale * TYPST_SUPERSAMPLE_FACTOR).max(1.0);
+    let desired_scale = (scale * TYPST_SUPERSAMPLE_FACTOR).max(1.0);
+    let max_tex = max_texture_size as f32;
+    let max_scale_x = max_tex / svg_size.width().max(1.0);
+    let max_scale_y = max_tex / svg_size.height().max(1.0);
+    let render_scale = desired_scale.min(max_scale_x).min(max_scale_y).max(1.0);
 
     let width_px = ((svg_size.width() * render_scale).round() as u32).max(1);
     let height_px = ((svg_size.height() * render_scale).round() as u32).max(1);
@@ -38,13 +48,14 @@ pub fn rasterize_svg_to_rgba(svg: &str, scale: f32) -> Result<TypstRasterized> {
     resvg::render(&tree, transform, &mut pixmap.as_mut());
 
     let (rgba, width, height, normalized_height_px) =
-        normalize_typst_raster(pixmap.take(), width_px, height_px);
+        normalize_typst_raster(pixmap.take(), width_px, height_px, tint);
 
     Ok(TypstRasterized {
         rgba,
         width,
         height,
         normalized_height_px,
+        natural_height_pts: svg_size.height() as f32,
     })
 }
 
@@ -70,12 +81,23 @@ pub fn normalized_world_height_from_metrics(
     requested_height * scale
 }
 
-fn normalize_typst_raster(rgba: Vec<u8>, width: u32, height: u32) -> (Vec<u8>, u32, u32, f32) {
+fn normalize_typst_raster(
+    rgba: Vec<u8>,
+    width: u32,
+    height: u32,
+    tint: bool,
+) -> (Vec<u8>, u32, u32, f32) {
     let (cropped, cropped_w, cropped_h) = crop_transparent_bounds(rgba, width, height);
-    let masked = convert_to_alpha_mask(cropped);
-    let dilated = dilate_alpha_mask(masked, cropped_w, cropped_h, TYPST_DILATION_RADIUS);
-    let normalized_height_px = estimate_typographic_height(&dilated, cropped_w, cropped_h);
-    (dilated, cropped_w, cropped_h, normalized_height_px)
+
+    let final_rgba = if tint {
+        let masked = convert_to_alpha_mask(cropped);
+        dilate_alpha_mask(masked, cropped_w, cropped_h, TYPST_DILATION_RADIUS)
+    } else {
+        cropped
+    };
+
+    let normalized_height_px = estimate_typographic_height(&final_rgba, cropped_w, cropped_h);
+    (final_rgba, cropped_w, cropped_h, normalized_height_px)
 }
 
 fn crop_transparent_bounds(rgba: Vec<u8>, width: u32, height: u32) -> (Vec<u8>, u32, u32) {
@@ -123,9 +145,6 @@ fn convert_to_alpha_mask(mut rgba: Vec<u8>) -> Vec<u8> {
     for px in rgba.chunks_exact_mut(4) {
         let alpha = px[3];
         if alpha == 0 {
-            px[0] = 255;
-            px[1] = 255;
-            px[2] = 255;
             continue;
         }
 
@@ -156,6 +175,7 @@ fn dilate_alpha_mask(mut rgba: Vec<u8>, width: u32, height: u32, radius: u32) ->
     for y in 0..height as i32 {
         for x in 0..width as i32 {
             let mut max_alpha = 0u8;
+            let mut best_rgba = [0u8; 4];
             for dy in -radius..=radius {
                 for dx in -radius..=radius {
                     let nx = x + dx;
@@ -163,8 +183,12 @@ fn dilate_alpha_mask(mut rgba: Vec<u8>, width: u32, height: u32, radius: u32) ->
                     if nx < 0 || ny < 0 || nx >= width as i32 || ny >= height as i32 {
                         continue;
                     }
-                    let idx = ((ny as u32 * width + nx as u32) * 4 + 3) as usize;
-                    max_alpha = max_alpha.max(source[idx]);
+                    let base_idx = ((ny as u32 * width + nx as u32) * 4) as usize;
+                    let alpha = source[base_idx + 3];
+                    if alpha >= max_alpha {
+                        max_alpha = alpha;
+                        best_rgba.copy_from_slice(&source[base_idx..base_idx + 4]);
+                    }
                 }
             }
 

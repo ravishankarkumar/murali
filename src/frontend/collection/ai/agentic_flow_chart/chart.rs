@@ -671,12 +671,14 @@ fn emit_transformed_primitive(
             height,
             color,
             offset,
+            rotation,
         } => {
             ctx.emit(RenderPrimitive::Text {
                 content,
                 height: height * scale,
                 color,
                 offset: transform_vec3(offset, source_center, target_center, scale),
+                rotation,
             });
         }
         RenderPrimitive::Latex {
@@ -697,12 +699,16 @@ fn emit_transformed_primitive(
             height,
             color,
             offset,
+            normalize,
+            tint,
         } => {
             ctx.emit(RenderPrimitive::Typst {
                 source,
                 height: height * scale,
                 color,
                 offset: transform_vec3(offset, source_center, target_center, scale),
+                normalize,
+                tint,
             });
         }
     }

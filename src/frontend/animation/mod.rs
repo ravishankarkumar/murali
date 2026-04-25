@@ -2365,6 +2365,18 @@ impl Animation for WriteText {
             latex.state.char_reveal = 0.0;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+
+        // Try CodeBlock
+        if let Some(cb) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::code_block::CodeBlock>(
+                self.target_id,
+            )
+        {
+            cb.state.char_reveal = 0.0;
+            cb.state.typewriter_mode = true;
+            cb.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
     }
 
@@ -2388,6 +2400,18 @@ impl Animation for WriteText {
             latex.state.char_reveal = eased_t;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+
+        // Try CodeBlock
+        if let Some(cb) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::code_block::CodeBlock>(
+                self.target_id,
+            )
+        {
+            cb.state.char_reveal = eased_t;
+            cb.state.typewriter_mode = true;
+            cb.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
     }
 
@@ -2430,6 +2454,18 @@ impl Animation for WriteText {
             latex.state.char_reveal = 0.0;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+
+        // Try CodeBlock
+        if let Some(cb) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::code_block::CodeBlock>(
+                self.target_id,
+            )
+        {
+            cb.state.char_reveal = 0.0;
+            cb.state.typewriter_mode = true;
+            cb.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
     }
 }
@@ -2488,6 +2524,18 @@ impl Animation for UnwriteText {
             latex.state.char_reveal = 1.0 - eased_t;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+
+        // Try CodeBlock
+        if let Some(cb) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::code_block::CodeBlock>(
+                self.target_id,
+            )
+        {
+            cb.state.char_reveal = 1.0 - eased_t;
+            cb.state.typewriter_mode = true;
+            cb.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
     }
 
@@ -2509,6 +2557,18 @@ impl Animation for UnwriteText {
             latex.state.char_reveal = 0.0;
             latex.state.typewriter_mode = true;
             latex.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
+            return;
+        }
+
+        // Try CodeBlock
+        if let Some(cb) = scene
+            .get_tattva_typed_mut::<crate::frontend::collection::text::code_block::CodeBlock>(
+                self.target_id,
+            )
+        {
+            cb.state.char_reveal = 0.0;
+            cb.state.typewriter_mode = true;
+            cb.mark_dirty(DirtyFlags::GEOMETRY | DirtyFlags::STYLE);
         }
     }
 

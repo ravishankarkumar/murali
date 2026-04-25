@@ -14,9 +14,7 @@ impl ColorSource {
     #[must_use]
     pub fn lerp(&self, other: &Self, t: f32) -> Self {
         match (self, other) {
-            (ColorSource::Solid(v1), ColorSource::Solid(v2)) => {
-                ColorSource::Solid(v1.lerp(*v2, t))
-            }
+            (ColorSource::Solid(v1), ColorSource::Solid(v2)) => ColorSource::Solid(v1.lerp(*v2, t)),
 
             // Fallback for mismatched types (e.g., solid ↔ gradient)
             (_, _) => {

@@ -6,7 +6,6 @@ pub struct RenderOptions {
     pub frames: Option<bool>,
     pub fps: Option<u32>,
     pub resolution: Option<(u32, u32)>,
-    pub output: Option<String>,
 }
 
 impl RenderOptions {
@@ -16,5 +15,9 @@ impl RenderOptions {
 
     pub fn frames_enabled(&self) -> bool {
         self.frames.unwrap_or(true)
+    }
+
+    pub fn preserve_frames_explicitly_requested(&self) -> bool {
+        self.frames == Some(true)
     }
 }

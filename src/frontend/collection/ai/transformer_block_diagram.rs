@@ -75,11 +75,21 @@ impl Project for TransformerBlockDiagram {
                     self.frame_color
                 },
             );
+
+            let label_h = self.block_height * 0.32;
+            let layout = crate::resource::text::layout::measure_label(name, label_h);
+            let final_h = if layout.width > inner_width * 0.92 {
+                label_h * (inner_width * 0.92 / layout.width)
+            } else {
+                label_h
+            };
+
             ctx.emit(RenderPrimitive::Text {
                 content: (*name).to_string(),
-                height: self.block_height * 0.32,
+                height: final_h,
                 color: self.text_color,
                 offset: Vec3::new(0.0, y, 0.0),
+                rotation: 0.0,
             });
             if idx + 1 < names.len() {
                 let next_y = top - (idx + 1) as f32 * (self.block_height + self.gap);
@@ -99,13 +109,15 @@ impl Project for TransformerBlockDiagram {
             content: "Input Tokens".to_string(),
             height: 0.22,
             color: self.text_color,
-            offset: Vec3::new(0.0, top + self.block_height * 0.95, 0.0),
+            offset: Vec3::new(0.0, top + self.block_height * 0.5 + 0.45, 0.0),
+            rotation: 0.0,
         });
         ctx.emit(RenderPrimitive::Text {
             content: "Output States".to_string(),
             height: 0.22,
             color: self.text_color,
-            offset: Vec3::new(0.0, -top - self.block_height * 0.95, 0.0),
+            offset: Vec3::new(0.0, -top - self.block_height * 0.5 - 0.45, 0.0),
+            rotation: 0.0,
         });
     }
 }

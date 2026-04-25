@@ -335,6 +335,7 @@ impl Project for NeuralNetworkDiagram {
                         height: 0.22,
                         color: Vec4::new(0.9, 0.9, 0.9, 1.0),
                         offset: Vec3::new(x, y_offset, 0.0),
+                        rotation: 0.0,
                     });
                 }
             }

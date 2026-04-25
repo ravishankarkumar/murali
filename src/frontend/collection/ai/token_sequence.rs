@@ -73,6 +73,7 @@ impl Project for TokenSequence {
                 height: self.token_height,
                 color: self.text_color,
                 offset: Vec3::new(center_x, 0.0, 0.0),
+                rotation: 0.0,
             });
 
             cursor += size.x + self.gap;

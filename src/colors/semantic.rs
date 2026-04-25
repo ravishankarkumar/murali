@@ -5,8 +5,9 @@
 //!
 //! ```rust
 //! use murali::colors::semantic::*;
+//! use murali::frontend::collection::primitives::circle::Circle;
 //!
-//! let circle = Circle::new().with_color(accent());
+//! let circle = Circle::new(1.0, 48, accent());
 //! ```
 //!
 //! The active theme is set by the `theme` key in `murali.toml`:

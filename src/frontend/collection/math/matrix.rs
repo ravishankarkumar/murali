@@ -203,6 +203,7 @@ impl Project for Matrix {
                 height: self.cell_height * cell.scale,
                 color,
                 offset: cell.center,
+                rotation: 0.0,
             });
         }
 

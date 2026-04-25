@@ -381,6 +381,7 @@ fn project_v1_text(state: &TableState, ctx: &mut ProjectionCtx, text_progress: f
                 height: title.height,
                 color,
                 offset: title.offset,
+                rotation: 0.0,
             });
         }
     }
@@ -399,6 +400,7 @@ fn project_v1_text(state: &TableState, ctx: &mut ProjectionCtx, text_progress: f
             height: entry.height,
             color,
             offset: entry.offset,
+            rotation: 0.0,
         });
     }
 }

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>name</key>
+  <string>Murali Dark</string>
+  <key>settings</key>
+  <array>
+    <dict>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#CBD5E1</string>
+        <key>background</key>
+        <string>#0F172A</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>scope</key>
+      <string>comment, punctuation.definition.comment</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#64748B</string>
+        <key>fontStyle</key>
+        <string>italic</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>scope</key>
+      <string>keyword, storage, storage.type</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#F472B6</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>scope</key>
+      <string>entity.name.function, support.function</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#38BDF8</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>scope</key>
+      <string>string, punctuation.definition.string</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#4ADE80</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>scope</key>
+      <string>constant.numeric, constant.language, constant.character</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#FB923C</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>scope</key>
+      <string>variable.parameter, variable.language, variable.other</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#E2E8F0</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>scope</key>
+      <string>entity.name.tag, support.type, entity.name.type</string>
+      <key>settings</key>
+      <dict>
+        <key>foreground</key>
+        <string>#818CF8</string>
+      </dict>
+    </dict>
+  </array>
+</dict>
+</plist>

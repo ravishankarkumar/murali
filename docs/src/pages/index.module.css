@@ -196,12 +196,31 @@
   animation: fadeIn 0.8s ease-out 0.2s both;
 }
 
+.heroNote {
+  color: var(--home-subtle);
+  font-size: 0.98rem;
+  line-height: 1.8;
+  margin: -0.6rem 0 1.8rem;
+  max-width: 58ch;
+  animation: fadeIn 0.8s ease-out 0.24s both;
+}
+
+.heroNote a {
+  color: var(--home-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.heroNote a:hover {
+  text-decoration: underline;
+}
+
 .constructRow {
   display: flex;
   flex-wrap: wrap;
   gap: 0.7rem;
   margin: 0 0 2.4rem;
-  animation: fadeIn 0.8s ease-out 0.24s both;
+  animation: fadeIn 0.8s ease-out 0.28s both;
 }
 
 .constructChip {
@@ -227,7 +246,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 1.25rem;
-  animation: fadeIn 0.8s ease-out 0.3s both;
+  animation: fadeIn 0.8s ease-out 0.34s both;
 }
 
 .heroActions .button--primary {

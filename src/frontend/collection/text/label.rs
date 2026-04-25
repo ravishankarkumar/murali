@@ -79,6 +79,7 @@ impl Label {
                 height: self.world_height,
                 color,
                 offset: glam::Vec3::new(offset_x, 0.0, 0.0),
+                rotation: 0.0,
             });
         } else {
             ctx.emit(RenderPrimitive::Text {
@@ -86,6 +87,7 @@ impl Label {
                 height: self.world_height,
                 color,
                 offset: glam::Vec3::ZERO,
+                rotation: 0.0,
             });
         }
     }

@@ -154,8 +154,9 @@ impl SyncBoundary {
                     height,
                     color,
                     offset,
+                    rotation,
                 } => self
-                    .build_label_instance(device, renderer, &content, height, color, offset)
+                    .build_label_instance(device, renderer, &content, height, color, offset, rotation)
                     .map(|mesh_instance| {
                         world.spawn((
                             MeshComponent(Arc::new(mesh_instance)),
@@ -180,8 +181,12 @@ impl SyncBoundary {
                     height,
                     color,
                     offset,
+                    normalize,
+                    tint,
                 } => self
-                    .build_typst_instance(device, renderer, &source, height, color, offset)
+                    .build_typst_instance(
+                        device, renderer, &source, height, color, offset, normalize, tint,
+                    )
                     .map(|mesh_instance| {
                         world.spawn((
                             MeshComponent(Arc::new(mesh_instance)),
@@ -206,6 +211,7 @@ impl SyncBoundary {
         height: f32,
         color: glam::Vec4,
         offset: glam::Vec3,
+        rotation: f32,
     ) -> Option<MeshInstance> {
         if self.label_resources.is_none() {
             self.label_resources = Some(LabelResources::new());
@@ -226,7 +232,12 @@ impl SyncBoundary {
 
         let layout = layout_label(&resources.font, content, height);
         let mesh = build_label_mesh(&layout, &resources.atlas, color);
-        let mesh = translate_mesh(mesh.as_ref(), offset);
+        let mesh = if rotation != 0.0 {
+            rotate_mesh(mesh.as_ref(), rotation)
+        } else {
+            mesh.as_ref().clone()
+        };
+        let mesh = translate_mesh(&mesh, offset);
         upload_mesh(device, renderer, &mesh, self.text_bind_group.clone())
     }
 
@@ -281,8 +292,10 @@ impl SyncBoundary {
         height: f32,
         color: glam::Vec4,
         offset: glam::Vec3,
+        normalize: bool,
+        tint: bool,
     ) -> Option<MeshInstance> {
-        let cache_key = format!("{height:.4}::{source}");
+        let cache_key = format!("{height:.4}::{tint}::{source}");
         let raster = if let Some(existing) = self.typst_cache.get(&cache_key) {
             existing
         } else {
@@ -314,7 +327,12 @@ impl SyncBoundary {
             let scale =
                 ((renderer.device_mgr.config.borrow().height as f32) / 4.0 / height.max(0.1))
                     .clamp(1.0, 8.0);
-            let rasterized = match rasterize_svg_to_rgba(&svg, scale) {
+            let rasterized = match rasterize_svg_to_rgba(
+                &svg,
+                scale,
+                renderer.device_mgr.max_texture_size(),
+                tint,
+            ) {
                 Ok(result) => result,
                 Err(error) => {
                     self.report_once(
@@ -332,6 +350,7 @@ impl SyncBoundary {
                     width: rasterized.width,
                     height: rasterized.height,
                     normalized_height_px: rasterized.normalized_height_px,
+                    natural_height_pts: rasterized.natural_height_pts,
                     svg: Some(svg),
                 },
             );
@@ -340,8 +359,17 @@ impl SyncBoundary {
 
         let bind_group =
             renderer.create_text_bind_group_from_raster(&raster.rgba, raster.width, raster.height);
-        let world_height =
-            normalized_typst_world_height(height, raster.height, raster.normalized_height_px);
+        
+        let world_height = if normalize {
+            normalized_typst_world_height(height, raster.height, raster.normalized_height_px)
+        } else {
+            // For block-like Typst content such as CodeBlock, the caller's
+            // requested height should be treated as authoritative. Using the
+            // raster's natural page height here causes the rendered quad to
+            // drift away from the frontend's measured layout box.
+            height
+        };
+
         let mesh = build_textured_quad(raster.width, raster.height, world_height, color);
         let mesh = translate_mesh(mesh.as_ref(), offset);
         upload_mesh(device, renderer, &mesh, Some(Arc::new(bind_group)))
@@ -461,6 +489,67 @@ fn translate_mesh(mesh: &crate::projection::Mesh, offset: glam::Vec3) -> crate::
                 .collect();
             crate::projection::Mesh {
                 data: MeshData::Text(translated),
+                indices: mesh.indices.clone(),
+                texture: mesh.texture.clone(),
+            }
+        }
+    }
+}
+fn rotate_mesh(mesh: &crate::projection::Mesh, angle: f32) -> crate::projection::Mesh {
+    let cos = angle.cos();
+    let sin = angle.sin();
+    match &mesh.data {
+        MeshData::Empty => mesh.clone(),
+        MeshData::Mesh(vertices) => {
+            let rotated = vertices
+                .iter()
+                .map(|v| {
+                    let mut v = *v;
+                    let x = v.position[0];
+                    let y = v.position[1];
+                    v.position[0] = x * cos - y * sin;
+                    v.position[1] = x * sin + y * cos;
+                    v
+                })
+                .collect();
+            crate::projection::Mesh {
+                data: MeshData::Mesh(rotated),
+                indices: mesh.indices.clone(),
+                texture: mesh.texture.clone(),
+            }
+        }
+        MeshData::Textured(vertices) => {
+            let rotated = vertices
+                .iter()
+                .map(|v| {
+                    let mut v = *v;
+                    let x = v.position[0];
+                    let y = v.position[1];
+                    v.position[0] = x * cos - y * sin;
+                    v.position[1] = x * sin + y * cos;
+                    v
+                })
+                .collect();
+            crate::projection::Mesh {
+                data: MeshData::Textured(rotated),
+                indices: mesh.indices.clone(),
+                texture: mesh.texture.clone(),
+            }
+        }
+        MeshData::Text(vertices) => {
+            let rotated = vertices
+                .iter()
+                .map(|v| {
+                    let mut v = *v;
+                    let x = v.position[0];
+                    let y = v.position[1];
+                    v.position[0] = x * cos - y * sin;
+                    v.position[1] = x * sin + y * cos;
+                    v
+                })
+                .collect();
+            crate::projection::Mesh {
+                data: MeshData::Text(rotated),
                 indices: mesh.indices.clone(),
                 texture: mesh.texture.clone(),
             }

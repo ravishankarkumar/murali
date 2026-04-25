@@ -18,33 +18,57 @@ use crate::engine::scene::Scene;
 use crate::frontend::theme::Theme;
 use crate::utils::project::find_project_root;
 
+#[derive(Debug, Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum PngCompressionMode {
+    Fast,
+    Balanced,
+    Smallest,
+}
+
+impl Default for PngCompressionMode {
+    fn default() -> Self {
+        Self::Balanced
+    }
+}
+
+impl PngCompressionMode {
+    fn encoder_settings(self) -> (CompressionType, FilterType) {
+        match self {
+            Self::Fast => (CompressionType::Fast, FilterType::NoFilter),
+            Self::Balanced => (CompressionType::Default, FilterType::Adaptive),
+            Self::Smallest => (CompressionType::Best, FilterType::Adaptive),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ExportSettings {
     pub width: u32,
     pub height: u32,
     pub fps: u32,
     pub duration_seconds: f32,
-    pub output_dir: PathBuf,
-    pub basename: String,
-    pub video_path: Option<PathBuf>,
-    pub gif_path: Option<PathBuf>,
-    pub capture_gif_dir: Option<PathBuf>,
+    pub artifact_dir: PathBuf,
+    pub video_enabled: bool,
+    pub preserve_frame_exports: bool,
     pub clear_color: Vec4,
+    pub png_compression: PngCompressionMode,
 }
 
 impl Default for ExportSettings {
     fn default() -> Self {
+        let stem = infer_default_export_stem();
+        let artifact_dir = default_artifact_dir(&stem);
         Self {
             width: 1920,
             height: 1080,
             fps: 60,
             duration_seconds: 1.0,
-            output_dir: PathBuf::from("render_output/frames"),
-            basename: "frame".to_string(),
-            video_path: Some(PathBuf::from("render_output/output.mp4")),
-            gif_path: None,
-            capture_gif_dir: None,
+            artifact_dir,
+            video_enabled: true,
+            preserve_frame_exports: false,
             clear_color: Vec4::new(0.05, 0.10, 0.15, 1.0),
+            png_compression: PngCompressionMode::default(),
         }
     }
 }
@@ -78,11 +102,8 @@ impl ExportSettings {
             .unwrap_or(settings.height);
         settings.fps = options.fps.or(cfg.fps).unwrap_or(settings.fps);
         settings.duration_seconds = cfg.duration_seconds.unwrap_or(settings.duration_seconds);
-        if let Some(output_dir) = cfg.output_dir {
-            settings.output_dir = resolve_project_relative_path(&project_root, output_dir);
-        }
-        if let Some(basename) = cfg.basename {
-            settings.basename = basename;
+        if let Some(artifact_dir) = cfg.artifact_dir {
+            settings.artifact_dir = resolve_config_artifact_dir(&project_root, artifact_dir);
         }
         if let Some(clear_color) = cfg.clear_color {
             settings.clear_color = Vec4::new(
@@ -92,27 +113,14 @@ impl ExportSettings {
                 clear_color[3],
             );
         }
-
-        settings.video_path = if options.video_enabled() {
-            resolve_video_output_path(
-                &project_root,
-                options
-                    .output
-                    .as_ref()
-                    .map(PathBuf::from)
-                    .or_else(|| cfg.video_path.map(|path| resolve_project_relative_path(&project_root, path))),
-            )
-        } else {
-            None
-        };
-
-        settings.gif_path = cfg
-            .gif_path
-            .map(|path| resolve_project_relative_path(&project_root, path));
-        if !options.frames_enabled() {
-            settings.output_dir =
-                resolve_project_relative_path(&project_root, PathBuf::from("render_output/frames"));
+        if let Some(png_compression) = cfg.png_compression {
+            settings.png_compression = png_compression;
         }
+        settings.preserve_frame_exports = options.preserve_frames_explicitly_requested();
+        if let Some(preserve_frame_exports) = cfg.preserve_frame_exports {
+            settings.preserve_frame_exports = preserve_frame_exports;
+        }
+        settings.video_enabled = cfg.video_enabled.unwrap_or_else(|| options.video_enabled());
 
         Ok(settings)
     }
@@ -125,30 +133,54 @@ impl ExportSettings {
         1.0 / self.fps.max(1) as f32
     }
 
+    pub fn export_stem(&self) -> String {
+        self.resolved_artifact_dir()
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(sanitize_stem)
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(infer_default_export_stem)
+    }
+
+    pub fn resolved_artifact_dir(&self) -> PathBuf {
+        if self.artifact_dir.is_absolute() || starts_with_rendered_output(&self.artifact_dir) {
+            self.artifact_dir.clone()
+        } else {
+            PathBuf::from("rendered_output").join(&self.artifact_dir)
+        }
+    }
+
+    pub fn frame_dir(&self) -> PathBuf {
+        self.resolved_artifact_dir().join("frames")
+    }
+
+    pub fn gif_dir(&self) -> PathBuf {
+        self.resolved_artifact_dir().join("gifs")
+    }
+
+    pub fn video_path(&self) -> PathBuf {
+        default_video_path(&self.resolved_artifact_dir(), &self.export_stem())
+    }
+
     pub fn frame_path(&self, index: u32) -> PathBuf {
-        self.output_dir
-            .join(format!("{}_{index:05}.png", self.basename))
+        self.frame_dir()
+            .join(format!("{}_{index:05}.png", self.export_stem()))
     }
 }
 
-fn resolve_video_output_path(project_root: &Path, path: Option<PathBuf>) -> Option<PathBuf> {
-    let path = path.unwrap_or_else(|| PathBuf::from("render_output/output.mp4"));
-    if looks_like_directory_path(&path) {
-        let stem = infer_default_export_stem();
-        return Some(resolve_project_relative_path(project_root, path).join(format!("{stem}.mp4")));
-    }
-
-    Some(resolve_project_relative_path(project_root, path))
+fn default_artifact_dir(stem: &str) -> PathBuf {
+    PathBuf::from("rendered_output").join(stem)
 }
 
-fn looks_like_directory_path(path: &Path) -> bool {
-    if path.as_os_str().is_empty() {
-        return true;
-    }
-    if path.exists() {
-        return path.is_dir();
-    }
-    path.extension().is_none()
+fn default_video_path(artifact_dir: &Path, stem: &str) -> PathBuf {
+    artifact_dir.join(format!("{stem}.mp4"))
+}
+
+fn starts_with_rendered_output(path: &Path) -> bool {
+    path.components()
+        .next()
+        .and_then(|component| component.as_os_str().to_str())
+        == Some("rendered_output")
 }
 
 fn infer_default_export_stem() -> String {
@@ -186,42 +218,48 @@ fn sanitize_stem(stem: &str) -> String {
     }
 }
 
-fn resolve_project_relative_path(project_root: &Path, path: PathBuf) -> PathBuf {
+fn resolve_config_artifact_dir(project_root: &Path, path: PathBuf) -> PathBuf {
     if path.is_absolute() {
-        path
-    } else {
+        return path;
+    }
+    if starts_with_rendered_output(&path) {
         project_root.join(path)
+    } else {
+        project_root.join("rendered_output").join(path)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_project_relative_path, resolve_video_output_path};
+    use super::{ExportSettings, resolve_config_artifact_dir};
     use std::path::{Path, PathBuf};
 
     #[test]
-    fn project_relative_paths_are_rebased_to_project_root() {
-        let project_root = Path::new("/tmp/murali-project");
-        let resolved =
-            resolve_project_relative_path(project_root, PathBuf::from("render_output/out.mp4"));
-        assert_eq!(resolved, project_root.join("render_output/out.mp4"));
+    fn export_stem_defaults_to_artifact_dir_name() {
+        let settings = ExportSettings {
+            artifact_dir: PathBuf::from("demo"),
+            ..ExportSettings::default()
+        };
+        assert_eq!(settings.export_stem(), "demo");
     }
 
     #[test]
-    fn absolute_paths_are_preserved() {
-        let project_root = Path::new("/tmp/murali-project");
-        let absolute = PathBuf::from("/var/tmp/out.mp4");
-        let resolved = resolve_project_relative_path(project_root, absolute.clone());
-        assert_eq!(resolved, absolute);
+    fn relative_artifact_dir_is_nested_under_rendered_output() {
+        let settings = ExportSettings {
+            artifact_dir: PathBuf::from("demo"),
+            ..ExportSettings::default()
+        };
+        assert_eq!(
+            settings.resolved_artifact_dir(),
+            PathBuf::from("rendered_output/demo")
+        );
     }
 
     #[test]
-    fn video_directory_paths_are_rebased_before_stem_is_added() {
+    fn config_artifact_dir_is_nested_under_project_rendered_output() {
         let project_root = Path::new("/tmp/murali-project");
-        let resolved = resolve_video_output_path(project_root, Some(PathBuf::from("exports")))
-            .expect("video output path should exist");
-        assert!(resolved.starts_with(project_root.join("exports")));
-        assert_eq!(resolved.extension().and_then(|ext| ext.to_str()), Some("mp4"));
+        let resolved = resolve_config_artifact_dir(project_root, PathBuf::from("demo"));
+        assert_eq!(resolved, project_root.join("rendered_output/demo"));
     }
 }
 
@@ -235,8 +273,11 @@ pub fn infer_duration(scene: &Scene) -> f32 {
 }
 
 pub fn export_scene(scene: Scene, settings: &ExportSettings) -> Result<()> {
-    fs::create_dir_all(&settings.output_dir)?;
-    clear_existing_frame_outputs(settings)?;
+    fs::create_dir_all(settings.resolved_artifact_dir())?;
+    if settings.video_enabled {
+        fs::create_dir_all(settings.frame_dir())?;
+        clear_existing_frame_outputs(settings)?;
+    }
     let mut marker_gif_state = MarkerGifState::from_settings(settings, &scene)?;
 
     let mut engine = pollster::block_on(Engine::new_headless_with_scene(
@@ -298,18 +339,24 @@ pub fn export_scene(scene: Scene, settings: &ExportSettings) -> Result<()> {
                 )
             })?;
 
-        let save_start = Instant::now();
-        save_png_fast(&image, &settings.frame_path(next_frame))
+        if settings.video_enabled {
+            let save_start = Instant::now();
+            save_png_fast(
+                &image,
+                &settings.frame_path(next_frame),
+                settings.png_compression,
+            )
             .with_context(|| format!("Failed to save export frame {}", next_frame))?;
-        if next_frame == 0 {
-            eprintln!(
-                "Export frame 1: png save finished in {:.2?}",
-                save_start.elapsed()
-            );
-            eprintln!(
-                "Export frame 1: total frame time {:.2?}",
-                frame_start.elapsed()
-            );
+            if next_frame == 0 {
+                eprintln!(
+                    "Export frame 1: png save finished in {:.2?}",
+                    save_start.elapsed()
+                );
+                eprintln!(
+                    "Export frame 1: total frame time {:.2?}",
+                    frame_start.elapsed()
+                );
+            }
         }
 
         if next_frame == 0 || next_frame + 1 == settings.total_frames() || next_frame % 10 == 0 {
@@ -321,15 +368,18 @@ pub fn export_scene(scene: Scene, settings: &ExportSettings) -> Result<()> {
         }
     }
 
-    if let Some(video_path) = &settings.video_path {
-        assemble_video(settings, video_path)?;
-    }
-
-    if let Some(gif_path) = &settings.gif_path {
-        assemble_gif(settings, gif_path)?;
+    let mut video_assembled = false;
+    if settings.video_enabled {
+        assemble_video(settings, &settings.video_path())?;
+        video_assembled = true;
     }
 
     marker_gif_state.assemble_all(settings)?;
+
+    if video_assembled && !settings.preserve_frame_exports {
+        remove_main_frame_outputs(settings)?;
+        marker_gif_state.cleanup_temp_frames()?;
+    }
 
     Ok(())
 }
@@ -338,7 +388,7 @@ fn assemble_video(settings: &ExportSettings, video_path: &Path) -> Result<()> {
     if !ffmpeg_available() {
         return Err(anyhow::anyhow!(
             "ffmpeg not found in PATH; PNG frames were exported to {}",
-            settings.output_dir.display()
+            settings.frame_dir().display()
         ));
     }
 
@@ -347,8 +397,8 @@ fn assemble_video(settings: &ExportSettings, video_path: &Path) -> Result<()> {
     }
 
     let pattern = settings
-        .output_dir
-        .join(format!("{}_%05d.png", settings.basename));
+        .frame_dir()
+        .join(format!("{}_%05d.png", settings.export_stem()));
 
     let status = Command::new("ffmpeg")
         .arg("-y")
@@ -365,49 +415,7 @@ fn assemble_video(settings: &ExportSettings, video_path: &Path) -> Result<()> {
     if !status.success() {
         return Err(anyhow::anyhow!(
             "ffmpeg exited with status {status}; frames remain in {}",
-            settings.output_dir.display()
-        ));
-    }
-
-    Ok(())
-}
-
-fn assemble_gif(settings: &ExportSettings, gif_path: &Path) -> Result<()> {
-    if !ffmpeg_available() {
-        return Err(anyhow::anyhow!(
-            "ffmpeg not found in PATH; PNG frames were exported to {}",
-            settings.output_dir.display()
-        ));
-    }
-
-    if let Some(parent) = gif_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    let pattern = settings
-        .output_dir
-        .join(format!("{}_%05d.png", settings.basename));
-
-    // High quality GIF generation using palettegen/paletteuse
-    let filter = format!(
-        "fps={},scale={}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
-        settings.fps, settings.width
-    );
-
-    let status = Command::new("ffmpeg")
-        .arg("-y")
-        .arg("-i")
-        .arg(pattern)
-        .arg("-vf")
-        .arg(filter)
-        .arg(gif_path)
-        .status()
-        .context("Failed to spawn ffmpeg for GIF assembly")?;
-
-    if !status.success() {
-        return Err(anyhow::anyhow!(
-            "ffmpeg exited with status {status}; frames remain in {}",
-            settings.output_dir.display()
+            settings.frame_dir().display()
         ));
     }
 
@@ -423,8 +431,9 @@ fn ffmpeg_available() -> bool {
 }
 
 fn clear_existing_frame_outputs(settings: &ExportSettings) -> Result<()> {
-    if settings.output_dir.exists() {
-        for entry in fs::read_dir(&settings.output_dir)? {
+    let frame_dir = settings.frame_dir();
+    if frame_dir.exists() {
+        for entry in fs::read_dir(&frame_dir)? {
             let entry = entry?;
             let path = entry.path();
             if !path.is_file() {
@@ -433,12 +442,21 @@ fn clear_existing_frame_outputs(settings: &ExportSettings) -> Result<()> {
             let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
                 continue;
             };
-            if name.starts_with(&format!("{}_", settings.basename)) && name.ends_with(".png") {
+            if name.starts_with(&format!("{}_", settings.export_stem())) && name.ends_with(".png") {
                 fs::remove_file(path)?;
             }
         }
     }
 
+    Ok(())
+}
+
+fn remove_main_frame_outputs(settings: &ExportSettings) -> Result<()> {
+    clear_existing_frame_outputs(settings)?;
+    let frame_dir = settings.frame_dir();
+    if frame_dir.exists() && fs::read_dir(&frame_dir)?.next().is_none() {
+        fs::remove_dir(&frame_dir)?;
+    }
     Ok(())
 }
 
@@ -455,7 +473,7 @@ fn save_requested_screenshots(
 
 #[derive(Debug, Default)]
 struct MarkerGifState {
-    output_dir: Option<PathBuf>,
+    gif_dir: Option<PathBuf>,
     frame_counts: HashMap<String, usize>,
     screenshot_count: usize,
     scene_screenshot_indices: Vec<usize>,
@@ -476,23 +494,24 @@ impl MarkerGifState {
             }
         }
 
-        let Some(output_dir) = settings.capture_gif_dir.clone() else {
+        if scene.gif_captures.is_empty() {
             return Ok(Self {
-                output_dir: None,
+                gif_dir: None,
                 frame_counts: HashMap::new(),
                 screenshot_count: 0,
                 scene_screenshot_indices: vec![0; scene.screenshot_captures.len()],
                 scene_gif_indices: vec![0; scene.gif_captures.len()],
             });
-        };
-        fs::create_dir_all(&output_dir)?;
-        let frames_root = marker_gif_frames_root(&output_dir);
+        }
+        let gif_dir = settings.gif_dir();
+        fs::create_dir_all(&gif_dir)?;
+        let frames_root = marker_gif_frames_root(&gif_dir);
         if frames_root.exists() {
             fs::remove_dir_all(&frames_root)?;
         }
         fs::create_dir_all(&frames_root)?;
         Ok(Self {
-            output_dir: Some(output_dir),
+            gif_dir: Some(gif_dir),
             frame_counts: HashMap::new(),
             screenshot_count: 0,
             scene_screenshot_indices: vec![0; scene.screenshot_captures.len()],
@@ -522,7 +541,7 @@ impl MarkerGifState {
                 if let Some(parent) = path.parent() {
                     fs::create_dir_all(parent)?;
                 }
-                save_png_fast(image, &path)?;
+                save_png_fast(image, &path, settings.png_compression)?;
                 self.scene_screenshot_indices[capture_idx] += 1;
             }
         }
@@ -545,20 +564,20 @@ impl MarkerGifState {
         settings: &ExportSettings,
         groups: &[String],
     ) -> Result<()> {
-        let Some(output_dir) = self.output_dir.as_ref() else {
+        let Some(gif_dir) = self.gif_dir.as_ref() else {
             return Ok(());
         };
 
         for group in groups {
             let group_key = sanitize_stem(group);
             let next_index = self.frame_counts.entry(group_key.clone()).or_insert(0);
-            let frame_path = marker_gif_frames_root(output_dir)
+            let frame_path = marker_gif_frames_root(gif_dir)
                 .join(&group_key)
                 .join(format!("{group_key}_{:05}.png", *next_index));
             if let Some(parent) = frame_path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            save_png_fast(image, &frame_path)?;
+            save_png_fast(image, &frame_path, settings.png_compression)?;
             *next_index += 1;
         }
 
@@ -567,7 +586,7 @@ impl MarkerGifState {
     }
 
     fn assemble_all(&self, settings: &ExportSettings) -> Result<()> {
-        let Some(output_dir) = self.output_dir.as_ref() else {
+        let Some(gif_dir) = self.gif_dir.as_ref() else {
             return Ok(());
         };
         if self.frame_counts.is_empty() {
@@ -576,7 +595,7 @@ impl MarkerGifState {
         if !ffmpeg_available() {
             return Err(anyhow::anyhow!(
                 "ffmpeg not found in PATH; marker GIF frames were exported to {}",
-                marker_gif_frames_root(output_dir).display()
+                marker_gif_frames_root(gif_dir).display()
             ));
         }
 
@@ -584,8 +603,19 @@ impl MarkerGifState {
             if *frame_count == 0 {
                 continue;
             }
-            let gif_path = output_dir.join(format!("{group}.gif"));
-            assemble_marker_gif(settings, output_dir, group, &gif_path)?;
+            let gif_path = gif_dir.join(format!("{group}.gif"));
+            assemble_marker_gif(settings, gif_dir, group, &gif_path)?;
+        }
+        Ok(())
+    }
+
+    fn cleanup_temp_frames(&self) -> Result<()> {
+        let Some(gif_dir) = self.gif_dir.as_ref() else {
+            return Ok(());
+        };
+        let frames_root = marker_gif_frames_root(gif_dir);
+        if frames_root.exists() {
+            fs::remove_dir_all(frames_root)?;
         }
         Ok(())
     }
@@ -599,7 +629,7 @@ impl MarkerGifState {
             Some(path) => resolve_screenshot_path(settings, path),
             None => {
                 let path = settings
-                    .output_dir
+                    .resolved_artifact_dir()
                     .join("captures")
                     .join(format!("capture_{:05}.png", self.screenshot_count));
                 self.screenshot_count += 1;
@@ -655,18 +685,23 @@ fn resolve_screenshot_path(settings: &ExportSettings, requested: &Path) -> PathB
     if requested.is_absolute() {
         requested.to_path_buf()
     } else {
-        settings.output_dir.join(requested)
+        settings.resolved_artifact_dir().join(requested)
     }
 }
 
-fn save_png_fast(image: &image::RgbaImage, path: &Path) -> Result<()> {
+fn save_png_fast(
+    image: &image::RgbaImage,
+    path: &Path,
+    png_compression: PngCompressionMode,
+) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
 
     let file = fs::File::create(path)?;
     let writer = BufWriter::new(file);
-    let encoder = PngEncoder::new_with_quality(writer, CompressionType::Fast, FilterType::NoFilter);
+    let (compression, filter) = png_compression.encoder_settings();
+    let encoder = PngEncoder::new_with_quality(writer, compression, filter);
     encoder.write_image(
         image.as_raw(),
         image.width(),

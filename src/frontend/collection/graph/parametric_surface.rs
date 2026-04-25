@@ -48,6 +48,10 @@ pub struct ParametricSurface {
     pub color_fn: Option<Arc<dyn Fn(f32) -> Vec4 + Send + Sync>>,
     /// Optional image texture mapped from the (u, v) parameter domain.
     pub texture: Option<Arc<TextureImage>>,
+    /// Optional horizontal flip for textured surfaces.
+    pub texture_flip_x: bool,
+    /// Optional vertical flip for textured surfaces.
+    pub texture_flip_y: bool,
 }
 
 impl ParametricSurface {
@@ -67,6 +71,8 @@ impl ParametricSurface {
             render_mode: SurfaceRenderMode::Solid,
             color_fn: None,
             texture: None,
+            texture_flip_x: false,
+            texture_flip_y: false,
         }
     }
 
@@ -107,6 +113,16 @@ impl ParametricSurface {
         Ok(self)
     }
 
+    pub fn with_texture_flip_x(mut self, flip: bool) -> Self {
+        self.texture_flip_x = flip;
+        self
+    }
+
+    pub fn with_texture_flip_y(mut self, flip: bool) -> Self {
+        self.texture_flip_y = flip;
+        self
+    }
+
     /// Generate mesh vertices and indices for the surface
     fn generate_mesh(&self) -> (Vec<MeshVertex>, Vec<u16>) {
         let mut vertices = Vec::new();
@@ -130,10 +146,11 @@ impl ParametricSurface {
                 let u = self.u_range.0 + i as f32 * u_step;
                 let v = self.v_range.0 + j as f32 * v_step;
                 let pos = (self.f)(u, v);
+                let color = self.get_color_for_point(pos);
 
                 vertices.push(MeshVertex {
                     position: [pos.x, pos.y, pos.z],
-                    color: [self.color.x, self.color.y, self.color.z, self.color.w],
+                    color: [color.x, color.y, color.z, color.w],
                 });
             }
         }
@@ -190,9 +207,17 @@ impl ParametricSurface {
                 let u = self.u_range.0 + i as f32 * u_step;
                 let v = self.v_range.0 + j as f32 * v_step;
                 let pos = (self.f)(u, v);
+                let mut uv_x = v_progress;
+                let mut uv_y = 1.0 - u_progress;
+                if self.texture_flip_x {
+                    uv_x = 1.0 - uv_x;
+                }
+                if self.texture_flip_y {
+                    uv_y = 1.0 - uv_y;
+                }
                 vertices.push(TextVertex {
                     position: [pos.x, pos.y, pos.z],
-                    uv: [v_progress, 1.0 - u_progress],
+                    uv: [uv_x, uv_y],
                     color: [self.color.x, self.color.y, self.color.z, self.color.w],
                 });
             }
@@ -319,8 +344,8 @@ impl ParametricSurface {
     /// Get color for a point based on color function or default color
     fn get_color_for_point(&self, point: Vec3) -> Vec4 {
         if let Some(color_fn) = &self.color_fn {
-            // Use height (z-coordinate) as the parameter for color mapping
-            color_fn(point.z)
+            // For surfaces, "height" is vertical displacement from the xz plane.
+            color_fn(point.y)
         } else {
             self.color
         }
